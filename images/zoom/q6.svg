@@ -1,0 +1,35 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q6 Zoom: Classical Acoustic Guitar (zoomOrigin: 50% 48%) -->
+  <rect width="640" height="420" fill="#172554"/>
+  <!-- Guitar Neck extending left -->
+  <rect x="0" y="176" width="248" height="68" fill="#451a03" stroke="#291206" stroke-width="4"/>
+  <!-- Frets -->
+  <g stroke="#cbd5e1" stroke-width="3">
+    <line x1="44" y1="178" x2="44" y2="242"/>
+    <line x1="94" y1="178" x2="94" y2="242"/>
+    <line x1="144" y1="178" x2="144" y2="242"/>
+    <line x1="194" y1="178" x2="194" y2="242"/>
+  </g>
+  <!-- Guitar Wooden Body (Horizontal) -->
+  <path d="M210,126 C265,68 352,92 376,126 C408,92 528,62 586,136 C618,178 618,242 586,284 C528,358 408,328 376,294 C352,328 265,352 210,294 C180,260 180,160 210,126 Z" fill="#d97706" stroke="#78350f" stroke-width="8"/>
+  <!-- Inner Wood Highlight -->
+  <path d="M224,138 C272,88 348,108 372,138 C402,108 514,82 566,146 C594,180 594,240 566,274 C514,338 402,312 372,282 C348,312 272,332 224,282 C198,254 198,166 224,138 Z" fill="#f59e0b"/>
+  <!-- Pickguard -->
+  <path d="M312,272 C345,274 378,298 362,318 C340,334 294,316 312,272 Z" fill="#451a03"/>
+  <!-- Ornate Soundhole Rosette centered at (326, 210) = 51% 50% -->
+  <circle cx="326" cy="210" r="64" fill="none" stroke="#fef3c7" stroke-width="6"/>
+  <circle cx="326" cy="210" r="56" fill="none" stroke="#78350f" stroke-width="5" stroke-dasharray="6 4"/>
+  <circle cx="326" cy="210" r="48" fill="#1c0a02"/>
+  <!-- Bridge on right -->
+  <rect x="462" y="152" width="32" height="116" rx="6" fill="#451a03" stroke="#291206" stroke-width="3"/>
+  <rect x="470" y="162" width="6" height="96" rx="2" fill="#f8fafc"/>
+  <!-- 6 Metallic Guitar Strings running across soundhole -->
+  <g stroke="#e2e8f0" stroke-linecap="round">
+    <line x1="0" y1="185" x2="474" y2="180" stroke-width="2.5"/>
+    <line x1="0" y1="195" x2="474" y2="192" stroke-width="2.3"/>
+    <line x1="0" y1="205" x2="474" y2="204" stroke-width="2.1"/>
+    <line x1="0" y1="215" x2="474" y2="216" stroke-width="1.9"/>
+    <line x1="0" y1="225" x2="474" y2="228" stroke-width="1.7"/>
+    <line x1="0" y1="235" x2="474" y2="240" stroke-width="1.5"/>
+  </g>
+</svg>

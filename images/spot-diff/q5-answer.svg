@@ -1,0 +1,44 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q5 Desert Oasis - Answer with 5 Red Circles -->
+  <defs>
+    <linearGradient id="oSkyAns" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="250" fill="url(#oSkyAns)"/>
+  <path d="M0,242 Q150,210 310,245 T600,235 L600,400 L0,400 Z" fill="#eab308"/>
+  <circle cx="515" cy="70" r="28" fill="#fef08a"/>
+  <circle cx="527" cy="64" r="25" fill="#4c2c72"/>
+  <ellipse cx="425" cy="328" rx="130" ry="44" fill="#0284c7" stroke="#38bdf8" stroke-width="4"/>
+  <g>
+    <ellipse cx="440" cy="326" rx="18" ry="10" fill="#f97316"/>
+    <polygon points="455,326 472,315 472,337" fill="#f97316"/>
+    <circle cx="430" cy="324" r="2.5" fill="#0f172a"/>
+  </g>
+  <rect x="492" y="175" width="14" height="125" fill="#78350f"/>
+  <path d="M499,178 Q455,152 440,188 M499,178 Q544,152 558,188 M499,178 Q490,136 535,148 M499,178 Q508,136 462,148" fill="none" stroke="#15803d" stroke-width="11" stroke-linecap="round"/>
+  <rect x="330" y="195" width="12" height="100" fill="#78350f"/>
+  <path d="M336,198 Q298,175 286,208 M336,198 Q374,175 384,208 M336,198 Q330,160 366,170" fill="none" stroke="#16a34a" stroke-width="10" stroke-linecap="round"/>
+  <polygon points="55,310 155,188 255,310" fill="#dc2626" stroke="#7f1d1d" stroke-width="4"/>
+  <polygon points="108,310 155,212 202,310" fill="#fbbf24"/>
+  <polygon points="134,310 155,244 176,310" fill="#1e293b"/>
+  <ellipse cx="86" cy="336" rx="18" ry="22" fill="#b45309" stroke="#78350f" stroke-width="3"/>
+  <rect x="76" y="308" width="20" height="10" rx="3" fill="#d97706"/>
+  <!-- 5 Red Highlight Circles -->
+  <g stroke="#ef4444" stroke-width="5" fill="rgba(239,68,68,0.16)">
+    <circle cx="512" cy="70" r="38"/>
+    <ellipse cx="155" cy="248" rx="95" ry="62"/>
+    <ellipse cx="336" cy="225" rx="52" ry="68"/>
+    <circle cx="86" cy="334" r="32"/>
+    <ellipse cx="448" cy="326" rx="38" ry="24"/>
+  </g>
+  <g font-family="sans-serif" font-weight="900" font-size="17" text-anchor="middle">
+    <circle cx="548" cy="40" r="14" fill="#ef4444"/><text x="548" y="46" fill="#ffffff">1</text>
+    <circle cx="155" cy="182" r="14" fill="#ef4444"/><text x="155" y="188" fill="#ffffff">2</text>
+    <circle cx="384" cy="166" r="14" fill="#ef4444"/><text x="384" y="172" fill="#ffffff">3</text>
+    <circle cx="118" cy="358" r="14" fill="#ef4444"/><text x="118" y="364" fill="#ffffff">4</text>
+    <circle cx="484" cy="306" r="14" fill="#ef4444"/><text x="484" y="312" fill="#ffffff">5</text>
+  </g>
+</svg>

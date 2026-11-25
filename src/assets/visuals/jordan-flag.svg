@@ -1,0 +1,14 @@
+<svg width="600" height="360" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360">
+  <!-- Official Flag of Jordan -->
+  <rect x="0" y="0" width="600" height="120" fill="#000000"/>
+  <rect x="0" y="120" width="600" height="120" fill="#ffffff"/>
+  <rect x="0" y="240" width="600" height="120" fill="#007a3d"/>
+  <!-- Red chevron -->
+  <polygon points="0,0 280,180 0,360" fill="#ce1126"/>
+  <!-- White 7-pointed star -->
+  <polygon
+    fill="#ffffff"
+    points="94,148 101.6,166.7 121.6,163.5 107.6,177.8 117.4,195.4 99.6,188.6 94,207.2 88.4,188.6 70.6,195.4 80.4,177.8 66.4,163.5 86.4,166.7"
+    transform="translate(-4, 2)"
+  />
+</svg>

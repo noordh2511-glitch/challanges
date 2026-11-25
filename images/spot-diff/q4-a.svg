@@ -1,0 +1,36 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q4 Street Cafe - Image A (4 differences) -->
+  <rect width="600" height="315" fill="#1e293b"/>
+  <rect y="310" width="600" height="90" fill="#64748b"/>
+  <!-- Cafe Building -->
+  <rect x="65" y="75" width="380" height="240" rx="6" fill="#fef3c7" stroke="#78350f" stroke-width="4"/>
+  <!-- Door -->
+  <rect x="105" y="168" width="84" height="147" rx="4" fill="#92400e"/>
+  <rect x="120" y="184" width="54" height="66" rx="3" fill="#bae6fd"/>
+  <!-- DIFF 1: Wall Clock above Door (present in A) -->
+  <circle cx="147" cy="122" r="24" fill="#ffffff" stroke="#0f172a" stroke-width="4"/>
+  <line x1="147" y1="122" x2="147" y2="106" stroke="#0f172a" stroke-width="3"/>
+  <line x1="147" y1="122" x2="160" y2="122" stroke="#0f172a" stroke-width="3"/>
+  <!-- Large Cafe Window -->
+  <rect x="225" y="156" width="185" height="106" rx="4" fill="#38bdf8" stroke="#78350f" stroke-width="4"/>
+  <!-- DIFF 2: RED & White Awning in A -->
+  <g>
+    <rect x="215" y="116" width="41" height="42" fill="#e11d48"/>
+    <rect x="256" y="116" width="41" height="42" fill="#ffffff"/>
+    <rect x="297" y="116" width="41" height="42" fill="#e11d48"/>
+    <rect x="338" y="116" width="41" height="42" fill="#ffffff"/>
+    <rect x="379" y="116" width="41" height="42" fill="#e11d48"/>
+  </g>
+  <!-- Cafe Table on sidewalk -->
+  <rect x="275" y="295" width="96" height="12" rx="4" fill="#78350f"/>
+  <rect x="319" y="307" width="8" height="58" fill="#451a03"/>
+  <rect x="296" y="362" width="54" height="8" rx="3" fill="#451a03"/>
+  <!-- DIFF 3: Coffee Cup on table (present in A) -->
+  <rect x="306" y="266" width="32" height="29" rx="5" fill="#f8fafc" stroke="#0f172a" stroke-width="3"/>
+  <path d="M338,274 C349,274 349,288 338,288" fill="none" stroke="#0f172a" stroke-width="3"/>
+  <!-- Street Lamp on right -->
+  <rect x="508" y="118" width="12" height="232" fill="#334155"/>
+  <rect x="492" y="346" width="44" height="14" rx="4" fill="#1e293b"/>
+  <!-- DIFF 4: Street Lamp GLOWING YELLOW in A -->
+  <circle cx="514" cy="96" r="28" fill="#fde047" stroke="#f59e0b" stroke-width="4"/>
+</svg>

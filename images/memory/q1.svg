@@ -1,0 +1,49 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q1 Memory: 4 Red Apples + 2 Yellow Bananas + 1 Blue Water Pitcher -->
+  <rect width="640" height="420" fill="#1e293b"/>
+  <!-- Soft kitchen wall window -->
+  <rect x="44" y="32" width="160" height="140" rx="10" fill="#38bdf8" stroke="#f8fafc" stroke-width="7"/>
+  <line x1="124" y1="32" x2="124" y2="172" stroke="#f8fafc" stroke-width="5"/>
+  <line x1="44" y1="102" x2="204" y2="102" stroke="#f8fafc" stroke-width="5"/>
+  <!-- Wooden Table -->
+  <rect x="24" y="290" width="592" height="28" rx="8" fill="#b45309"/>
+  <rect x="48" y="318" width="24" height="102" fill="#78350f"/>
+  <rect x="568" y="318" width="24" height="102" fill="#78350f"/>
+  <!-- Fruit Bowl on left-center -->
+  <path d="M90,248 L310,248 C300,296 250,300 200,300 C150,300 100,296 90,248 Z" fill="#f59e0b" stroke="#92400e" stroke-width="4"/>
+  <!-- EXACTLY 4 RED APPLES (clearly distinct) -->
+  <!-- Apple 1 -->
+  <g>
+    <circle cx="136" cy="236" r="24" fill="#ef4444" stroke="#991b1b" stroke-width="3"/>
+    <path d="M136,212 L136,200" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="146" cy="205" rx="9" ry="5" fill="#22c55e" transform="rotate(-25 146 205)"/>
+  </g>
+  <!-- Apple 2 -->
+  <g>
+    <circle cx="192" cy="232" r="24" fill="#ef4444" stroke="#991b1b" stroke-width="3"/>
+    <path d="M192,208 L192,196" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="202" cy="201" rx="9" ry="5" fill="#22c55e" transform="rotate(-25 202 201)"/>
+  </g>
+  <!-- Apple 3 -->
+  <g>
+    <circle cx="248" cy="236" r="24" fill="#ef4444" stroke="#991b1b" stroke-width="3"/>
+    <path d="M248,212 L248,200" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="258" cy="205" rx="9" ry="5" fill="#22c55e" transform="rotate(-25 258 205)"/>
+  </g>
+  <!-- Apple 4 (on top center) -->
+  <g>
+    <circle cx="192" cy="186" r="23" fill="#ef4444" stroke="#991b1b" stroke-width="3"/>
+    <path d="M192,163 L192,151" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="202" cy="156" rx="9" ry="5" fill="#22c55e" transform="rotate(-25 202 156)"/>
+  </g>
+  <!-- 2 Yellow Bananas beside bowl -->
+  <path d="M332,276 Q368,242 414,274 Q378,292 332,276 Z" fill="#facc15" stroke="#ca8a04" stroke-width="3"/>
+  <path d="M342,262 Q378,226 422,256 Q386,274 342,262 Z" fill="#fde047" stroke="#ca8a04" stroke-width="3"/>
+  <!-- BRIGHT BLUE Water Pitcher on right -->
+  <g>
+    <path d="M554,196 C590,196 590,260 550,264" fill="none" stroke="#2563eb" stroke-width="11" stroke-linecap="round"/>
+    <path d="M472,174 L554,174 L546,290 L480,290 Z" fill="#3b82f6" stroke="#1d4ed8" stroke-width="4"/>
+    <polygon points="472,174 452,188 476,204" fill="#3b82f6" stroke="#1d4ed8" stroke-width="3"/>
+    <rect x="492" y="196" width="12" height="72" rx="6" fill="#93c5fd" opacity="0.65"/>
+  </g>
+</svg>

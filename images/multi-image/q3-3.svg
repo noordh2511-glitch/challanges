@@ -1,0 +1,15 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q3-3: Lush Green Tree (شجرة) -->
+  <rect width="400" height="235" fill="#38bdf8"/>
+  <rect y="230" width="400" height="70" fill="#15803d"/>
+  <!-- Tree Trunk -->
+  <rect x="176" y="158" width="48" height="94" rx="8" fill="#78350f"/>
+  <path d="M188,185 L156,154 M212,185 L244,154" stroke="#78350f" stroke-width="10" stroke-linecap="round"/>
+  <!-- Leafy Canopy -->
+  <circle cx="200" cy="108" r="68" fill="#16a34a"/>
+  <circle cx="142" cy="136" r="48" fill="#22c55e"/>
+  <circle cx="258" cy="136" r="48" fill="#22c55e"/>
+  <circle cx="200" cy="148" r="52" fill="#15803d"/>
+  <!-- Cute Apples/Blossoms -->
+  <circle cx="164" cy="118" r="7" fill="#ef4444"/><circle cx="234" cy="112" r="7" fill="#ef4444"/><circle cx="202" cy="144" r="7" fill="#ef4444"/>
+</svg>

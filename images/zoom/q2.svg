@@ -1,0 +1,41 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q2 Zoom: Pepperoni Pizza Slice (zoomOrigin: 50% 56%) -->
+  <rect width="640" height="420" fill="#1c1917"/>
+  <!-- Wooden Pizza Board Circle -->
+  <circle cx="320" cy="215" r="192" fill="#78350f" stroke="#451a03" stroke-width="8"/>
+  <circle cx="320" cy="215" r="176" fill="#92400e"/>
+  <!-- Crust Edge (Top Curved) -->
+  <path d="M150,115 Q320,42 490,115 L465,152 Q320,92 175,152 Z" fill="#d97706" stroke="#92400e" stroke-width="5"/>
+  <!-- Tomato Sauce Layer -->
+  <path d="M174,148 Q320,92 466,148 L320,382 Z" fill="#dc2626"/>
+  <!-- Melted Golden Mozzarella Cheese -->
+  <path d="M188,154 Q320,104 452,154 L320,368 Z" fill="#facc15"/>
+  <!-- Melted Cheese Highlights -->
+  <ellipse cx="285" cy="220" rx="28" ry="18" fill="#fef08a" opacity="0.65"/>
+  <ellipse cx="355" cy="245" rx="24" ry="16" fill="#fef08a" opacity="0.65"/>
+  <!-- Pepperoni Slices (clustered richly around 50% 56% = 320, 235) -->
+  <g fill="#b91c1c" stroke="#7f1d1d" stroke-width="4">
+    <circle cx="268" cy="184" r="28"/>
+    <circle cx="366" cy="188" r="28"/>
+    <circle cx="320" cy="242" r="30"/>
+    <circle cx="294" cy="306" r="24"/>
+    <circle cx="348" cy="296" r="22"/>
+  </g>
+  <!-- Pepperoni Speckle Details -->
+  <g fill="#fca5a5" opacity="0.65">
+    <circle cx="312" cy="235" r="4"/><circle cx="330" cy="248" r="3.5"/><circle cx="324" cy="228" r="3"/>
+    <circle cx="260" cy="178" r="3.5"/><circle cx="372" cy="182" r="3.5"/>
+  </g>
+  <!-- Black Olive Rings -->
+  <g fill="none" stroke="#0f172a" stroke-width="7">
+    <circle cx="318" cy="176" r="11"/>
+    <circle cx="272" cy="248" r="11"/>
+    <circle cx="374" cy="246" r="11"/>
+  </g>
+  <!-- Fresh Green Basil Leaves -->
+  <g fill="#16a34a" stroke="#14532d" stroke-width="2">
+    <ellipse cx="305" cy="214" rx="16" ry="9" transform="rotate(-30 305 214)"/>
+    <ellipse cx="345" cy="224" rx="16" ry="9" transform="rotate(28 345 224)"/>
+    <ellipse cx="320" cy="284" rx="15" ry="8" transform="rotate(-15 320 284)"/>
+  </g>
+</svg>

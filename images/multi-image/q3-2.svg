@@ -1,0 +1,21 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q3-2: Open Hand Palm (يد) -->
+  <rect width="400" height="300" fill="#1e1b4b"/>
+  <circle cx="200" cy="152" r="115" fill="#312e81"/>
+  <!-- Open Hand Illustration -->
+  <g fill="#fdba74" stroke="#c2410c" stroke-width="4" stroke-linejoin="round">
+    <!-- Fingers -->
+    <rect x="148" y="68" width="22" height="92" rx="11"/>
+    <rect x="176" y="48" width="23" height="110" rx="11"/>
+    <rect x="205" y="54" width="23" height="104" rx="11"/>
+    <rect x="234" y="76" width="21" height="86" rx="10"/>
+    <!-- Thumb -->
+    <rect x="114" y="138" width="24" height="72" rx="12" transform="rotate(-38 126 174)"/>
+    <!-- Palm -->
+    <rect x="142" y="134" width="114" height="102" rx="34"/>
+    <!-- Wrist -->
+    <rect x="164" y="218" width="70" height="52" rx="12"/>
+  </g>
+  <!-- Palm crease lines -->
+  <path d="M164,174 Q198,166 232,178 M172,198 Q196,192 222,202" fill="none" stroke="#c2410c" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+</svg>

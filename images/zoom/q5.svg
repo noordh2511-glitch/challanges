@@ -1,0 +1,43 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q5 Zoom: Monarch Butterfly Wings (zoomOrigin: 38% 44%) -->
+  <rect width="640" height="420" fill="#064e3b"/>
+  <!-- Subtle Leaf Veins Backdrop -->
+  <circle cx="110" cy="360" r="120" fill="#065f46" opacity="0.6"/>
+  <circle cx="540" cy="80" r="130" fill="#065f46" opacity="0.6"/>
+  <!-- Left Upper Wing -->
+  <path d="M312,188 C235,55 95,48 76,125 C60,188 140,248 298,224 Z" fill="#0f172a"/>
+  <path d="M294,190 C235,88 128,82 114,132 C104,174 162,216 286,208 Z" fill="#f97316"/>
+  <!-- Left Lower Wing -->
+  <path d="M306,226 C188,236 126,312 174,364 C216,408 296,348 312,258 Z" fill="#0f172a"/>
+  <path d="M292,238 C206,248 164,302 194,336 C222,366 280,322 296,260 Z" fill="#fb923c"/>
+  <!-- Right Upper Wing -->
+  <path d="M328,188 C405,55 545,48 564,125 C580,188 500,248 342,224 Z" fill="#0f172a"/>
+  <path d="M346,190 C405,88 512,82 526,132 C536,174 478,216 354,208 Z" fill="#f97316"/>
+  <!-- Right Lower Wing -->
+  <path d="M334,226 C452,236 514,312 466,364 C424,408 344,348 328,258 Z" fill="#0f172a"/>
+  <path d="M348,238 C434,248 476,302 446,336 C418,366 360,322 344,260 Z" fill="#fb923c"/>
+  <!-- Intricate Black Wing Veins -->
+  <g stroke="#0f172a" stroke-width="6" fill="none" stroke-linecap="round">
+    <path d="M294,194 Q212,135 120,126"/>
+    <path d="M290,200 Q204,174 114,168"/>
+    <path d="M286,208 Q220,210 156,214"/>
+    <path d="M294,250 Q236,286 188,334"/>
+    <path d="M346,194 Q428,135 520,126"/>
+    <path d="M350,200 Q436,174 526,168"/>
+    <path d="M354,208 Q420,210 484,214"/>
+    <path d="M346,250 Q404,286 452,334"/>
+  </g>
+  <!-- Crisp White Monarch Margin Spots -->
+  <g fill="#ffffff">
+    <circle cx="96" cy="112" r="6"/><circle cx="88" cy="138" r="6"/><circle cx="98" cy="166" r="6"/><circle cx="118" cy="192" r="5"/>
+    <circle cx="152" cy="86" r="5"/><circle cx="182" cy="78" r="5"/>
+    <circle cx="544" cy="112" r="6"/><circle cx="552" cy="138" r="6"/><circle cx="542" cy="166" r="6"/><circle cx="522" cy="192" r="5"/>
+    <circle cx="488" cy="86" r="5"/><circle cx="458" cy="78" r="5"/>
+    <circle cx="166" cy="342" r="5"/><circle cx="192" cy="366" r="5"/><circle cx="474" cy="342" r="5"/><circle cx="448" cy="366" r="5"/>
+  </g>
+  <!-- Butterfly Body & Antennae -->
+  <ellipse cx="320" cy="228" rx="14" ry="74" fill="#0f172a"/>
+  <circle cx="320" cy="144" r="15" fill="#0f172a"/>
+  <path d="M312,134 Q292,92 272,86 M328,134 Q348,92 368,86" fill="none" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="272" cy="86" r="4" fill="#fde047"/><circle cx="368" cy="86" r="4" fill="#fde047"/>
+</svg>

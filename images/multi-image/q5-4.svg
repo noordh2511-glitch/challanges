@@ -1,0 +1,20 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q5-4: Winter Snowman & Snowflakes (الشتاء) -->
+  <rect width="400" height="230" fill="#1e3a8a"/>
+  <rect y="225" width="400" height="75" fill="#f8fafc"/>
+  <!-- Snowflakes -->
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="62" cy="48" r="5"/><circle cx="118" cy="96" r="4"/><circle cx="315" cy="54" r="5"/><circle cx="348" cy="118" r="4.5"/><circle cx="84" cy="158" r="4"/><circle cx="288" cy="144" r="4"/>
+  </g>
+  <!-- Snowman -->
+  <circle cx="200" cy="216" r="52" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+  <circle cx="200" cy="136" r="36" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+  <!-- Scarf -->
+  <rect x="168" y="162" width="64" height="14" rx="6" fill="#e11d48"/>
+  <rect x="212" y="172" width="14" height="34" rx="5" fill="#be123c"/>
+  <!-- Eyes, Carrot Nose & Hat -->
+  <circle cx="188" cy="128" r="4.5" fill="#0f172a"/><circle cx="212" cy="128" r="4.5" fill="#0f172a"/>
+  <polygon points="200,136 228,142 200,148" fill="#f97316"/>
+  <rect x="166" y="96" width="68" height="10" rx="4" fill="#0f172a"/>
+  <rect x="178" y="64" width="44" height="34" rx="4" fill="#0f172a"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#1e293b"/>
+  <circle cx="200" cy="150" r="112" fill="#334155"/>
+  <!-- Sound waves -->
+  <path d="M108,96 Q90,114 108,132 M88,82 Q64,114 88,146" fill="none" stroke="#fde047" stroke-width="6" stroke-linecap="round"/>
+  <!-- Referee Whistle -->
+  <path d="M120,124 L235,124 C272,124 295,148 295,180 C295,214 268,238 232,238 C196,238 172,216 170,180 L170,162 L120,162 Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="5"/>
+  <rect x="150" y="124" width="24" height="16" fill="#0f172a"/>
+  <circle cx="232" cy="181" r="24" fill="#94a3b8" stroke="#0f172a" stroke-width="4"/>
+  <!-- Ring -->
+  <circle cx="295" cy="144" r="14" fill="none" stroke="#f59e0b" stroke-width="6"/>
+</svg>

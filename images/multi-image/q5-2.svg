@@ -1,0 +1,23 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q5-2: Bright Summer Sun & Beach (الصيف) -->
+  <defs>
+    <linearGradient id="sumSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="190" fill="url(#sumSky)"/>
+  <rect y="185" width="400" height="55" fill="#0369a1"/>
+  <rect y="235" width="400" height="65" fill="#fde68a"/>
+  <!-- Bright Sun with Rays -->
+  <circle cx="200" cy="96" r="42" fill="#fde047"/>
+  <g stroke="#facc15" stroke-width="7" stroke-linecap="round">
+    <line x1="200" y1="30" x2="200" y2="44"/><line x1="200" y1="148" x2="200" y2="162"/>
+    <line x1="134" y1="96" x2="148" y2="96"/><line x1="252" y1="96" x2="266" y2="96"/>
+    <line x1="154" y1="50" x2="164" y2="60"/><line x1="236" y1="132" x2="246" y2="142"/>
+    <line x1="246" y1="50" x2="236" y2="60"/><line x1="164" y1="132" x2="154" y2="142"/>
+  </g>
+  <!-- Beach Umbrella -->
+  <line x1="96" y1="192" x2="96" y2="270" stroke="#78350f" stroke-width="6"/>
+  <path d="M44,198 Q96,154 148,198 Z" fill="#ef4444"/>
+</svg>

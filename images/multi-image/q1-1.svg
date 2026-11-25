@@ -1,0 +1,10 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q1-1: Glowing Golden Star (نجم) -->
+  <rect width="400" height="300" fill="#0f172a"/>
+  <circle cx="200" cy="150" r="115" fill="#1e293b"/>
+  <g fill="#fef08a" opacity="0.6">
+    <circle cx="64" cy="54" r="4"/><circle cx="336" cy="64" r="4"/><circle cx="80" cy="240" r="3"/><circle cx="324" cy="238" r="3.5"/>
+  </g>
+  <polygon points="200,36 229,112 310,116 246,166 268,244 200,198 132,244 154,166 90,116 171,112" fill="#facc15" stroke="#eab308" stroke-width="6" stroke-linejoin="round"/>
+  <polygon points="200,66 218,118 272,121 230,154 244,206 200,176 156,206 170,154 128,121 182,118" fill="#fef08a" opacity="0.55"/>
+</svg>

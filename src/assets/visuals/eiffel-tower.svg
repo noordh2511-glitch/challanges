@@ -1,0 +1,64 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde047"/>
+    </linearGradient>
+    <linearGradient id="tower" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="50%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="420" fill="url(#sky)"/>
+  <!-- Sun -->
+  <circle cx="485" cy="115" r="52" fill="#fef08a" opacity="0.9"/>
+  <!-- Clouds -->
+  <g fill="#ffffff" opacity="0.5">
+    <ellipse cx="130" cy="95" rx="60" ry="18"/>
+    <ellipse cx="165" cy="88" rx="40" ry="15"/>
+    <ellipse cx="520" cy="175" rx="58" ry="15"/>
+  </g>
+  <!-- Distant Paris skyline -->
+  <rect x="0" y="330" width="640" height="90" fill="#0f172a"/>
+  <rect x="20" y="295" width="75" height="40" fill="#1e293b"/>
+  <rect x="105" y="305" width="60" height="30" fill="#1e293b"/>
+  <rect x="475" y="300" width="65" height="35" fill="#1e293b"/>
+  <rect x="550" y="288" width="75" height="47" fill="#1e293b"/>
+  <!-- Green park Champ de Mars -->
+  <rect x="0" y="355" width="640" height="65" fill="#15803d"/>
+  <polygon points="270,355 370,355 440,420 200,420" fill="#d6d3d1"/>
+  <!-- Trees -->
+  <g fill="#166534">
+    <circle cx="70" cy="348" r="24"/><circle cx="115" cy="352" r="22"/><circle cx="160" cy="350" r="20"/>
+    <circle cx="480" cy="350" r="20"/><circle cx="525" cy="352" r="22"/><circle cx="570" cy="348" r="24"/>
+  </g>
+  <!-- Eiffel Tower -->
+  <g stroke="#0f172a" stroke-width="2">
+    <!-- Spire -->
+    <rect x="317" y="26" width="6" height="34" fill="#475569"/>
+    <rect x="309" y="58" width="22" height="10" rx="2" fill="#475569"/>
+    <!-- Upper shaft -->
+    <polygon points="312,68 328,68 342,195 298,195" fill="url(#tower)"/>
+    <!-- Second deck -->
+    <rect x="285" y="192" width="70" height="14" rx="2" fill="#334155"/>
+    <!-- Middle legs -->
+    <polygon points="294,206 346,206 372,272 268,272" fill="url(#tower)"/>
+    <polygon points="312,212 328,212 338,266 302,266" fill="#f97316" opacity="0.65"/>
+    <!-- First deck -->
+    <rect x="252" y="270" width="136" height="16" rx="3" fill="#334155"/>
+    <!-- Lower legs + iconic arch -->
+    <path d="M262,286 L296,286 L268,358 L224,358 Z" fill="url(#tower)"/>
+    <path d="M344,286 L378,286 L416,358 L372,358 Z" fill="url(#tower)"/>
+    <path d="M268,358 Q320,285 372,358" fill="none" stroke="#334155" stroke-width="10"/>
+  </g>
+  <!-- Lattice detail lines -->
+  <g stroke="#94a3b8" stroke-width="1.5" opacity="0.65">
+    <line x1="305" y1="120" x2="335" y2="120"/>
+    <line x1="302" y1="155" x2="338" y2="155"/>
+    <line x1="286" y1="235" x2="354" y2="235"/>
+    <line x1="308" y1="90" x2="336" y2="180"/>
+    <line x1="332" y1="90" x2="304" y2="180"/>
+  </g>
+</svg>

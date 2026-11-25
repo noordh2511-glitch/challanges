@@ -1,0 +1,19 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q2-2: Golden Sand Dunes (رمال) -->
+  <defs>
+    <linearGradient id="sandSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fef08a"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="175" fill="url(#sandSky)"/>
+  <circle cx="310" cy="64" r="30" fill="#fef9c3"/>
+  <!-- Golden Desert Sand Dunes -->
+  <path d="M0,175 Q110,118 220,175 T400,165 L400,300 L0,300 Z" fill="#f59e0b"/>
+  <path d="M0,224 Q140,168 275,222 T400,210 L400,300 L0,300 Z" fill="#d97706"/>
+  <path d="M0,262 Q105,232 210,262 T400,256 L400,300 L0,300 Z" fill="#b45309"/>
+  <!-- Sand Grain Dots -->
+  <g fill="#fef3c7" opacity="0.65">
+    <circle cx="85" cy="215" r="3"/><circle cx="145" cy="242" r="2.5"/><circle cx="265" cy="248" r="3"/><circle cx="325" cy="232" r="2.5"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#090d24"/>
+  <!-- Stars -->
+  <g fill="#ffffff" opacity="0.8">
+    <circle cx="55" cy="48" r="2.5"/><circle cx="340" cy="60" r="3"/><circle cx="95" cy="215" r="2"/><circle cx="320" cy="230" r="2.5"/><circle cx="285" cy="110" r="2"/>
+  </g>
+  <!-- Rocket Flame -->
+  <polygon points="182,212 218,212 200,275" fill="#f97316"/>
+  <polygon points="190,212 210,212 200,255" fill="#fde047"/>
+  <!-- Fins -->
+  <polygon points="168,162 135,212 172,202" fill="#e11d48"/>
+  <polygon points="232,162 265,212 228,202" fill="#e11d48"/>
+  <!-- Rocket Body -->
+  <path d="M200,32 C232,68 238,124 232,208 L168,208 C162,124 168,68 200,32 Z" fill="#f8fafc"/>
+  <path d="M200,32 C218,52 226,74 229,94 L171,94 C174,74 182,52 200,32 Z" fill="#e11d48"/>
+  <!-- Window -->
+  <circle cx="200" cy="136" r="22" fill="#38bdf8" stroke="#1e293b" stroke-width="6"/>
+  <circle cx="193" cy="129" r="6" fill="#ffffff" opacity="0.7"/>
+</svg>

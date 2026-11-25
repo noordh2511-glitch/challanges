@@ -1,0 +1,17 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q1-2: Deep Blue Ocean Waves (بحر) -->
+  <defs>
+    <linearGradient id="seaSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#e0f2fe"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="145" fill="url(#seaSky)"/>
+  <circle cx="318" cy="56" r="28" fill="#fde047"/>
+  <!-- Deep Ocean Layers -->
+  <rect y="135" width="400" height="165" fill="#0369a1"/>
+  <path d="M0,155 Q50,130 100,155 T200,155 T300,155 T400,155 L400,300 L0,300 Z" fill="#0284c7"/>
+  <path d="M0,205 Q50,180 100,205 T200,205 T300,205 T400,205 L400,300 L0,300 Z" fill="#075985"/>
+  <!-- White Wave Foams -->
+  <path d="M22,162 Q62,146 102,162 M172,174 Q212,158 252,174 M282,226 Q322,210 362,226 M52,246 Q92,230 132,246" fill="none" stroke="#bae6fd" stroke-width="6" stroke-linecap="round"/>
+</svg>

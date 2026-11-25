@@ -1,0 +1,13 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q6-3: Golden Medal with Ribbon (الميدالية الذهبية) -->
+  <rect width="400" height="300" fill="#1e1b4b"/>
+  <circle cx="200" cy="155" r="112" fill="#312e81"/>
+  <!-- Ribbon -->
+  <polygon points="140,26 184,26 206,126 176,126" fill="#2563eb"/>
+  <polygon points="260,26 216,26 194,126 224,126" fill="#ef4444"/>
+  <!-- Gold Medal Circle -->
+  <circle cx="200" cy="184" r="76" fill="#f59e0b" stroke="#fef08a" stroke-width="6"/>
+  <circle cx="200" cy="184" r="58" fill="#fbbf24" stroke="#b45309" stroke-width="3"/>
+  <!-- Star in Medal -->
+  <polygon points="200,144 211,170 239,172 218,190 225,218 200,203 175,218 182,190 161,172 189,170" fill="#fef9c3"/>
+</svg>

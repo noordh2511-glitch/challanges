@@ -1,0 +1,36 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q1 Beach Scene - Image A -->
+  <defs>
+    <linearGradient id="bSkyA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="235" fill="url(#bSkyA)"/>
+  <rect y="230" width="600" height="80" fill="#0369a1"/>
+  <path d="M0,300 Q180,285 350,305 T600,295 L600,400 L0,400 Z" fill="#fde68a"/>
+  <!-- Sun -->
+  <circle cx="515" cy="72" r="36" fill="#fde047"/>
+  <!-- DIFF 1 (Cloud present in A) -->
+  <g fill="#ffffff">
+    <ellipse cx="120" cy="74" rx="48" ry="18"/>
+    <ellipse cx="152" cy="64" rx="34" ry="16"/>
+  </g>
+  <!-- Lighthouse on right -->
+  <polygon points="480,295 494,165 530,165 544,295" fill="#f8fafc" stroke="#334155" stroke-width="3"/>
+  <rect x="492" y="195" width="40" height="26" fill="#dc2626"/>
+  <rect x="486" y="246" width="52" height="26" fill="#dc2626"/>
+  <rect x="490" y="150" width="44" height="16" fill="#1e293b"/>
+  <polygon points="486,150 512,126 538,150" fill="#dc2626"/>
+  <!-- Sailboat in sea -->
+  <path d="M180,268 L315,268 L294,294 L202,294 Z" fill="#78350f"/>
+  <line x1="248" y1="144" x2="248" y2="268" stroke="#451a03" stroke-width="5"/>
+  <!-- DIFF 2 (RED sail in A) -->
+  <polygon points="252,148 320,256 252,256" fill="#e11d48"/>
+  <polygon points="244,168 194,256 244,256" fill="#f8fafc"/>
+  <!-- Beach Umbrella on left -->
+  <line x1="108" y1="255" x2="108" y2="355" stroke="#78350f" stroke-width="6"/>
+  <path d="M52,262 Q108,215 164,262 Z" fill="#f59e0b"/>
+  <!-- DIFF 3 (Orange Starfish on sand in A) -->
+  <polygon points="392,332 401,352 422,354 406,368 411,388 392,377 373,388 378,368 362,354 383,352" fill="#f97316" stroke="#c2410c" stroke-width="2"/>
+</svg>

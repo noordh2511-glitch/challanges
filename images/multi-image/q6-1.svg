@@ -1,0 +1,12 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q6-1: Olympic Flaming Torch (الشعلة الأولمبية) -->
+  <rect width="400" height="300" fill="#0f172a"/>
+  <circle cx="200" cy="128" r="108" fill="#1e293b"/>
+  <!-- Flame -->
+  <path d="M200,26 C236,68 250,104 224,142 L176,142 C150,104 164,68 200,26 Z" fill="#f97316"/>
+  <path d="M200,52 C222,82 228,108 214,138 L186,138 C172,108 178,82 200,52 Z" fill="#fde047"/>
+  <!-- Torch Bowl & Handle -->
+  <polygon points="154,138 246,138 222,178 178,178" fill="#f59e0b" stroke="#b45309" stroke-width="4"/>
+  <polygon points="180,178 220,178 208,274 192,274" fill="#cbd5e1" stroke="#64748b" stroke-width="4"/>
+  <rect x="172" y="176" width="56" height="12" rx="4" fill="#fbbf24"/>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#172554"/>
+  <circle cx="200" cy="155" r="115" fill="#1e3a8a"/>
+  <!-- Golden Arabic Dallah -->
+  <g fill="#f59e0b" stroke="#92400e" stroke-width="3">
+    <!-- Spout -->
+    <path d="M168,140 Q120,130 96,86 Q128,108 164,118 Z" fill="#fbbf24"/>
+    <!-- Handle -->
+    <path d="M236,118 C288,118 292,202 238,214" fill="none" stroke="#fbbf24" stroke-width="11" stroke-linecap="round"/>
+    <!-- Body -->
+    <path d="M165,112 L235,112 C245,148 258,192 236,242 L164,242 C142,192 155,148 165,112 Z"/>
+    <!-- Neck & Lid -->
+    <path d="M160,112 Q200,66 240,112 Z" fill="#fcd34d"/>
+    <circle cx="200" cy="66" r="11" fill="#fde68a"/>
+    <rect x="196" y="44" width="8" height="16" rx="4" fill="#fbbf24"/>
+    <!-- Base -->
+    <rect x="154" y="242" width="92" height="14" rx="6" fill="#d97706"/>
+  </g>
+</svg>

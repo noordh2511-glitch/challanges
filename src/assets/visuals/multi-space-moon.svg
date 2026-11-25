@@ -1,0 +1,12 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#090d24"/>
+  <g fill="#ffffff" opacity="0.8">
+    <circle cx="62" cy="58" r="2.5"/><circle cx="332" cy="48" r="2.5"/><circle cx="88" cy="240" r="2"/><circle cx="348" cy="212" r="3"/>
+  </g>
+  <!-- Glowing Moon -->
+  <circle cx="200" cy="150" r="88" fill="#e2e8f0"/>
+  <circle cx="165" cy="122" r="20" fill="#cbd5e1"/>
+  <circle cx="234" cy="170" r="26" fill="#cbd5e1"/>
+  <circle cx="185" cy="196" r="14" fill="#cbd5e1"/>
+  <circle cx="232" cy="108" r="12" fill="#cbd5e1"/>
+</svg>

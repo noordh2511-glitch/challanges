@@ -1,0 +1,22 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q3-1: Cute Bird (عصفور) -->
+  <rect width="400" height="300" fill="#0c4a6e"/>
+  <circle cx="200" cy="150" r="112" fill="#0369a1"/>
+  <!-- Branch -->
+  <line x1="60" y1="224" x2="340" y2="210" stroke="#78350f" stroke-width="10" stroke-linecap="round"/>
+  <!-- Bird Legs -->
+  <line x1="186" y1="194" x2="186" y2="218" stroke="#f59e0b" stroke-width="5"/>
+  <line x1="214" y1="194" x2="214" y2="216" stroke="#f59e0b" stroke-width="5"/>
+  <!-- Tail -->
+  <polygon points="145,168 92,192 106,154" fill="#0284c7"/>
+  <!-- Body -->
+  <ellipse cx="205" cy="162" rx="68" ry="48" fill="#38bdf8"/>
+  <ellipse cx="222" cy="176" rx="46" ry="30" fill="#fef08a"/>
+  <!-- Wing -->
+  <ellipse cx="186" cy="160" rx="40" ry="22" fill="#0284c7" transform="rotate(-14 186 160)"/>
+  <!-- Head & Beak -->
+  <circle cx="256" cy="116" r="38" fill="#38bdf8"/>
+  <polygon points="290,108 326,118 290,130" fill="#f97316"/>
+  <circle cx="268" cy="110" r="6" fill="#0f172a"/>
+  <circle cx="270" cy="108" r="2" fill="#ffffff"/>
+</svg>

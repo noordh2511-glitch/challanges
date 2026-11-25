@@ -1,0 +1,47 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- مدرج الكولوسيوم في روما -->
+  <defs>
+    <linearGradient id="romeSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="65%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="335" fill="url(#romeSky)"/>
+  <rect y="330" width="640" height="90" fill="#78716c"/>
+  <!-- Outer Colosseum Structure (Higher left broken wall) -->
+  <path d="M90,335 L90,116 Q210,88 395,112 L425,180 L550,192 L550,335 Z" fill="#e7cfa6" stroke="#92400e" stroke-width="4"/>
+  <!-- Horizontal Cornices -->
+  <line x1="90" y1="184" x2="430" y2="184" stroke="#b45309" stroke-width="6"/>
+  <line x1="90" y1="254" x2="550" y2="254" stroke="#b45309" stroke-width="6"/>
+  <!-- Arches Row 1 (Top Left) -->
+  <g fill="#451a03">
+    <path d="M116,178 L116,144 A16,16 0 0,1 148,144 L148,178 Z"/>
+    <path d="M170,178 L170,144 A16,16 0 0,1 202,144 L202,178 Z"/>
+    <path d="M224,178 L224,144 A16,16 0 0,1 256,144 L256,178 Z"/>
+    <path d="M278,178 L278,144 A16,16 0 0,1 310,144 L310,178 Z"/>
+    <path d="M332,178 L332,144 A16,16 0 0,1 364,144 L364,178 Z"/>
+  </g>
+  <!-- Arches Row 2 (Middle) -->
+  <g fill="#451a03">
+    <path d="M116,248 L116,214 A16,16 0 0,1 148,214 L148,248 Z"/>
+    <path d="M170,248 L170,214 A16,16 0 0,1 202,214 L202,248 Z"/>
+    <path d="M224,248 L224,214 A16,16 0 0,1 256,214 L256,248 Z"/>
+    <path d="M278,248 L278,214 A16,16 0 0,1 310,214 L310,248 Z"/>
+    <path d="M332,248 L332,214 A16,16 0 0,1 364,214 L364,248 Z"/>
+    <path d="M386,248 L386,214 A16,16 0 0,1 418,214 L418,248 Z"/>
+    <path d="M440,248 L440,214 A16,16 0 0,1 472,214 L472,248 Z"/>
+    <path d="M494,248 L494,214 A16,16 0 0,1 526,214 L526,248 Z"/>
+  </g>
+  <!-- Arches Row 3 (Ground) -->
+  <g fill="#291206">
+    <path d="M116,335 L116,292 A16,16 0 0,1 148,292 L148,335 Z"/>
+    <path d="M170,335 L170,292 A16,16 0 0,1 202,292 L202,335 Z"/>
+    <path d="M224,335 L224,292 A16,16 0 0,1 256,292 L256,335 Z"/>
+    <path d="M278,335 L278,292 A16,16 0 0,1 310,292 L310,335 Z"/>
+    <path d="M332,335 L332,292 A16,16 0 0,1 364,292 L364,335 Z"/>
+    <path d="M386,335 L386,292 A16,16 0 0,1 418,292 L418,335 Z"/>
+    <path d="M440,335 L440,292 A16,16 0 0,1 472,292 L472,335 Z"/>
+    <path d="M494,335 L494,292 A16,16 0 0,1 526,292 L526,335 Z"/>
+  </g>
+</svg>

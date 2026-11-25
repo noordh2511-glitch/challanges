@@ -1,0 +1,24 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q5 Desert Oasis - Image B (5 differences) -->
+  <defs>
+    <linearGradient id="oSkyB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="250" fill="url(#oSkyB)"/>
+  <path d="M0,242 Q150,210 310,245 T600,235 L600,400 L0,400 Z" fill="#eab308"/>
+  <!-- DIFF 1: Crescent Moon MISSING -->
+  <ellipse cx="425" cy="328" rx="130" ry="44" fill="#0284c7" stroke="#38bdf8" stroke-width="4"/>
+  <!-- DIFF 5: Fish MISSING -->
+  <!-- Palm Tree 1 -->
+  <rect x="492" y="175" width="14" height="125" fill="#78350f"/>
+  <path d="M499,178 Q455,152 440,188 M499,178 Q544,152 558,188 M499,178 Q490,136 535,148 M499,178 Q508,136 462,148" fill="none" stroke="#15803d" stroke-width="11" stroke-linecap="round"/>
+  <!-- DIFF 3: Second Palm Tree MISSING -->
+  <!-- DIFF 2: BLUE & Gold Tent in B -->
+  <polygon points="55,310 155,188 255,310" fill="#2563eb" stroke="#1e3a8a" stroke-width="4"/>
+  <polygon points="108,310 155,212 202,310" fill="#fbbf24"/>
+  <polygon points="134,310 155,244 176,310" fill="#1e293b"/>
+  <!-- DIFF 4: Clay Pot MISSING -->
+</svg>

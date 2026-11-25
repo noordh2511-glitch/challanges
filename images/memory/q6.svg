@@ -1,0 +1,48 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q6 Memory: 3 Sailboats + 4 Birds in Sky + Lighthouse Number 9 -->
+  <defs>
+    <linearGradient id="harborSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="238" fill="url(#harborSky)"/>
+  <rect y="232" width="640" height="188" fill="#0369a1"/>
+  <!-- Sun -->
+  <circle cx="84" cy="68" r="32" fill="#fde047"/>
+  <!-- EXACTLY 4 BIRDS IN SKY (clearly separated) -->
+  <g fill="none" stroke="#0f172a" stroke-width="4.5" stroke-linecap="round">
+    <path d="M168,76 Q178,62 188,76 Q198,62 208,76"/>
+    <path d="M254,54 Q264,40 274,54 Q284,40 294,54"/>
+    <path d="M332,96 Q342,82 352,96 Q362,82 372,96"/>
+    <path d="M408,58 Q418,44 428,58 Q438,44 448,58"/>
+  </g>
+  <!-- Rocky Island + Lighthouse #9 on right -->
+  <ellipse cx="556" cy="316" rx="84" ry="30" fill="#78716c"/>
+  <polygon points="518,308 532,126 580,126 594,308" fill="#f8fafc" stroke="#1e293b" stroke-width="4"/>
+  <rect x="526" y="150" width="60" height="24" fill="#dc2626"/>
+  <rect x="528" y="106" width="56" height="22" fill="#1e293b"/>
+  <polygon points="522,106 556,74 590,106" fill="#dc2626"/>
+  <!-- BOLD NUMBER 9 ON LIGHTHOUSE -->
+  <circle cx="556" cy="236" r="28" fill="#fde047" stroke="#0f172a" stroke-width="3"/>
+  <text x="556" y="249" font-family="sans-serif" font-weight="900" font-size="36" text-anchor="middle" fill="#0f172a">9</text>
+  <!-- EXACTLY 3 SAILBOATS IN SEA -->
+  <!-- Boat 1 (Left - Red Sail) -->
+  <g>
+    <path d="M52,320 L152,320 L136,342 L68,342 Z" fill="#78350f"/>
+    <line x1="102" y1="224" x2="102" y2="320" stroke="#451a03" stroke-width="4"/>
+    <polygon points="105,228 154,310 105,310" fill="#ef4444"/>
+  </g>
+  <!-- Boat 2 (Center - Yellow Sail) -->
+  <g>
+    <path d="M210,292 L310,292 L294,314 L226,314 Z" fill="#78350f"/>
+    <line x1="260" y1="196" x2="260" y2="292" stroke="#451a03" stroke-width="4"/>
+    <polygon points="263,200 312,282 263,282" fill="#facc15"/>
+  </g>
+  <!-- Boat 3 (Right-Middle - Green Sail) -->
+  <g>
+    <path d="M352,342 L452,342 L436,364 L368,364 Z" fill="#78350f"/>
+    <line x1="402" y1="246" x2="402" y2="342" stroke="#451a03" stroke-width="4"/>
+    <polygon points="405,250 454,332 405,332" fill="#22c55e"/>
+  </g>
+</svg>

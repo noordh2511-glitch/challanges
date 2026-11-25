@@ -1,0 +1,35 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q1 Zoom: Classic Soccer Ball on Pitch (zoomOrigin: 50% 48%) -->
+  <rect width="640" height="420" fill="#15803d"/>
+  <!-- Pitch Stripes -->
+  <rect x="0" y="0" width="128" height="420" fill="#166534" opacity="0.45"/>
+  <rect x="256" y="0" width="128" height="420" fill="#166534" opacity="0.45"/>
+  <rect x="512" y="0" width="128" height="420" fill="#166534" opacity="0.45"/>
+  <line x1="0" y1="210" x2="640" y2="210" stroke="#ffffff" stroke-width="6" opacity="0.35"/>
+  <!-- Shadow -->
+  <ellipse cx="320" cy="368" rx="135" ry="22" fill="#052e16" opacity="0.5"/>
+  <!-- Ball Body -->
+  <circle cx="320" cy="205" r="154" fill="#f8fafc" stroke="#0f172a" stroke-width="7"/>
+  <!-- Subtle Shading -->
+  <circle cx="320" cy="205" r="150" fill="none" stroke="#cbd5e1" stroke-width="14" opacity="0.45"/>
+  <!-- Center Pentagon (right at 50% 48%) -->
+  <polygon points="320,145 376,186 355,252 285,252 264,186" fill="#0f172a"/>
+  <!-- Stitching Lines -->
+  <g stroke="#0f172a" stroke-width="5" stroke-linecap="round">
+    <line x1="320" y1="145" x2="320" y2="82"/>
+    <line x1="376" y1="186" x2="438" y2="162"/>
+    <line x1="355" y1="252" x2="398" y2="306"/>
+    <line x1="285" y1="252" x2="242" y2="306"/>
+    <line x1="264" y1="186" x2="202" y2="162"/>
+  </g>
+  <!-- Dashed Seam Detail for Extreme Zoom Texture -->
+  <g stroke="#94a3b8" stroke-width="2" stroke-dasharray="5 5" fill="none">
+    <polygon points="320,152 369,188 350,245 290,245 271,188"/>
+  </g>
+  <!-- Outer Black Pentagons -->
+  <polygon points="282,60 358,60 320,92" fill="#0f172a"/>
+  <polygon points="464,142 472,208 432,164" fill="#0f172a"/>
+  <polygon points="176,142 168,208 208,164" fill="#0f172a"/>
+  <polygon points="434,306 378,342 396,294" fill="#0f172a"/>
+  <polygon points="206,306 262,342 244,294" fill="#0f172a"/>
+</svg>

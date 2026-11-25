@@ -1,0 +1,12 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#090d24"/>
+  <g fill="#ffffff" opacity="0.8">
+    <circle cx="52" cy="70" r="2.5"/><circle cx="348" cy="65" r="2.5"/><circle cx="96" cy="245" r="2"/>
+  </g>
+  <!-- Saturn Planet -->
+  <ellipse cx="200" cy="155" rx="140" ry="38" fill="none" stroke="#fde047" stroke-width="14" transform="rotate(-18 200 155)" opacity="0.85"/>
+  <circle cx="200" cy="155" r="68" fill="#f59e0b"/>
+  <path d="M138,142 Q200,162 262,142" fill="none" stroke="#d97706" stroke-width="10"/>
+  <path d="M144,175 Q200,192 256,175" fill="none" stroke="#fbbf24" stroke-width="8"/>
+  <path d="M84,195 A140,38 -18 0,0 326,115" fill="none" stroke="#fde047" stroke-width="14" stroke-linecap="round"/>
+</svg>

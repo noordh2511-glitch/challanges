@@ -1,0 +1,37 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q5 Desert Oasis - Image A (5 differences) -->
+  <defs>
+    <linearGradient id="oSkyA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="250" fill="url(#oSkyA)"/>
+  <path d="M0,242 Q150,210 310,245 T600,235 L600,400 L0,400 Z" fill="#eab308"/>
+  <!-- DIFF 1: Crescent Moon in top-right sky (present in A) -->
+  <circle cx="515" cy="70" r="28" fill="#fef08a"/>
+  <circle cx="527" cy="64" r="25" fill="#4c2c72"/>
+  <!-- Oasis Water Pond -->
+  <ellipse cx="425" cy="328" rx="130" ry="44" fill="#0284c7" stroke="#38bdf8" stroke-width="4"/>
+  <!-- DIFF 5: Orange Fish jumping in pond (present in A) -->
+  <g>
+    <ellipse cx="440" cy="326" rx="18" ry="10" fill="#f97316"/>
+    <polygon points="455,326 472,315 472,337" fill="#f97316"/>
+    <circle cx="430" cy="324" r="2.5" fill="#0f172a"/>
+  </g>
+  <!-- Palm Tree 1 (always present) -->
+  <rect x="492" y="175" width="14" height="125" fill="#78350f"/>
+  <path d="M499,178 Q455,152 440,188 M499,178 Q544,152 558,188 M499,178 Q490,136 535,148 M499,178 Q508,136 462,148" fill="none" stroke="#15803d" stroke-width="11" stroke-linecap="round"/>
+  <!-- DIFF 3: Second Palm Tree on left of pond (present in A) -->
+  <rect x="330" y="195" width="12" height="100" fill="#78350f"/>
+  <path d="M336,198 Q298,175 286,208 M336,198 Q374,175 384,208 M336,198 Q330,160 366,170" fill="none" stroke="#16a34a" stroke-width="10" stroke-linecap="round"/>
+  <!-- Bedouin Tent on left -->
+  <!-- DIFF 2: RED & Gold Tent in A -->
+  <polygon points="55,310 155,188 255,310" fill="#dc2626" stroke="#7f1d1d" stroke-width="4"/>
+  <polygon points="108,310 155,212 202,310" fill="#fbbf24"/>
+  <polygon points="134,310 155,244 176,310" fill="#1e293b"/>
+  <!-- DIFF 4: Clay Pot beside tent (present in A) -->
+  <ellipse cx="86" cy="336" rx="18" ry="22" fill="#b45309" stroke="#78350f" stroke-width="3"/>
+  <rect x="76" y="308" width="20" height="10" rx="3" fill="#d97706"/>
+</svg>

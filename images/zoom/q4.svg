@@ -1,0 +1,29 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- Q4 Zoom: Professional DSLR Camera (zoomOrigin: 52% 52%) -->
+  <rect width="640" height="420" fill="#1e293b"/>
+  <!-- Top Viewfinder Prism -->
+  <path d="M235,96 L262,56 L396,56 L422,96 Z" fill="#0f172a" stroke="#475569" stroke-width="4"/>
+  <rect x="292" y="68" width="74" height="16" rx="4" fill="#e2e8f0"/>
+  <!-- Mode Dial & Shutter Button -->
+  <rect x="135" y="76" width="54" height="22" rx="4" fill="#64748b"/>
+  <rect x="468" y="80" width="38" height="18" rx="6" fill="#dc2626"/>
+  <!-- Camera Body -->
+  <rect x="96" y="96" width="448" height="264" rx="26" fill="#0f172a" stroke="#64748b" stroke-width="5"/>
+  <!-- Textured Grip on Left -->
+  <rect x="114" y="122" width="72" height="212" rx="14" fill="#1e293b" stroke="#334155" stroke-width="3"/>
+  <!-- Red Accent Stripe & LED -->
+  <rect x="184" y="138" width="8" height="72" rx="4" fill="#ef4444"/>
+  <circle cx="484" cy="142" r="11" fill="#f59e0b"/>
+  <!-- Multi-Ring Camera Lens centered at (334, 224) = 52% 53% -->
+  <circle cx="334" cy="224" r="116" fill="#334155" stroke="#94a3b8" stroke-width="6"/>
+  <circle cx="334" cy="224" r="98" fill="#0f172a" stroke="#475569" stroke-width="4"/>
+  <circle cx="334" cy="224" r="82" fill="#1e293b" stroke="#ef4444" stroke-width="3"/>
+  <!-- Glass Optics -->
+  <circle cx="334" cy="224" r="68" fill="#0c4a6e"/>
+  <circle cx="334" cy="224" r="46" fill="#082f49" stroke="#38bdf8" stroke-width="3"/>
+  <circle cx="334" cy="224" r="24" fill="#020617"/>
+  <!-- Colorful Glass Reflections -->
+  <ellipse cx="304" cy="196" rx="20" ry="12" fill="#38bdf8" opacity="0.65" transform="rotate(-35 304 196)"/>
+  <circle cx="364" cy="252" r="10" fill="#a855f7" opacity="0.7"/>
+  <circle cx="294" cy="214" r="6" fill="#ffffff" opacity="0.85"/>
+</svg>

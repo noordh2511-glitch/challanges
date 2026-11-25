@@ -1,0 +1,40 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Q1 Beach Scene - Answer with 3 Red Circles -->
+  <defs>
+    <linearGradient id="bSkyAns" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="235" fill="url(#bSkyAns)"/>
+  <rect y="230" width="600" height="80" fill="#0369a1"/>
+  <path d="M0,300 Q180,285 350,305 T600,295 L600,400 L0,400 Z" fill="#fde68a"/>
+  <circle cx="515" cy="72" r="36" fill="#fde047"/>
+  <g fill="#ffffff">
+    <ellipse cx="120" cy="74" rx="48" ry="18"/>
+    <ellipse cx="152" cy="64" rx="34" ry="16"/>
+  </g>
+  <polygon points="480,295 494,165 530,165 544,295" fill="#f8fafc" stroke="#334155" stroke-width="3"/>
+  <rect x="492" y="195" width="40" height="26" fill="#dc2626"/>
+  <rect x="486" y="246" width="52" height="26" fill="#dc2626"/>
+  <rect x="490" y="150" width="44" height="16" fill="#1e293b"/>
+  <polygon points="486,150 512,126 538,150" fill="#dc2626"/>
+  <path d="M180,268 L315,268 L294,294 L202,294 Z" fill="#78350f"/>
+  <line x1="248" y1="144" x2="248" y2="268" stroke="#451a03" stroke-width="5"/>
+  <polygon points="252,148 320,256 252,256" fill="#e11d48"/>
+  <polygon points="244,168 194,256 244,256" fill="#f8fafc"/>
+  <line x1="108" y1="255" x2="108" y2="355" stroke="#78350f" stroke-width="6"/>
+  <path d="M52,262 Q108,215 164,262 Z" fill="#f59e0b"/>
+  <polygon points="392,332 401,352 422,354 406,368 411,388 392,377 373,388 378,368 362,354 383,352" fill="#f97316" stroke="#c2410c" stroke-width="2"/>
+  <!-- Red Highlight Circles -->
+  <g stroke="#ef4444" stroke-width="6" fill="rgba(239,68,68,0.16)">
+    <ellipse cx="132" cy="70" rx="64" ry="30"/>
+    <ellipse cx="284" cy="204" rx="46" ry="62"/>
+    <circle cx="392" cy="360" r="36"/>
+  </g>
+  <g font-family="sans-serif" font-weight="900" font-size="18" text-anchor="middle">
+    <circle cx="192" cy="48" r="15" fill="#ef4444"/><text x="192" y="54" fill="#ffffff">1</text>
+    <circle cx="328" cy="156" r="15" fill="#ef4444"/><text x="328" y="162" fill="#ffffff">2</text>
+    <circle cx="428" cy="336" r="15" fill="#ef4444"/><text x="428" y="342" fill="#ffffff">3</text>
+  </g>
+</svg>

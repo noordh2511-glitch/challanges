@@ -1,0 +1,15 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="160" fill="#38bdf8"/>
+  <rect y="155" width="400" height="145" fill="#0284c7"/>
+  <!-- Palm trees on bank -->
+  <rect x="0" y="146" width="115" height="22" rx="10" fill="#15803d"/>
+  <rect x="38" y="96" width="8" height="54" fill="#78350f"/>
+  <path d="M42,96 Q15,78 8,104 M42,96 Q68,78 76,104 M42,96 Q42,66 64,74" fill="none" stroke="#16a34a" stroke-width="7" stroke-linecap="round"/>
+  <!-- Felucca sailboat on the Nile -->
+  <path d="M145,212 L278,212 L255,244 L168,244 Z" fill="#92400e"/>
+  <line x1="210" y1="68" x2="210" y2="212" stroke="#78350f" stroke-width="5"/>
+  <polygon points="212,72 285,196 212,196" fill="#f8fafc"/>
+  <polygon points="206,92 152,196 206,196" fill="#fef3c7"/>
+  <!-- Waves -->
+  <path d="M40,265 Q80,255 120,265 T200,265 T280,265 T360,265" fill="none" stroke="#bae6fd" stroke-width="4" stroke-linecap="round"/>
+</svg>

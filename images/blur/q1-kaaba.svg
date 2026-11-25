@@ -1,0 +1,40 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- الكعبة المشرفة - مشهد توضيحي -->
+  <defs>
+    <linearGradient id="skyK" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="55%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="420" fill="url(#skyK)"/>
+  <!-- Crescent & Stars -->
+  <circle cx="520" cy="78" r="24" fill="#fde047"/>
+  <circle cx="530" cy="72" r="22" fill="#172554"/>
+  <g fill="#fef08a" opacity="0.85">
+    <circle cx="110" cy="64" r="3"/><circle cx="210" cy="48" r="2.5"/><circle cx="430" cy="56" r="3"/><circle cx="165" cy="110" r="2"/>
+  </g>
+  <!-- Minarets in background -->
+  <g fill="#e2e8f0" stroke="#94a3b8" stroke-width="2">
+    <rect x="82" y="128" width="24" height="165"/>
+    <polygon points="78,128 94,92 110,128" fill="#fbbf24"/>
+    <rect x="534" y="128" width="24" height="165"/>
+    <polygon points="530,128 546,92 562,128" fill="#fbbf24"/>
+  </g>
+  <!-- White Marble Courtyard (Mataf) -->
+  <rect x="0" y="290" width="640" height="130" fill="#f1f5f9"/>
+  <ellipse cx="320" cy="340" rx="260" ry="52" fill="#e2e8f0"/>
+  <!-- Kaaba Cube -->
+  <polygon points="215,155 325,130 435,155 435,322 325,350 215,322" fill="#0f172a" stroke="#334155" stroke-width="3"/>
+  <polygon points="325,130 435,155 435,322 325,350" fill="#1e293b"/>
+  <!-- Golden Kiswah Belt (Hizam) -->
+  <polygon points="215,186 325,163 325,188 215,210" fill="#f59e0b"/>
+  <polygon points="325,163 435,186 435,210 325,188" fill="#fbbf24"/>
+  <!-- Golden Door -->
+  <polygon points="354,228 394,236 394,308 354,300" fill="#fbbf24" stroke="#b45309" stroke-width="3"/>
+  <!-- Ornamental Gold Medallions -->
+  <g fill="#fcd34d">
+    <ellipse cx="250" cy="236" rx="10" ry="6"/>
+    <ellipse cx="290" cy="228" rx="10" ry="6"/>
+  </g>
+</svg>

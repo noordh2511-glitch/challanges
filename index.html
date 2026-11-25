@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>سين جيم | لعبة المسابقات الجماعية</title>
+  <meta name="description" content="لعبة مسابقات جماعية عربية تفاعلية بنظام سين جيم مع 6 فئات، مؤقت، وسائل مساعدة، ولوحة نقاط احترافية." />
+  <meta name="theme-color" content="#0b1228" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="src/assets/icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="src/assets/icons/icon.svg" />
+
+  <!-- الخط العربي: Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="src/css/styles.css" />
+</head>
+<body>
+  <!-- خلفية الأستوديو المضيئة -->
+  <div class="studio-bg" aria-hidden="true">
+    <div class="studio-orb studio-orb-1"></div>
+    <div class="studio-orb studio-orb-2"></div>
+    <div class="studio-orb studio-orb-3"></div>
+    <div class="studio-grid"></div>
+  </div>
+
+  <!-- إشعارات سريعة -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+  <!-- طبقة قصاصات احتفالية خفيفة لنجاح السرقة -->
+  <canvas id="steal-confetti-canvas" class="confetti-canvas steal-confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- جذر شاشة العرض التلفزيوني للجمهور (?mode=display - Phase 4 Pack 3) -->
+  <div id="tv-display-root" class="tv-display-root" hidden aria-hidden="true"></div>
+
+  <!-- =========================================================
+       الشاشة الأولى: شاشة إعداد الجولة (Setup Screen)
+       ========================================================= -->
+  <main id="setup-screen" class="screen setup-screen active">
+    <div class="container setup-container">
+      <header class="hero-header">
+        <div class="hero-top-row">
+          <div class="hero-badges-group">
+            <div class="brand-badge">
+              <span class="brand-dot"></span>
+              مسابقة ثقافية جماعية تفاعلية
+            </div>
+            <span id="offline-status-badge" class="offline-status-badge" hidden aria-live="polite">
+              📡 وضع عدم الاتصال
+            </span>
+          </div>
+          <div class="hero-utility-actions">
+            <button
+              type="button"
+              id="btn-install-pwa"
+              class="btn btn-gold-outline btn-xs pwa-install-btn"
+              hidden
+              title="تثبيت «سين جيم» كتطبيق مستقل يعمل دون إنترنت"
+            >
+              <span>📲</span>
+              <span>تثبيت التطبيق</span>
+            </button>
+            <button
+              type="button"
+              id="btn-audio-mixer-setup"
+              class="btn btn-icon-only btn-sm hero-sound-btn"
+              title="إعدادات الصوت ومستوى المؤثرات"
+              aria-label="فتح إعدادات الصوت"
+              aria-expanded="false"
+            >
+              🎚️
+            </button>
+            <button
+              type="button"
+              id="btn-toggle-sound-setup"
+              class="btn btn-icon-only btn-sm hero-sound-btn"
+              title="كتم / تشغيل الصوت"
+              aria-label="كتم أو تشغيل الصوت"
+              aria-pressed="false"
+            >
+              🔊
+            </button>
+          </div>
+        </div>
+        <h1 class="brand-title">
+          <span class="brand-highlight">سين</span> جيم
+        </h1>
+        <p class="brand-subtitle">
+          أدخل أسماء الفريقين، خصّص وسائل المساعدة التكتيكية، واختر <strong>6 فئات</strong> لتبدأ جولة التحدي من 36 سؤالاً
+        </p>
+      </header>
+
+      <!-- إدخال أسماء الفريقين -->
+      <section class="panel teams-setup-panel" aria-label="إعداد أسماء الفريقين">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <span class="panel-icon">👥</span>
+            أسماء الفريقين
+          </h2>
+        </div>
+        <div class="teams-inputs-grid">
+          <div class="team-input-card team-1-accent">
+            <label for="team1-input" class="input-label">
+              <span class="team-color-dot team-1-dot"></span>
+              اسم الفريق الأول
+            </label>
+            <input
+              type="text"
+              id="team1-input"
+              class="text-input"
+              placeholder="مثال: فريق الصقور"
+              value="الفريق الأول"
+              maxlength="24"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="vs-divider" aria-hidden="true">VS</div>
+
+          <div class="team-input-card team-2-accent">
+            <label for="team2-input" class="input-label">
+              <span class="team-color-dot team-2-dot"></span>
+              اسم الفريق الثاني
+            </label>
+            <input
+              type="text"
+              id="team2-input"
+              class="text-input"
+              placeholder="مثال: فريق النجوم"
+              value="الفريق الثاني"
+              maxlength="24"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- تخصيص وسائل المساعدة واللعب التكتيكي (قابل للطي - Phase 4 Pack 2) -->
+      <section id="tactical-setup-panel" class="panel tactical-setup-panel" aria-label="تخصيص وسائل المساعدة واللعب التكتيكي">
+        <button
+          type="button"
+          id="btn-toggle-tactical-panel"
+          class="tactical-collapse-trigger"
+          aria-expanded="false"
+          aria-controls="tactical-panel-body"
+        >
+          <div class="tactical-trigger-main">
+            <span class="panel-title tactical-panel-title">
+              <span class="panel-icon">⚡</span>
+              وسائل المساعدة وإعدادات الجلسة
+            </span>
+            <div id="tactical-summary-pills" class="tactical-summary-pills">
+              <!-- يتم تحديث ملخص الإعدادات النشطة ديناميكياً -->
+            </div>
+          </div>
+          <span class="tactical-chevron" aria-hidden="true">▾</span>
+        </button>
+
+        <div id="tactical-panel-body" class="tactical-panel-body" hidden>
+          <div class="tactical-cards-grid">
+            <!-- أ) كشف التلميح مقابل خصم نقاط -->
+            <div id="tactical-card-hint" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">💡</span>
+                  <div>
+                    <h3 class="tactical-card-title">كشف التلميح مقابل خصم</h3>
+                    <p class="tactical-card-sub">متاح للأسئلة التي تضم تلميحاً قبل كشف الإجابة</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-hint-enabled"
+                  class="tactical-switch active"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="تفعيل أو تعطيل كشف التلميح"
+                >
+                  <span class="tactical-switch-thumb"></span>
+                </button>
+              </div>
+              <div class="tactical-options-group" id="hint-options-group">
+                <span class="tactical-opt-label">نسبة الخصم من قيمة السؤال:</span>
+                <div class="tactical-pills-row" role="group" aria-label="نسبة خصم التلميح">
+                  <button type="button" class="tactical-opt-btn active" data-setting="hintPenalty" data-value="0.25">25% (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0.5">50%</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0">0% (مجاني)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ب) مضاعفة النقاط (2x) -->
+            <div id="tactical-card-double" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">⚡</span>
+                  <div>
+                    <h3 class="tactical-card-title">مضاعفة النقاط (2x)</h3>
+                    <p class="tactical-card-sub">تُفعَّل من لوحة اللعب قبل اختيار السؤال فقط</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-double-enabled"
+                  class="tactical-switch active"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="تفعيل أو تعطيل مضاعفة النقاط"
+                >
+                  <span class="tactical-switch-thumb"></span>
+                </button>
+              </div>
+              <div class="tactical-options-group" id="double-options-group">
+                <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
+                <div class="tactical-pills-row" role="group" aria-label="رصيد مضاعفة النقاط لكل فريق">
+                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="0">0</button>
+                  <button type="button" class="tactical-opt-btn active" data-setting="doubleCount" data-value="1">1 (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="2">2</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="3">3</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ج) تبديل السؤال (Swap) -->
+            <div id="tactical-card-swap" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">🔄</span>
+                  <div>
+                    <h3 class="tactical-card-title">تبديل السؤال (Swap)</h3>
+                    <p class="tactical-card-sub">استبدال السؤال بآخر جديد من نفس الفئة والصعوبة</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-swap-enabled"
+                  class="tactical-switch active"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="تفعيل أو تعطيل تبديل السؤال"
+                >
+                  <span class="tactical-switch-thumb"></span>
+                </button>
+              </div>
+              <div class="tactical-options-group" id="swap-options-group">
+                <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
+                <div class="tactical-pills-row" role="group" aria-label="رصيد تبديل السؤال لكل فريق">
+                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="0">0</button>
+                  <button type="button" class="tactical-opt-btn active" data-setting="swapCount" data-value="1">1 (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="2">2</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="3">3</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- د) فرصة السرقة (Steal Mode) -->
+            <div id="tactical-card-steal" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">🔥</span>
+                  <div>
+                    <h3 class="tactical-card-title">فرصة السرقة (Steal Mode)</h3>
+                    <p class="tactical-card-sub">منح المنافس فرصة خطف النقاط عند الإجابة الخاطئة (بدون 2x)</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-steal-enabled"
+                  class="tactical-switch active"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="تفعيل أو تعطيل فرصة السرقة"
+                >
+                  <span class="tactical-switch-thumb"></span>
+                </button>
+              </div>
+              <div class="tactical-options-group" id="steal-options-group">
+                <div class="tactical-subrow">
+                  <span class="tactical-opt-label">نسبة نقاط السرقة:</span>
+                  <div class="tactical-pills-row" role="group" aria-label="نسبة نقاط السرقة">
+                    <button type="button" class="tactical-opt-btn active" data-setting="stealMultiplier" data-value="0.5">50% (افتراضي)</button>
+                    <button type="button" class="tactical-opt-btn" data-setting="stealMultiplier" data-value="1">100%</button>
+                  </div>
+                </div>
+                <div class="tactical-subrow">
+                  <span class="tactical-opt-label">مؤقت السرقة:</span>
+                  <div class="tactical-pills-row" role="group" aria-label="مدة مؤقت السرقة">
+                    <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="10">10 ثوانٍ</button>
+                    <button type="button" class="tactical-opt-btn active" data-setting="stealTimerSeconds" data-value="15">15 ثانية (افتراضي)</button>
+                    <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="20">20 ثانية</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- هـ) المؤقت العام للأسئلة (Phase 4 Pack 4) -->
+            <div id="tactical-card-main-timer" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">⏱️</span>
+                  <div>
+                    <h3 class="tactical-card-title">المؤقت العام للأسئلة</h3>
+                    <p class="tactical-card-sub">مدة التفكير للأسئلة العادية والبصرية (يُحفظ تلقائياً مع المباراة)</p>
+                  </div>
+                </div>
+              </div>
+              <div class="tactical-options-group" id="main-timer-options-group">
+                <span class="tactical-opt-label">المدة الافتراضية لكل سؤال:</span>
+                <div class="tactical-pills-row" role="group" aria-label="مدة المؤقت العام للأسئلة">
+                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="30">30ث</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="45">45ث</button>
+                  <button type="button" class="tactical-opt-btn active" data-setting="mainTimerSeconds" data-value="60">60ث (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="90">90ث</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="0">∞ بدون مؤقت</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- و) إبقاء الشاشة مضاءة (Screen Wake Lock - Phase 4 Pack 4) -->
+            <div id="tactical-card-wakelock" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">☀️</span>
+                  <div>
+                    <h3 class="tactical-card-title">إبقاء الشاشة مضاءة (Wake Lock)</h3>
+                    <p class="tactical-card-sub">يمنع خفوت أو إطفاء الشاشة تلقائياً أثناء اللعب وعرض التلفزيون</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-wakelock-enabled"
+                  class="tactical-switch active"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="تفعيل أو تعطيل منع إطفاء الشاشة"
+                >
+                  <span class="tactical-switch-thumb"></span>
+                </button>
+              </div>
+              <div class="tactical-options-group">
+                <span id="wakelock-status-note" class="tactical-opt-label">مفعّل تلقائياً أثناء لوحة اللعب وشاشة التلفزيون</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tactical-panel-footer">
+            <span class="tactical-footer-hint">💡 يمكنك التراجع (Ctrl+Z) عن أي إجراء أثناء المباراة لاسترجاع النقاط ووسائل المساعدة.</span>
+            <button type="button" id="btn-reset-tactical-defaults" class="btn btn-ghost btn-xs">
+              ↺ استعادة الإعدادات الافتراضية
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- اختيار 6 فئات -->
+      <section class="panel categories-setup-panel" aria-label="اختيار فئات الجولة">
+        <div class="categories-toolbar">
+          <div class="categories-heading">
+            <h2 class="panel-title">
+              <span class="panel-icon">🎯</span>
+              اختر 6 فئات للجولة
+            </h2>
+          </div>
+
+          <div class="toolbar-actions">
+            <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm">
+              <span class="btn-icon">☁️</span>
+              تحديث الشيت
+            </button>
+            <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm">
+              <span class="btn-icon">📚</span>
+              إدارة البنك
+            </button>
+            <button type="button" id="btn-reset-history" class="btn btn-danger-outline btn-sm">
+              <span class="btn-icon">🔄</span>
+              تصفير السجل
+            </button>
+          </div>
+        </div>
+
+        <!-- مُبدّل ملف المجموعة النشط (Profile Switcher - Phase 4) -->
+        <div id="profile-switcher-bar" class="profile-switcher-bar" aria-label="اختيار ملف مجموعة اللعب">
+          <div class="profile-switcher-main">
+            <span class="profile-switcher-label">👤 المجموعة:</span>
+            <div id="profile-pills-list" class="profile-pills-list" role="group" aria-label="ملفات المجموعات المتاحة">
+              <!-- يتم توليد أزرار المجموعات ديناميكياً -->
+            </div>
+            <button
+              type="button"
+              id="btn-toggle-new-profile"
+              class="profile-add-btn"
+              aria-expanded="false"
+              title="إنشاء ملف مجموعة جديد (مثل: العائلة، الأصدقاء)"
+            >
+              + مجموعة جديدة
+            </button>
+          </div>
+
+          <form id="new-profile-form" class="new-profile-form" hidden>
+            <div class="new-profile-input-row">
+              <input
+                type="text"
+                id="new-profile-input"
+                class="profile-name-input"
+                placeholder="اسم المجموعة (مثال: العائلة، الأصدقاء)..."
+                maxlength="28"
+                autocomplete="off"
+                aria-label="اسم المجموعة الجديدة"
+              />
+              <button type="submit" id="btn-save-new-profile" class="btn btn-primary btn-xs">
+                حفظ وتفعيل
+              </button>
+              <button type="button" id="btn-cancel-new-profile" class="btn btn-ghost btn-xs">
+                إلغاء
+              </button>
+            </div>
+            <div class="profile-presets-row" aria-label="اقتراحات سريعة">
+              <span class="profile-presets-hint">اقتراحات:</span>
+              <button type="button" class="profile-preset-chip" data-preset="العائلة">👨‍👩‍👧‍👦 العائلة</button>
+              <button type="button" class="profile-preset-chip" data-preset="الأصدقاء">🤝 الأصدقاء</button>
+              <button type="button" class="profile-preset-chip" data-preset="العمل">💼 العمل</button>
+              <button type="button" class="profile-preset-chip" data-preset="سهرة الخميس">🌙 سهرة الخميس</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- شريط إحصائيات بنك الأسئلة المدمج -->
+        <div class="bank-stats-strip" id="played-summary" aria-live="polite">
+          <!-- يتم تحديث ملخص الأسئلة الجديدة والملعوبة -->
+        </div>
+
+        <!-- مؤشر حالة المزامنة مع Google Sheets -->
+        <div id="sheets-status-bar" class="sheets-status-bar" hidden aria-live="polite">
+          <span id="sheets-status-spinner" class="sheets-spinner" hidden aria-hidden="true"></span>
+          <span id="sheets-status-text"></span>
+        </div>
+
+        <!-- شريط التصنيفات الرئيسية (Top Bar) -->
+        <nav class="category-groups-bar-wrap" aria-label="التصنيفات الرئيسية">
+          <div
+            id="category-groups-bar"
+            class="category-groups-bar"
+            role="tablist"
+            aria-label="تصفية الفئات حسب التصنيف الرئيسي"
+          >
+            <!-- يتم توليد أزرار التصنيفات الرئيسية ديناميكياً من JavaScript -->
+          </div>
+        </nav>
+
+        <!-- شريط البحث والتصفية السريعة والاختيار العشوائي -->
+        <div class="category-quick-toolbar" role="search" aria-label="بحث وتصفية الفئات">
+          <div class="category-search-wrap">
+            <span class="category-search-icon" aria-hidden="true">🔍</span>
+            <input
+              type="search"
+              id="category-search-input"
+              class="category-search-input"
+              placeholder="ابحث عن فئة..."
+              autocomplete="off"
+              aria-label="ابحث عن فئة"
+            />
+            <button
+              type="button"
+              id="btn-clear-search"
+              class="category-search-clear"
+              aria-label="مسح البحث"
+              title="مسح البحث"
+              hidden
+            >
+              ×
+            </button>
+          </div>
+
+          <button
+            type="button"
+            id="btn-hide-completed"
+            class="quick-filter-pill"
+            aria-pressed="false"
+            title="إخفاء الفئات التي لا تحتوي على أسئلة جديدة"
+          >
+            <span class="quick-filter-dot" aria-hidden="true"></span>
+            <span>إخفاء المكتملة</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-balanced-categories"
+            class="quick-balanced-btn"
+            title="اختيار 6 فئات متنوعة تلقائياً من مجالات مختلفة بأكبر عدد من الأسئلة الجديدة"
+          >
+            <span aria-hidden="true">✨</span>
+            <span>تشكيلة متوازنة</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-random-categories"
+            class="quick-random-btn"
+            title="اختيار 6 فئات عشوائياً من التصنيف الحالي"
+          >
+            <span aria-hidden="true">🎲</span>
+            <span>عشوائي</span>
+          </button>
+        </div>
+
+        <div id="setup-categories-grid" class="setup-categories-grid" role="group" aria-label="قائمة الفئات المتوفرة">
+          <!-- يتم إنشاء بطاقات الفئات ديناميكياً من JavaScript -->
+        </div>
+      </section>
+    </div>
+
+    <!-- الشريط السفلي الثابت لبدء اللعبة (Sticky Bottom Action Dock) -->
+    <div id="setup-action-dock" class="setup-action-dock" role="region" aria-label="ملخص الاختيار وبدء اللعبة">
+      <div class="setup-dock-inner">
+        <div class="setup-dock-status">
+          <div id="selection-counter" class="selection-counter">
+            المختار: <strong id="selected-count">0</strong> / 6
+          </div>
+          <button
+            type="button"
+            id="btn-clear-selections"
+            class="btn-clear-selections"
+            hidden
+            title="إلغاء جميع الفئات المختارة"
+          >
+            مسح
+          </button>
+        </div>
+
+        <button type="button" id="btn-start-game" class="btn btn-primary setup-start-btn" disabled>
+          <span id="btn-start-game-label">اختر 6 فئات إضافية</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- =========================================================
+       الشاشة الثانية: لوحة اللعب الرئيسية (Game Board Screen)
+       ========================================================= -->
+  <section id="game-screen" class="screen game-screen" aria-hidden="true">
+    <!-- الشريط العلوي للنقاط (Scoreboard) -->
+    <header class="scoreboard-bar">
+      <div class="scoreboard-inner">
+        <!-- بطاقة الفريق الأول -->
+        <div id="scoreboard-team-1" class="score-team-card team-1-card active-turn">
+          <div class="score-team-top">
+            <div class="score-team-identity">
+              <span class="team-badge-dot team-1-dot"></span>
+              <h2 id="board-team1-name" class="score-team-name">الفريق الأول</h2>
+            </div>
+            <span id="team1-turn-pill" class="turn-pill">الدور الآن</span>
+          </div>
+
+          <div class="score-team-bottom">
+            <div class="score-value-row">
+              <button type="button" class="score-adjust-btn minus" data-team="0" data-delta="-100" title="خصم 100 نقطة" aria-label="خصم 100 نقطة للفريق الأول">
+                -100
+              </button>
+              <div id="board-team1-score" class="score-number">0</div>
+              <button type="button" class="score-adjust-btn plus" data-team="0" data-delta="100" title="إضافة 100 نقطة" aria-label="إضافة 100 نقطة للفريق الأول">
+                +100
+              </button>
+            </div>
+
+            <div id="team1-lifelines-status" class="lifelines-status-row" aria-label="وسائل المساعدة للفريق الأول">
+              <!-- يتم تحديثها ديناميكياً -->
+            </div>
+          </div>
+        </div>
+
+        <!-- أدوات التحكم الوسطى -->
+        <div class="scoreboard-center">
+          <div class="mini-brand">
+            <span class="mini-brand-title"><span>سين</span> جيم</span>
+            <span id="board-remaining-pill" class="remaining-pill">متبقي 36 / 36</span>
+            <span id="offline-status-badge-game" class="offline-status-badge offline-badge-compact" hidden aria-live="polite">
+              📡 أوفلاين
+            </span>
+          </div>
+          <div class="center-controls">
+            <button
+              type="button"
+              id="btn-undo-action"
+              class="btn btn-secondary btn-xs btn-undo-action"
+              disabled
+              title="لا توجد إجراءات للتراجع عنها (Ctrl+Z)"
+              aria-label="تراجع عن آخر إجراء"
+            >
+              <span class="btn-icon">↶</span>
+              <span>تراجع</span>
+              <span id="undo-steps-badge" class="undo-steps-badge" hidden>0</span>
+            </button>
+            <button type="button" id="btn-switch-turn" class="btn btn-secondary btn-xs" title="تبديل الدور يدوياً">
+              <span class="btn-icon">🔁</span>
+              <span>تبديل الدور</span>
+            </button>
+            <button type="button" id="btn-end-round" class="btn btn-gold-outline btn-xs" title="إنهاء الجولة وإعلان الفائز">
+              <span class="btn-icon">🏁</span>
+              <span>إنهاء</span>
+            </button>
+            <button type="button" id="btn-return-setup" class="btn btn-ghost btn-xs" title="العودة لاختيار الفئات">
+              <span class="btn-icon">↩️</span>
+              <span>الفئات</span>
+            </button>
+            <button type="button" id="btn-audio-mixer-game" class="btn btn-icon-only btn-xs" title="إعدادات الصوت ومستوى المؤثرات" aria-label="فتح إعدادات الصوت" aria-expanded="false">
+              🎚️
+            </button>
+            <button type="button" id="btn-toggle-sound" class="btn btn-icon-only btn-xs" title="كتم / تشغيل الصوت" aria-label="كتم أو تشغيل الصوت" aria-pressed="false">
+              🔊
+            </button>
+            <button type="button" id="btn-toggle-fullscreen" class="btn btn-icon-only btn-xs" title="ملء الشاشة" aria-label="تبديل وضع ملء الشاشة" aria-pressed="false">
+              ⛶
+            </button>
+            <button type="button" id="btn-open-tv-display" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني للجمهور في نافذة مستقلة">
+              <span class="btn-icon">📺</span>
+              <span>فتح شاشة العرض (TV)</span>
+            </button>
+          </div>
+
+          <!-- شريط حالة وضع الشاشتين وتوجيه الصوت (Phase 4 Pack 3) -->
+          <div id="dual-screen-status-bar" class="dual-screen-status-bar" aria-live="polite">
+            <span id="dual-screen-status-pill" class="dual-status-pill is-single">⚪ وضع الشاشة الواحدة</span>
+            <button
+              type="button"
+              id="btn-toggle-audio-route"
+              class="btn btn-ghost btn-xxs dual-audio-route-btn"
+              hidden
+              title="اختيار مصدر المؤثرات الصوتية لمنع الصدى بين الجهازين"
+            >
+              📺 الصوت: التلفزيون
+            </button>
+            <button
+              type="button"
+              id="btn-resync-tv"
+              class="btn btn-ghost btn-xxs"
+              hidden
+              title="إعادة مزامنة شاشة العرض التلفزيوني فوراً"
+            >
+              🔄 مزامنة
+            </button>
+            <button
+              type="button"
+              id="btn-close-tv"
+              class="btn btn-danger-outline btn-xxs"
+              hidden
+              title="إغلاق وفصل شاشة العرض التلفزيوني"
+            >
+              ✕ إغلاق العرض
+            </button>
+          </div>
+        </div>
+
+        <!-- بطاقة الفريق الثاني -->
+        <div id="scoreboard-team-2" class="score-team-card team-2-card">
+          <div class="score-team-top">
+            <div class="score-team-identity">
+              <span class="team-badge-dot team-2-dot"></span>
+              <h2 id="board-team2-name" class="score-team-name">الفريق الثاني</h2>
+            </div>
+            <span id="team2-turn-pill" class="turn-pill">الدور الآن</span>
+          </div>
+
+          <div class="score-team-bottom">
+            <div class="score-value-row">
+              <button type="button" class="score-adjust-btn minus" data-team="1" data-delta="-100" title="خصم 100 نقطة" aria-label="خصم 100 نقطة للفريق الثاني">
+                -100
+              </button>
+              <div id="board-team2-score" class="score-number">0</div>
+              <button type="button" class="score-adjust-btn plus" data-team="1" data-delta="100" title="إضافة 100 نقطة" aria-label="إضافة 100 نقطة للفريق الثاني">
+                +100
+              </button>
+            </div>
+
+            <div id="team2-lifelines-status" class="lifelines-status-row" aria-label="وسائل المساعدة للفريق الثاني">
+              <!-- يتم تحديثها ديناميكياً -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- شبكة الفئات الست (6 أعمدة على الشاشات العريضة × 6 بطاقات نقاط) -->
+    <div class="board-wrapper">
+      <div id="game-board-grid" class="game-board-grid" aria-label="لوحة الأسئلة">
+        <!-- يتم توليد 6 أعمدة فئات ديناميكياً -->
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       نافذة السؤال والمؤقت ووسائل المساعدة (Question Modal)
+       ========================================================= -->
+  <div id="question-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-category-name" aria-hidden="true">
+    <div class="modal-card question-modal-card">
+      <!-- ترويسة السؤال الثابتة -->
+      <div class="q-modal-header">
+        <div class="q-meta-badges">
+          <span class="q-category-pill">
+            <span id="modal-category-icon">🌍</span>
+            <span id="modal-category-name">جغرافيا</span>
+          </span>
+          <span id="modal-points-pill" class="q-points-pill pts-200">200 نقطة</span>
+          <span id="modal-visual-type-pill" class="q-visual-pill" hidden></span>
+        </div>
+
+        <div class="q-header-end">
+          <div id="modal-turn-badge" class="q-turn-badge team-1-turn">
+            دور: <strong id="modal-active-team-name">الفريق الأول</strong>
+          </div>
+          <button
+            type="button"
+            id="btn-flag-question"
+            class="q-flag-btn"
+            title="تحديد هذا السؤال للمراجعة لاحقاً (دون مقاطعة اللعب)"
+            aria-label="تحديد السؤال للمراجعة"
+            aria-expanded="false"
+          >
+            <span aria-hidden="true">🚩</span>
+            <span id="btn-flag-question-label">مراجعة</span>
+          </button>
+          <button
+            type="button"
+            id="btn-cancel-question"
+            class="q-modal-close-btn"
+            title="إلغاء والعودة للوحة (Esc)"
+            aria-label="إغلاق السؤال والعودة للوحة"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- درج تحديد السؤال للمراجعة (Flag Question Drawer - Phase 4 Pack 4) -->
+      <div id="flag-question-drawer" class="flag-question-drawer" hidden aria-label="تحديد السؤال للمراجعة">
+        <div class="flag-drawer-head">
+          <span class="flag-drawer-title">🚩 تحديد السؤال للمراجعة لاحقاً (لا يؤثر على سير الجولة)</span>
+          <button type="button" id="btn-close-flag-drawer" class="btn btn-ghost btn-xxs" aria-label="إغلاق درج المراجعة">✕</button>
+        </div>
+        <div id="flag-reason-chips" class="flag-reason-chips" role="radiogroup" aria-label="سبب المراجعة">
+          <button type="button" class="flag-reason-chip active" data-flag-reason="typo">✏️ خطأ إملائي</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="unclear">❓ صياغة غير واضحة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="broken-image">🖼️ صورة معطّلة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="wrong-info">⚠️ معلومة غير دقيقة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="difficulty">⚖️ صعوبة غير مناسبة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="other">📝 أخرى</button>
+        </div>
+        <div class="flag-drawer-bottom">
+          <input
+            type="text"
+            id="flag-note-input"
+            class="flag-note-input"
+            placeholder="ملاحظة سريعة اختيارية (مثال: تعديل السنة أو استبدال الرابط)..."
+            maxlength="240"
+            autocomplete="off"
+          />
+          <div class="flag-drawer-actions">
+            <button type="button" id="btn-save-flag" class="btn btn-amber btn-xs">
+              🚩 حفظ للمراجعة
+            </button>
+            <button type="button" id="btn-remove-flag" class="btn btn-danger-outline btn-xs" hidden>
+              🗑️ إزالة التحديد
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- شريط حالة فرصة السرقة النشطة بلون الفريق المنافس -->
+      <div id="steal-status-banner" class="steal-status-banner" hidden aria-live="polite">
+        <div class="steal-banner-main">
+          <span class="steal-fire-icon" aria-hidden="true">🔥</span>
+          <span id="steal-banner-text" class="steal-banner-text">فرصة سرقة للفريق الثاني</span>
+          <span id="steal-banner-pts-badge" class="steal-banner-pts-badge">+100 نقطة</span>
+        </div>
+        <div id="steal-team-selector" class="steal-team-selector" hidden role="group" aria-label="اختيار الفريق السارق">
+          <!-- يظهر تلقائياً في حال وجود 3 فرق أو أكثر -->
+        </div>
+      </div>
+
+      <!-- شريط معاينة حالة شاشة التلفزيون للمقدّم (يظهر فقط عند اتصال شاشة العرض TV) -->
+      <div id="host-tv-status-bar" class="host-tv-status-bar" hidden aria-live="polite">
+        <div class="host-tv-preview-badges">
+          <span class="host-tv-live-tag">📺 شاشة التلفزيون:</span>
+          <span id="host-tv-visibility-pill" class="host-tv-vis-pill state-hidden">🙈 الإجابة مخفية</span>
+          <span id="host-tv-mask-pill" class="host-tv-mask-pill" hidden></span>
+        </div>
+        <button
+          type="button"
+          id="btn-host-cockpit-undo"
+          class="btn btn-ghost btn-xxs"
+          title="تراجع عن آخر خطوة داخل السؤال (Ctrl+Z)"
+        >
+          ↶ تراجع
+        </button>
+      </div>
+
+      <!-- المؤقت وأدواته (ثابت أعلى النافذة للأسئلة القياسية ووضع السرقة) -->
+      <div id="timer-section" class="timer-section">
+        <div class="timer-top-row">
+          <div class="timer-display-group">
+            <div id="timer-display" class="timer-display">01:00</div>
+            <span id="timer-mode-label" class="timer-mode-label">الوقت الأساسي</span>
+          </div>
+
+          <div class="timer-controls">
+            <button type="button" id="btn-timer-toggle" class="btn btn-secondary btn-xs">
+              <span id="timer-toggle-icon">⏸️</span>
+              <span id="timer-toggle-text">إيقاف</span>
+              <kbd class="kbd-hint">Space</kbd>
+            </button>
+            <button type="button" id="btn-timer-reset" class="btn btn-ghost btn-xs">
+              🔄 إعادة ضبط
+              <kbd class="kbd-hint">R</kbd>
+            </button>
+          </div>
+        </div>
+
+        <div class="timer-progress-track" aria-hidden="true">
+          <div id="timer-progress-bar" class="timer-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- جسم النافذة القابل للتمرير عند الحاجة فقط -->
+      <div id="q-modal-scroll-body" class="q-modal-scroll-body">
+        <!-- شريط مؤشرات وسائل المساعدة المفعّلة في هذا السؤال (مثل ⚡ مضاعفة 2x نشطة) -->
+        <div id="active-lifelines-banners" class="active-lifelines-banners" hidden></div>
+
+        <!-- لوحة تحكم المقدّم السرية (Host Cockpit — مرئية للمقدّم فقط عند اتصال شاشة العرض TV) -->
+        <div id="host-cockpit-card" class="host-cockpit-card" hidden>
+          <div class="host-cockpit-header">
+            <span class="host-cockpit-badge">🎙️ لوحة المقدّم (مخفية عن الجمهور على التلفزيون)</span>
+            <span id="host-cockpit-charades-tag" class="host-cockpit-charades-tag" hidden>🎭 كلمة التمثيل للممثّل والمقدّم</span>
+          </div>
+
+          <div class="host-cockpit-answer-box">
+            <span class="host-cockpit-field-label">✅ الإجابة الصحيحة:</span>
+            <div id="host-cockpit-answer-text" class="host-cockpit-answer-text"></div>
+          </div>
+
+          <div id="host-cockpit-hint-row" class="host-cockpit-detail-row" hidden>
+            <div class="host-cockpit-detail-content">
+              <span class="host-cockpit-field-label">💡 التلميح:</span>
+              <span id="host-cockpit-hint-text" class="host-cockpit-detail-text"></span>
+            </div>
+            <button type="button" id="btn-host-project-hint" class="btn btn-gold-outline btn-xs">
+              📺 إظهار التلميح على التلفزيون
+            </button>
+          </div>
+
+          <div id="host-cockpit-exp-row" class="host-cockpit-detail-row" hidden>
+            <div class="host-cockpit-detail-content">
+              <span id="host-cockpit-exp-label" class="host-cockpit-field-label">📌 الشرح:</span>
+              <span id="host-cockpit-exp-text" class="host-cockpit-detail-text"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- جسم السؤال والوسائط البصرية التفاعلية -->
+        <div id="question-body-box" class="question-body-box">
+          <!-- وضع العرض المخصّص لفئات «من غير كلام» (CharadesQuestionView - mgk-*) -->
+          <div id="charades-view" class="charades-view" hidden>
+            <!-- بطاقة العنوان الذكية: التصنيف الفرعي + عدد الكلمات فقط -->
+            <div id="charades-header-card" class="charades-header-card">
+              <div class="charades-header-eyebrow">
+                <span id="charades-eyebrow-text">🎭 من غير كلام — تحدي التمثيل الصامت</span>
+              </div>
+              <h3 id="charades-topic-title" class="charades-topic-title">وسائل نقل</h3>
+              <div class="charades-meta-pills">
+                <span id="charades-word-count-pill" class="charades-word-count-pill">🔢 عدد الكلمات: كلمتان</span>
+              </div>
+            </div>
+
+            <!-- منطقة الكشف السري للممثّل (Hold-to-Reveal) مع ثبات تام للموضع لمنع انزياح الزر تحت المؤشر -->
+            <div id="charades-actor-stage" class="charades-actor-stage select-none">
+              <div class="charades-card-viewport">
+                <div id="charades-decoy-card" class="charades-decoy-card">
+                  <div class="charades-decoy-icon" aria-hidden="true">🙈</div>
+                  <div class="charades-decoy-title">شاشة التمويه الآمنة</div>
+                  <p class="charades-decoy-desc">
+                    يُدير الفريق المخمّن ظهره للشاشة، ويضغط الممثّل مطوّلاً على الزر أدناه لمعرفة الكلمة وفكرة التمثيل سراً.
+                  </p>
+                </div>
+
+                <div id="charades-secret-card" class="charades-secret-card" hidden>
+                  <div class="charades-secret-badge">🤫 للممثّل فقط — ممنوع الكلام أو الإشارة للحروف!</div>
+                  <div id="charades-secret-answer" class="charades-secret-answer"></div>
+                  <div id="charades-secret-explanation" class="charades-secret-explanation" hidden></div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="btn-hold-reveal-secret"
+                class="btn charades-hold-btn select-none"
+                aria-label="اضغط مع الاستمرار لكشف الكلمة سراً للممثّل"
+              >
+                <span class="charades-hold-icon" aria-hidden="true">👆</span>
+                <span id="btn-hold-reveal-label">اضغط مع الاستمرار لكشف الكلمة سراً</span>
+              </button>
+            </div>
+
+            <!-- مؤقت جولة «من غير كلام» المدمج (60 / 90 / 120 ثانية) -->
+            <div id="charades-timer-box" class="charades-timer-box">
+              <div class="charades-timer-top">
+                <div class="charades-duration-selector" id="charades-duration-pills" role="group" aria-label="اختيار مدة جولة التمثيل">
+                  <span class="charades-dur-label">المدة:</span>
+                  <button type="button" class="charades-dur-pill" data-charades-sec="60">60ث</button>
+                  <button type="button" class="charades-dur-pill" data-charades-sec="90">90ث</button>
+                  <button type="button" class="charades-dur-pill" data-charades-sec="120">120ث</button>
+                </div>
+
+                <div class="charades-timer-actions">
+                  <button type="button" id="btn-charades-timer-toggle" class="btn btn-primary btn-sm">
+                    <span id="charades-timer-toggle-icon">▶️</span>
+                    <span id="charades-timer-toggle-text">ابدأ</span>
+                    <kbd class="kbd-hint kbd-hint-light">Space</kbd>
+                  </button>
+                  <button type="button" id="btn-charades-timer-reset" class="btn btn-ghost btn-sm">
+                    🔄 إعادة ضبط
+                    <kbd class="kbd-hint">R</kbd>
+                  </button>
+                </div>
+              </div>
+
+              <div class="charades-timer-readout-row">
+                <div id="charades-timer-display" class="charades-timer-display">01:00</div>
+                <span id="charades-timer-status" class="charades-timer-status">جاهز لبدء التمثيل</span>
+              </div>
+
+              <div class="charades-timer-track" aria-hidden="true">
+                <div id="charades-timer-progress" class="charades-timer-progress"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- المرحلة الأولى لنوع memory: شاشة الاستعداد قبل بدء العرض -->
+          <div id="memory-ready-panel" class="memory-ready-panel" hidden>
+            <div class="memory-ready-icon" aria-hidden="true">🧠</div>
+            <h3 class="memory-ready-title">استعد لاختبار ذاكرة الصورة!</h3>
+            <p class="memory-ready-desc">
+              تأكّد من انتباه الفريق بالكامل؛ عند الضغط على البدء ستظهر الصورة لفترة محدودة ثم تختفي ليظهر السؤال ويبدأ المؤقت.
+            </p>
+            <button type="button" id="btn-memory-start" class="btn btn-primary btn-lg">
+              👁️ ابدأ عرض الصورة (10 ثوانٍ)
+            </button>
+          </div>
+
+          <!-- شريط عداد الذاكرة (المرحلة الثانية لنوع memory) -->
+          <div id="memory-countdown-panel" class="memory-countdown-panel" hidden>
+            <div class="memory-countdown-top">
+              <div class="memory-countdown-info">
+                <span class="memory-badge">🧠 وضع الذاكرة</span>
+                <span>ركّز جيداً في الصورة! ستختفي خلال</span>
+                <strong id="memory-seconds-display" class="memory-seconds-display">10</strong>
+                <span>ثوانٍ</span>
+              </div>
+              <button type="button" id="btn-memory-skip" class="btn btn-secondary btn-sm">
+                ⏭️ انتهيت - اعرض السؤال
+              </button>
+            </div>
+            <div class="memory-progress-track" aria-hidden="true">
+              <div id="memory-progress-bar" class="memory-progress-bar"></div>
+            </div>
+          </div>
+
+          <p id="modal-question-text" class="question-text"></p>
+
+          <!-- حاوية الصورة المفردة (للعادي، التغبيش، التقريب، الألوان المعكوسة، الظل، والذاكرة) -->
+          <div id="modal-question-image-wrap" class="media-wrap" hidden>
+            <div id="visual-image-stage" class="visual-image-stage">
+              <div id="visual-image-skeleton" class="visual-image-skeleton" hidden aria-live="polite">
+                <span class="visual-loading-spinner" aria-hidden="true"></span>
+                <span id="visual-loading-label" class="visual-loading-label">جاري تحميل الصورة...</span>
+              </div>
+              <div id="visual-image-error" class="visual-image-error" hidden role="alert">
+                <div class="visual-error-icon" aria-hidden="true">🖼️</div>
+                <div class="visual-error-title">تعذّر تحميل صورة السؤال</div>
+                <p class="visual-error-desc">تحقّق من الاتصال بالإنترنت ثم اضغط إعادة المحاولة دون ضياع الجولة.</p>
+                <div class="visual-error-actions">
+                  <button type="button" id="btn-retry-visual-image" class="btn btn-primary btn-xs">
+                    🔄 إعادة المحاولة
+                  </button>
+                  <button type="button" id="btn-skip-broken-memory" class="btn btn-secondary btn-xs" hidden>
+                    ⏭️ عرض نص السؤال
+                  </button>
+                </div>
+              </div>
+              <img id="modal-question-image" class="modal-media-img" alt="صورة السؤال" draggable="false" />
+              <span id="single-image-zoom-hint" class="zoom-hint-badge" hidden>🔍 اضغط للتكبير</span>
+            </div>
+            <div id="blur-controls-wrap" class="blur-controls-wrap" hidden>
+              <button type="button" id="btn-reduce-blur" class="btn btn-secondary btn-sm">
+                👁️ تخفيف التغبيش (تلميح)
+              </button>
+            </div>
+            <div id="zoom-controls-wrap" class="zoom-controls-wrap" hidden>
+              <button type="button" id="btn-reduce-zoom" class="btn btn-secondary btn-sm">
+                🔎 تخفيف الزوم (تلميح)
+              </button>
+            </div>
+          </div>
+
+          <!-- شارة عدد الفروقات المطلوب إيجادها (تظهر لنوع spot-diff عند توفر differencesCount) -->
+          <div id="spot-diff-badge-wrap" class="spot-diff-badge-wrap" hidden>
+            <span id="spot-diff-count-badge" class="spot-diff-count-badge">🔍 المطلوب إيجاد 3 فروقات</span>
+          </div>
+
+          <!-- حاوية الصور المتعددة (لنوعي spot-diff و multi-image) -->
+          <div id="modal-multi-images-wrap" class="multi-images-wrap" hidden></div>
+        </div>
+
+        <!-- شريط الأدوات التكتيكية داخل السؤال (التلميح المخصوم + تبديل السؤال) -->
+        <div id="question-tactical-bar" class="question-tactical-bar">
+          <div class="tactical-actions-row">
+            <div id="question-hint-wrap" class="question-hint-wrap" hidden>
+              <button type="button" id="btn-show-hint" class="btn btn-gold-outline btn-sm tactical-action-btn">
+                <span id="btn-show-hint-text">💡 كشف التلميح (-25%)</span>
+                <kbd class="kbd-hint">H</kbd>
+              </button>
+            </div>
+
+            <div id="question-swap-wrap" class="question-swap-wrap" hidden>
+              <button type="button" id="btn-swap-question" class="btn btn-secondary btn-sm tactical-action-btn">
+                <span id="btn-swap-question-text">🔄 تبديل السؤال (متبقي 1)</span>
+              </button>
+              <span id="swap-unavailable-note" class="swap-unavailable-note" hidden>لا توجد أسئلة بديلة متاحة</span>
+            </div>
+          </div>
+
+          <!-- بطاقة عرض التلميح الأنيقة (تعرض hint فقط دون explanation) -->
+          <div id="question-hint-box" class="question-hint-box" hidden></div>
+        </div>
+
+        <!-- بطاقة الإجابة الصحيحة (تظهر بعد كشف الإجابة) -->
+        <div id="answer-section" class="answer-section" hidden>
+          <div class="answer-card">
+            <div class="answer-label">✅ الإجابة الصحيحة</div>
+            <div id="modal-answer-text" class="answer-text"></div>
+            <div id="modal-answer-explanation" class="answer-explanation" hidden></div>
+            <div id="modal-answer-image-wrap" class="media-wrap" hidden>
+              <div id="answer-image-stage" class="visual-image-stage answer-image-stage is-zoomable">
+                <div id="answer-image-skeleton" class="visual-image-skeleton" hidden aria-live="polite">
+                  <span class="visual-loading-spinner" aria-hidden="true"></span>
+                  <span class="visual-loading-label">جاري تحميل صورة الإجابة...</span>
+                </div>
+                <div id="answer-image-error" class="visual-image-error" hidden role="alert">
+                  <div class="visual-error-title">تعذّر تحميل صورة الإجابة</div>
+                  <div class="visual-error-actions">
+                    <button type="button" id="btn-retry-answer-image" class="btn btn-primary btn-xs">
+                      🔄 إعادة المحاولة
+                    </button>
+                  </div>
+                </div>
+                <img id="modal-answer-image" class="modal-media-img" alt="صورة الإجابة" />
+                <span id="answer-image-zoom-hint" class="zoom-hint-badge">🔍 اضغط للتكبير</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- التذييل السفلي الثابت (إظهار الإجابة / إجابة خاطئة والسرقة / احتساب النقاط) -->
+      <div class="q-modal-sticky-footer">
+        <!-- 1) الحالة الأساسية قبل كشف الإجابة -->
+        <div id="pre-reveal-actions" class="q-modal-pre-reveal">
+          <button type="button" id="btn-reveal-answer" class="btn btn-primary btn-reveal-main">
+            <span id="btn-reveal-answer-label">👁️ إظهار الإجابة</span>
+            <kbd class="kbd-hint kbd-hint-light">Enter</kbd>
+          </button>
+          <button type="button" id="btn-wrong-answer" class="btn btn-danger-outline btn-wrong-turn">
+            <span id="btn-wrong-answer-label">❌ إجابة خاطئة</span>
+          </button>
+        </div>
+
+        <!-- 2) عرض خيار السرقة بعد إجابة خاطئة للفريق صاحب الدور -->
+        <div id="steal-offer-actions" class="steal-footer-panel" hidden>
+          <div id="steal-offer-prompt" class="award-prompt steal-offer-prompt">
+            ❌ إجابة غير صحيحة — هل تريد منح الفريق المنافس فرصة السرقة؟
+          </div>
+          <div class="steal-offer-grid">
+            <button type="button" id="btn-open-steal" class="btn btn-amber btn-steal-main">
+              <span id="btn-open-steal-label">🔥 فتح فرصة السرقة (+100 نقطة)</span>
+              <kbd class="kbd-hint kbd-hint-light">S</kbd>
+            </button>
+            <button type="button" id="btn-skip-steal-close" class="btn btn-secondary btn-steal-secondary">
+              <span>👁️ إغلاق السؤال دون نقاط وكشف الإجابة</span>
+            </button>
+            <button type="button" id="btn-cancel-steal-offer" class="btn btn-ghost btn-xs" title="العودة للسؤال">
+              ↩️ رجوع
+            </button>
+          </div>
+        </div>
+
+        <!-- 3) أزرار الحسم أثناء فرصة السرقة النشطة -->
+        <div id="steal-active-actions" class="steal-footer-panel" hidden>
+          <div id="steal-active-prompt" class="award-prompt steal-active-prompt">
+            🔥 حسم محاولة السرقة:
+          </div>
+          <div class="steal-resolve-grid">
+            <button type="button" id="btn-steal-success" class="btn btn-steal-win">
+              <span id="btn-steal-success-label">✅ نجحت السرقة (+100 نقطة)</span>
+            </button>
+            <button type="button" id="btn-steal-fail" class="btn btn-danger-outline btn-steal-lose">
+              <span>❌ فشلت السرقة (كشف الإجابة وإغلاق السؤال)</span>
+            </button>
+            <button type="button" id="btn-steal-peek-answer" class="btn btn-ghost btn-xs" title="إظهار الإجابة الصحيحة للتحقق قبل الحسم">
+              👁️ إظهار الإجابة للحسم
+            </button>
+          </div>
+        </div>
+
+        <!-- 4) شريط إغلاق سريع لحظة عرض الإجابة بعد حسم السرقة أو الإغلاق بدون نقاط -->
+        <div id="closing-reveal-actions" class="closing-reveal-actions" hidden>
+          <button type="button" id="btn-finish-closing-reveal" class="btn btn-primary btn-reveal-full">
+            <span>✓ العودة للوحة اللعب</span>
+            <kbd class="kbd-hint kbd-hint-light">Enter</kbd>
+          </button>
+        </div>
+
+        <!-- 5) أزرار منح النقاط التقليدية بعد كشف الإجابة -->
+        <div id="post-reveal-actions" class="award-section" hidden>
+          <div class="award-prompt">من أجاب بشكل صحيح؟</div>
+          <div id="award-buttons-grid" class="award-buttons-grid">
+            <button type="button" id="btn-award-team1" class="btn btn-award-team1">
+              <span class="award-team-label" id="award-team1-label">فاز الفريق الأول</span>
+              <span class="award-points-row">
+                <span class="award-points-tag" id="award-team1-pts">(+200)</span>
+                <kbd class="kbd-hint kbd-hint-light">1</kbd>
+              </span>
+            </button>
+
+            <button type="button" id="btn-award-team2" class="btn btn-award-team2">
+              <span class="award-team-label" id="award-team2-label">فاز الفريق الثاني</span>
+              <span class="award-points-row">
+                <span class="award-points-tag" id="award-team2-pts">(+200)</span>
+                <kbd class="kbd-hint kbd-hint-light">2</kbd>
+              </span>
+            </button>
+
+            <button type="button" id="btn-award-none" class="btn btn-award-none">
+              <span class="award-team-label">لا أحد</span>
+              <span class="award-points-row">
+                <span class="award-points-tag">(0)</span>
+                <kbd class="kbd-hint">0</kbd>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة الفائز (Winner Modal)
+       ========================================================= -->
+  <div id="winner-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="winner-title" aria-hidden="true">
+    <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+    <div id="winner-modal-card" class="modal-card winner-modal-card">
+      <div class="winner-trophy" id="winner-trophy">🏆</div>
+      <div id="winner-subtitle" class="winner-eyebrow">نهاية الجولة</div>
+      <h2 id="winner-title" class="winner-title">فاز الفريق الأول!</h2>
+
+      <div class="winner-scores-grid">
+        <div id="winner-card-team1" class="winner-team-box team-1-box">
+          <div class="winner-crown" hidden>👑 الفائز</div>
+          <div id="winner-team1-name" class="winner-team-name">الفريق الأول</div>
+          <div id="winner-team1-score" class="winner-team-score">0</div>
+          <div class="winner-score-unit">نقطة</div>
+        </div>
+
+        <div id="winner-card-team2" class="winner-team-box team-2-box">
+          <div class="winner-crown" hidden>👑 الفائز</div>
+          <div id="winner-team2-name" class="winner-team-name">الفريق الثاني</div>
+          <div id="winner-team2-score" class="winner-team-score">0</div>
+          <div class="winner-score-unit">نقطة</div>
+        </div>
+      </div>
+
+      <p id="winner-stats-note" class="winner-stats-note"></p>
+
+      <!-- لوحة إحصائيات نهاية المباراة وسجل الأسئلة (Match Analytics Dashboard - Phase 4 Pack 3) -->
+      <section id="winner-analytics-dashboard" class="winner-analytics-dashboard" hidden aria-label="إحصائيات نهاية المباراة">
+        <div class="analytics-tabs-bar">
+          <div class="analytics-tabs-group" role="tablist">
+            <button
+              type="button"
+              id="btn-tab-analytics-overview"
+              class="analytics-tab-btn active"
+              role="tab"
+              aria-selected="true"
+            >
+              📊 ملخص الإحصائيات
+            </button>
+            <button
+              type="button"
+              id="btn-tab-analytics-log"
+              class="analytics-tab-btn"
+              role="tab"
+              aria-selected="false"
+            >
+              📋 سجل الأسئلة (<span id="analytics-log-count">0</span>)
+            </button>
+          </div>
+          <button type="button" id="btn-copy-match-summary" class="btn btn-ghost btn-xxs" title="نسخ ملخص وإحصائيات المباراة للمشاركة">
+            📤 نسخ الملخص
+          </button>
+        </div>
+
+        <div id="analytics-overview-panel" class="analytics-panel">
+          <div id="analytics-kpi-grid" class="analytics-kpi-grid"></div>
+          <div id="analytics-team-compare" class="analytics-team-compare"></div>
+          <div id="analytics-categories-breakdown" class="analytics-categories-breakdown"></div>
+        </div>
+
+        <div id="analytics-log-panel" class="analytics-panel" hidden>
+          <div id="analytics-events-list" class="analytics-events-list"></div>
+        </div>
+      </section>
+
+      <div class="winner-actions">
+        <div class="winner-primary-actions">
+          <button type="button" id="btn-rematch-round" class="btn btn-primary btn-lg">
+            🎉 جولة جديدة
+          </button>
+          <button type="button" id="btn-new-round" class="btn btn-secondary btn-lg">
+            🎯 العودة لاختيار الفئات
+          </button>
+        </div>
+        <button type="button" id="btn-resume-round" class="btn btn-ghost btn-sm" hidden>
+          العودة لاستكمال الجولة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة إدارة بنك الأسئلة (Question Bank Manager Modal - Phase 3)
+       ========================================================= -->
+  <div id="bank-manager-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bank-manager-title" aria-hidden="true">
+    <div class="modal-card bank-manager-card">
+      <!-- ترويسة ثابتة -->
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="bank-manager-title" class="bank-modal-title">
+            <span>📚</span>
+            إدارة بنك الأسئلة
+          </h2>
+          <p id="bank-sources-summary" class="bank-sources-summary"></p>
+        </div>
+        <button type="button" id="btn-close-bank-manager" class="q-modal-close-btn" aria-label="إغلاق نافذة إدارة بنك الأسئلة" title="إغلاق (Esc)">
+          ✕
+        </button>
+      </div>
+
+      <!-- محتوى قابل للتمرير -->
+      <div class="bank-modal-scroll-body">
+        <!-- إحصائيات اللعب للملف النشط (Phase 4) -->
+        <section class="bank-section bank-profile-stats-section" aria-label="إحصائيات اللعب للمجموعة النشطة">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">👤 إحصائيات اللعب للملف النشط</h3>
+            <span id="bank-active-profile-pill" class="bank-count-pill">المجموعة: عام</span>
+          </div>
+
+          <div id="bank-profile-stats-grid" class="bank-profile-stats-grid">
+            <!-- يتم تعبئة إحصائيات اللعب للملف النشط ديناميكياً -->
+          </div>
+
+          <div class="bank-profile-actions-row">
+            <button type="button" id="btn-bank-profile-reset" class="btn btn-danger-outline btn-sm">
+              🔄 تصفير سجل الأسئلة الملعوبة للملف النشط
+            </button>
+          </div>
+        </section>
+
+        <!-- تقرير «صحة البنك» (Bank Health Report - Phase 4) -->
+        <section class="bank-section bank-health-section" aria-label="تقرير صحة بنك الأسئلة">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🩺 تقرير «صحة البنك»</h3>
+            <span id="bank-last-sync-pill" class="bank-sync-time-pill">آخر مزامنة: محلي</span>
+          </div>
+
+          <div id="bank-health-metrics" class="bank-health-grid">
+            <!-- يتم توليد بطاقات صحة البنك ديناميكياً -->
+          </div>
+
+          <div id="bank-duplicates-box" class="bank-health-subbox" hidden></div>
+          <div id="bank-under50-box" class="bank-health-subbox"></div>
+        </section>
+
+        <!-- نظرة عامة وبحث في فئات البنك -->
+        <section class="bank-section" aria-label="استعراض إحصائيات الفئات">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">📊 استعراض فئات البنك</h3>
+            <span id="bank-overview-count" class="bank-count-pill">0 فئة</span>
+          </div>
+
+          <div class="bank-search-row">
+            <div class="category-search-wrap">
+              <span class="category-search-icon" aria-hidden="true">🔍</span>
+              <input
+                type="search"
+                id="bank-category-search"
+                class="category-search-input"
+                placeholder="ابحث داخل فئات البنك..."
+                autocomplete="off"
+                aria-label="ابحث داخل فئات البنك"
+              />
+              <button
+                type="button"
+                id="btn-clear-bank-search"
+                class="category-search-clear"
+                aria-label="مسح بحث البنك"
+                title="مسح البحث"
+                hidden
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <div id="bank-categories-overview" class="bank-categories-overview">
+            <!-- يتم توليد ملخص فئات البنك ديناميكياً -->
+          </div>
+        </section>
+
+        <!-- القسم أ: استيراد دفعة أسئلة (JSON) -->
+        <section class="bank-section" aria-label="استيراد دفعة أسئلة بصيغة JSON">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">📥 أ) استيراد دفعة أسئلة (JSON)</h3>
+            <span class="bank-section-hint">يدعم مصفوفة فئات <code>[...]</code> أو فئة واحدة <code>{...}</code></span>
+          </div>
+
+          <textarea
+            id="bank-json-input"
+            class="bank-json-textarea"
+            dir="ltr"
+            spellcheck="false"
+            rows="6"
+            placeholder='[&#10;  {&#10;    "id": "my-category",&#10;    "name": "اسم الفئة",&#10;    "icon": "🌟",&#10;    "color": "#06b6d4",&#10;    "description": "وصف قصير",&#10;    "questions": [&#10;      { "id": "my-200-1", "points": 200, "question": "السؤال؟", "answer": "الإجابة" }&#10;    ]&#10;  }&#10;]'
+          ></textarea>
+
+          <div class="bank-import-actions">
+            <button type="button" id="btn-import-json" class="btn btn-primary btn-sm">
+              ✅ فحص وإضافة للبنك
+            </button>
+            <button type="button" id="btn-clear-json-input" class="btn btn-ghost btn-sm">
+              مسح النص
+            </button>
+          </div>
+
+          <div id="bank-import-feedback" class="bank-feedback-box" hidden></div>
+        </section>
+
+        <!-- القسم ب: الحفظ الدائم للنشر (تصدير ملف extra-questions.js) -->
+        <section class="bank-section" aria-label="الحفظ الدائم وتصدير ملف extra-questions.js">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">💾 ب) الحفظ الدائم للنشر (تصدير الملف)</h3>
+            <span id="bank-export-stats" class="bank-count-pill">0 فئات إضافية</span>
+          </div>
+
+          <div class="bank-export-row">
+            <button type="button" id="btn-export-extra-js" class="btn btn-amber btn-sm">
+              ⬇️ تنزيل ملف extra-questions.js
+            </button>
+          </div>
+          <p class="bank-export-note">
+            ملاحظة: بعد تنزيل الملف، استبدل الملف <code>src/data/extra-questions.js</code> داخل مجلد المشروع لحفظ جميع الفئات والأسئلة الإضافية بشكل دائم عند النشر على <strong>Netlify</strong> أو أي استضافة أخرى.
+          </p>
+        </section>
+
+        <!-- القسم ج: عرض وإدارة الفئات الإضافية المستوردة في المتصفح -->
+        <section class="bank-section" aria-label="عرض وإدارة الفئات الإضافية">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🗂️ ج) الفئات الإضافية المستوردة في المتصفح</h3>
+            <button type="button" id="btn-clear-all-custom" class="btn btn-danger-outline btn-sm" disabled>
+              🗑️ مسح كل المستوردة
+            </button>
+          </div>
+
+          <div id="bank-custom-list" class="bank-custom-list">
+            <!-- يتم توليد قائمة الفئات المستوردة ديناميكياً -->
+          </div>
+        </section>
+
+        <!-- القسم د: الأسئلة المحدّدة للمراجعة (Flagged Questions - Phase 4 Pack 4) -->
+        <section id="bank-flagged-section" class="bank-section bank-flagged-section" aria-label="الأسئلة المحدّدة للمراجعة">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🚩 د) الأسئلة المحدّدة للمراجعة</h3>
+            <span id="bank-flagged-count" class="bank-count-pill">0 أسئلة</span>
+          </div>
+
+          <div class="bank-flagged-actions">
+            <button type="button" id="btn-export-flagged-csv" class="btn btn-secondary btn-xs" disabled>
+              📄 تصدير CSV (للشيت)
+            </button>
+            <button type="button" id="btn-copy-flagged-json" class="btn btn-ghost btn-xs" disabled>
+              📋 نسخ JSON
+            </button>
+            <button type="button" id="btn-clear-all-flagged" class="btn btn-danger-outline btn-xs" disabled>
+              🗑️ مسح قائمة المراجعة
+            </button>
+          </div>
+
+          <div id="bank-flagged-list" class="bank-flagged-list">
+            <!-- يتم توليد الأسئلة المحدّدة للمراجعة ديناميكياً -->
+          </div>
+        </section>
+
+        <!-- القسم هـ: النسخ الاحتياطي والاستعادة الكاملة (Full Backup & Restore - Phase 4 Pack 4) -->
+        <section id="bank-backup-section" class="bank-section bank-backup-section" aria-label="النسخ الاحتياطي والاستعادة الكاملة">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🛡️ هـ) النسخ الاحتياطي والاستعادة الكاملة</h3>
+            <span class="bank-section-hint">يشمل المجموعات، السجل، المراجعة، والإعدادات</span>
+          </div>
+
+          <div class="backup-actions-row">
+            <button type="button" id="btn-export-full-backup" class="btn btn-primary btn-sm">
+              ⬇️ تصدير نسخة احتياطية كاملة (JSON)
+            </button>
+            <label for="input-import-backup-file" class="btn btn-secondary btn-sm backup-file-label">
+              ⬆️ اختيار ملف نسخة احتياطية
+            </label>
+            <input type="file" id="input-import-backup-file" accept=".json,application/json" hidden />
+          </div>
+
+          <div id="backup-import-preview" class="backup-import-preview" hidden>
+            <div id="backup-preview-summary" class="backup-preview-summary"></div>
+            <div class="backup-restore-controls">
+              <div class="backup-mode-pills" role="radiogroup" aria-label="وضع الاستعادة">
+                <button type="button" class="backup-mode-pill active" data-backup-mode="merge">
+                  🔀 دمج آمن مع البيانات الحالية
+                </button>
+                <button type="button" class="backup-mode-pill" data-backup-mode="replace">
+                  ♻️ استبدال كامل
+                </button>
+              </div>
+              <div class="backup-confirm-btns">
+                <button type="button" id="btn-confirm-restore-backup" class="btn btn-amber btn-xs">
+                  ✅ تأكيد الاستعادة
+                </button>
+                <button type="button" id="btn-cancel-restore-backup" class="btn btn-ghost btn-xs">
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="backup-feedback-box" class="bank-feedback-box" hidden></div>
+        </section>
+      </div>
+
+      <!-- تذييل ثابت بإجراءات آمنة -->
+      <div class="bank-modal-footer">
+        <button type="button" id="btn-bank-reset-history" class="btn btn-danger-outline btn-sm">
+          🔄 تصفير سجل الأسئلة الملعوبة
+        </button>
+        <button type="button" id="btn-bank-footer-close" class="btn btn-secondary btn-sm">
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة تأكيد الإجراءات (Confirm Modal)
+       ========================================================= -->
+  <div id="confirm-modal" class="modal-overlay confirm-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-hidden="true">
+    <div class="modal-card confirm-modal-card">
+      <div class="confirm-icon">⚠️</div>
+      <h3 id="confirm-title" class="confirm-title">تصفير سجل الأسئلة الملعوبة؟</h3>
+      <p id="confirm-message" class="confirm-message">
+        سيتم مسح سجل الأسئلة السابقة لتصبح جميع أسئلة البنك متاحة مجدداً كـ «أسئلة جديدة».
+      </p>
+      <div class="confirm-actions">
+        <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">تراجع</button>
+        <button type="button" id="btn-confirm-ok" class="btn btn-danger">نعم، صفّر السجل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة استئناف المباراة المحفوظة تلقائياً (Resume Match Modal - Phase 4)
+       ========================================================= -->
+  <div id="resume-match-modal" class="modal-overlay resume-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-modal-title" aria-hidden="true">
+    <div class="modal-card resume-modal-card">
+      <div class="resume-modal-badge">💾 حفظ تلقائي للمباراة</div>
+      <h3 id="resume-modal-title" class="resume-modal-title">توجد مباراة سابقة غير مكتملة!</h3>
+      <p class="resume-modal-desc">
+        عثرنا على جولة جارية محفوظة تلقائياً. هل تود متابعتها من حيث توقفت أم بدء مباراة جديدة؟
+      </p>
+
+      <div id="resume-match-summary" class="resume-match-summary">
+        <!-- ملخص الفريقين والنقاط والأسئلة المتبقية -->
+      </div>
+
+      <div class="resume-modal-actions">
+        <button type="button" id="btn-resume-saved-match" class="btn btn-primary btn-lg">
+          ▶️ متابعة المباراة السابقة
+        </button>
+        <button type="button" id="btn-discard-saved-match" class="btn btn-secondary btn-lg">
+          🆕 بدء مباراة جديدة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       عارض تكبير الصور التفاعلي (Image Lightbox)
+       ========================================================= -->
+  <div id="image-lightbox" class="lightbox-overlay" role="dialog" aria-modal="true" aria-label="تكبير الصورة" aria-hidden="true">
+    <button type="button" id="btn-lightbox-close" class="lightbox-close-btn" aria-label="إغلاق التكبير" title="إغلاق (Esc)">✕</button>
+    <button type="button" id="btn-lightbox-prev" class="lightbox-nav-btn lightbox-prev" aria-label="الصورة السابقة" hidden>‹</button>
+    <div class="lightbox-content">
+      <img id="lightbox-img" class="lightbox-img" alt="معاينة مكبّرة للصورة" />
+      <div id="lightbox-caption" class="lightbox-caption" hidden></div>
+    </div>
+    <button type="button" id="btn-lightbox-next" class="lightbox-nav-btn lightbox-next" aria-label="الصورة التالية" hidden>›</button>
+  </div>
+
+  <!-- =========================================================
+       لوحة التحكم المتقدمة بالصوت (Audio Mixer Popover - Phase 4 Pack 4)
+       ========================================================= -->
+  <div id="audio-mixer-popover" class="audio-mixer-popover" role="dialog" aria-label="إعدادات الصوت والمؤثرات" hidden>
+    <div class="audio-mixer-header">
+      <span class="audio-mixer-title">🎚️ التحكم بالصوت والمؤثرات</span>
+      <button type="button" id="btn-close-audio-mixer" class="btn btn-ghost btn-xxs" aria-label="إغلاق إعدادات الصوت">✕</button>
+    </div>
+
+    <div class="audio-volume-row">
+      <div class="audio-volume-label-row">
+        <label for="audio-volume-slider">مستوى الصوت الرئيسي</label>
+        <strong id="audio-volume-value">80%</strong>
+      </div>
+      <input
+        type="range"
+        id="audio-volume-slider"
+        class="audio-volume-slider"
+        min="0"
+        max="100"
+        step="5"
+        value="80"
+        aria-label="مستوى الصوت الرئيسي"
+      />
+    </div>
+
+    <div class="audio-categories-list">
+      <div class="audio-cat-row">
+        <span>⏱️ دقات المؤقت وجرس الوقت</span>
+        <button type="button" id="toggle-sfx-timer" class="tactical-switch active" role="switch" aria-checked="true" aria-label="أصوات المؤقت">
+          <span class="tactical-switch-thumb"></span>
+        </button>
+      </div>
+      <div class="audio-cat-row">
+        <span>⚡ نقرات الواجهة والوسائل والتراجع</span>
+        <button type="button" id="toggle-sfx-ui" class="tactical-switch active" role="switch" aria-checked="true" aria-label="أصوات الواجهة والوسائل">
+          <span class="tactical-switch-thumb"></span>
+        </button>
+      </div>
+      <div class="audio-cat-row">
+        <span>🎉 كشف الإجابة والنقاط والاحتفال</span>
+        <button type="button" id="toggle-sfx-celebrations" class="tactical-switch active" role="switch" aria-checked="true" aria-label="أصوات النقاط والاحتفال">
+          <span class="tactical-switch-thumb"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="audio-mixer-footer">
+      <button type="button" id="btn-test-audio" class="btn btn-secondary btn-xs">
+        🔔 اختبار الصوت
+      </button>
+      <button type="button" id="btn-mixer-mute" class="btn btn-ghost btn-xs">
+        🔇 كتم الكل
+      </button>
+    </div>
+  </div>
+
+  <!-- ربط ملفات البيانات والإعدادات والوحدات المستقلة والمنطق بالترتيب الصحيح -->
+  <script src="src/data/questions.js"></script>
+  <script src="src/data/extra-questions.js"></script>
+  <script src="sheets-config.js"></script>
+  <script src="src/utils/historyStore.js"></script>
+  <script src="src/utils/sheetSanitizer.js"></script>
+  <script src="src/utils/matchStore.js"></script>
+  <script src="src/utils/imagePreloader.js"></script>
+  <script src="src/utils/liveSync.js"></script>
+  <script src="src/utils/wakeLock.js"></script>
+  <script src="src/utils/flaggedQuestionsStore.js"></script>
+  <script src="src/utils/backupManager.js"></script>
+  <script src="src/utils/pwaManager.js"></script>
+  <script src="src/js/audio.js"></script>
+  <script src="src/js/confetti.js"></script>
+  <script src="src/js/displayView.js"></script>
+  <script src="src/js/app.js"></script>
+</body>
+</html>

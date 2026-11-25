@@ -1,0 +1,39 @@
+<svg width="640" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400">
+  <!-- Cozy Study Desk Scene for Memory Challenge -->
+  <!-- Wall -->
+  <rect width="640" height="400" fill="#1e293b"/>
+  <!-- Window on left -->
+  <rect x="38" y="34" width="140" height="145" rx="8" fill="#38bdf8" stroke="#e2e8f0" stroke-width="8"/>
+  <line x1="108" y1="34" x2="108" y2="179" stroke="#e2e8f0" stroke-width="6"/>
+  <line x1="38" y1="106" x2="178" y2="106" stroke="#e2e8f0" stroke-width="6"/>
+  <circle cx="145" cy="72" r="18" fill="#fde047"/>
+  <!-- Wall Clock showing 3:00 -->
+  <circle cx="530" cy="86" r="44" fill="#f8fafc" stroke="#f59e0b" stroke-width="7"/>
+  <line x1="530" y1="86" x2="530" y2="56" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+  <line x1="530" y1="86" x2="554" y2="86" stroke="#0f172a" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="530" cy="86" r="5" fill="#e11d48"/>
+  <!-- Wooden Bookshelf with EXACTLY 3 Books (Blue, Green, Yellow) -->
+  <rect x="235" y="128" width="210" height="14" rx="4" fill="#92400e"/>
+  <rect x="262" y="64" width="28" height="64" rx="3" fill="#2563eb" stroke="#1e3a8a" stroke-width="2"/>
+  <rect x="296" y="52" width="30" height="76" rx="3" fill="#10b981" stroke="#065f46" stroke-width="2"/>
+  <rect x="332" y="70" width="28" height="58" rx="3" fill="#f59e0b" stroke="#92400e" stroke-width="2"/>
+  <!-- Small green cactus on shelf -->
+  <rect x="382" y="102" width="30" height="26" rx="4" fill="#d97706"/>
+  <rect x="390" y="74" width="14" height="30" rx="7" fill="#22c55e"/>
+  <!-- Desk Surface -->
+  <rect x="30" y="295" width="580" height="22" rx="6" fill="#b45309"/>
+  <rect x="55" y="317" width="22" height="83" fill="#78350f"/>
+  <rect x="563" y="317" width="22" height="83" fill="#78350f"/>
+  <!-- Laptop in center -->
+  <rect x="220" y="196" width="175" height="96" rx="8" fill="#0f172a" stroke="#94a3b8" stroke-width="5"/>
+  <rect x="234" y="210" width="147" height="68" rx="3" fill="#0ea5e9" opacity="0.35"/>
+  <rect x="200" y="287" width="215" height="10" rx="4" fill="#cbd5e1"/>
+  <!-- RED MUG on right of desk -->
+  <path d="M484,264 C500,264 500,284 484,284" fill="none" stroke="#ef4444" stroke-width="6"/>
+  <rect x="444" y="252" width="42" height="43" rx="6" fill="#ef4444" stroke="#b91c1c" stroke-width="2"/>
+  <path d="M457,242 Q452,232 460,224 M471,242 Q466,232 474,224" fill="none" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+  <!-- Yellow Desk Lamp on left -->
+  <rect x="92" y="285" width="54" height="10" rx="4" fill="#facc15"/>
+  <path d="M119,285 L108,230 L146,204" fill="none" stroke="#eab308" stroke-width="7" stroke-linecap="round"/>
+  <polygon points="136,192 174,212 156,228 128,210" fill="#facc15"/>
+</svg>

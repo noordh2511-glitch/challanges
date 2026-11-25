@@ -1,0 +1,17 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="egyptSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde047"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="215" fill="url(#egyptSky)"/>
+  <circle cx="315" cy="76" r="34" fill="#fef9c3"/>
+  <rect y="205" width="400" height="95" fill="#d97706"/>
+  <!-- Pyramids of Giza -->
+  <polygon points="35,218 135,96 235,218" fill="#eab308"/>
+  <polygon points="135,96 235,218 175,218" fill="#ca8a04"/>
+  <polygon points="165,228 250,124 335,228" fill="#f59e0b"/>
+  <polygon points="250,124 335,228 282,228" fill="#b45309"/>
+  <polygon points="285,234 335,168 385,234" fill="#eab308"/>
+</svg>

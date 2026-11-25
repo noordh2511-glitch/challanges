@@ -1,0 +1,11 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q6-2: 5 Colorful Interlocking Rings (الحلقات الأولمبية) -->
+  <rect width="400" height="300" fill="#f8fafc"/>
+  <g fill="none" stroke-width="11">
+    <circle cx="108" cy="124" r="44" stroke="#0284c7"/>
+    <circle cx="200" cy="124" r="44" stroke="#0f172a"/>
+    <circle cx="292" cy="124" r="44" stroke="#dc2626"/>
+    <circle cx="154" cy="172" r="44" stroke="#eab308"/>
+    <circle cx="246" cy="172" r="44" stroke="#16a34a"/>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q6-4: Winners Podium 1-2-3 (منصة التتويج) -->
+  <rect width="400" height="300" fill="#0f172a"/>
+  <!-- Spotlight Rays -->
+  <polygon points="200,10 110,270 290,270" fill="#38bdf8" opacity="0.12"/>
+  <!-- 2nd Place (Left) -->
+  <rect x="64" y="156" width="90" height="106" rx="6" fill="#94a3b8" stroke="#cbd5e1" stroke-width="4"/>
+  <text x="109" y="220" font-family="sans-serif" font-weight="900" font-size="44" text-anchor="middle" fill="#0f172a">2</text>
+  <!-- 1st Place (Center) -->
+  <rect x="155" y="106" width="90" height="156" rx="6" fill="#f59e0b" stroke="#fde68a" stroke-width="4"/>
+  <text x="200" y="192" font-family="sans-serif" font-weight="900" font-size="52" text-anchor="middle" fill="#0f172a">1</text>
+  <!-- Crown above 1st -->
+  <polygon points="174,88 182,58 200,76 218,58 226,88" fill="#fde047" stroke="#b45309" stroke-width="3"/>
+  <!-- 3rd Place (Right) -->
+  <rect x="246" y="186" width="90" height="76" rx="6" fill="#d97706" stroke="#fdba74" stroke-width="4"/>
+  <text x="291" y="238" font-family="sans-serif" font-weight="900" font-size="40" text-anchor="middle" fill="#0f172a">3</text>
+</svg>

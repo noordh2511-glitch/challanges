@@ -1,0 +1,30 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Golden Vintage Compass (Great for Zoom!) -->
+  <rect width="600" height="400" fill="#0f172a"/>
+  <!-- Outer Gold Case -->
+  <circle cx="300" cy="212" r="158" fill="#d97706" stroke="#fbbf24" stroke-width="10"/>
+  <!-- Top Ring -->
+  <circle cx="300" cy="36" r="24" fill="none" stroke="#fbbf24" stroke-width="10"/>
+  <!-- Dial Face -->
+  <circle cx="300" cy="212" r="134" fill="#fef3c7" stroke="#92400e" stroke-width="4"/>
+  <!-- Degree Ticks -->
+  <g stroke="#78350f" stroke-width="3">
+    <line x1="300" y1="84" x2="300" y2="104"/>
+    <line x1="300" y1="320" x2="300" y2="340"/>
+    <line x1="172" y1="212" x2="192" y2="212"/>
+    <line x1="408" y1="212" x2="428" y2="212"/>
+  </g>
+  <!-- Cardinal Letters -->
+  <g font-family="sans-serif" font-weight="900" font-size="26" text-anchor="middle" fill="#78350f">
+    <text x="300" y="130" fill="#dc2626">N</text>
+    <text x="300" y="314">S</text>
+    <text x="392" y="221">E</text>
+    <text x="208" y="221">W</text>
+  </g>
+  <!-- Compass Rose Star -->
+  <polygon points="300,136 318,196 376,212 318,228 300,288 282,228 224,212 282,196" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+  <!-- Red/Blue Magnetic Needle -->
+  <polygon points="300,122 318,212 282,212" fill="#dc2626"/>
+  <polygon points="300,302 318,212 282,212" fill="#1e3a8a"/>
+  <circle cx="300" cy="212" r="14" fill="#fbbf24" stroke="#78350f" stroke-width="4"/>
+</svg>

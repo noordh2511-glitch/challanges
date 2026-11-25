@@ -1,0 +1,32 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- أهرامات الجيزة -->
+  <defs>
+    <linearGradient id="gizaSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="60%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="295" fill="url(#gizaSky)"/>
+  <circle cx="515" cy="96" r="42" fill="#fef08a"/>
+  <!-- Desert Sand -->
+  <rect y="285" width="640" height="135" fill="#d97706"/>
+  <path d="M0,335 Q180,305 340,335 T640,325 L640,420 L0,420 Z" fill="#b45309"/>
+  <!-- Great Pyramid (Left) -->
+  <polygon points="50,305 210,115 370,305" fill="#f59e0b"/>
+  <polygon points="210,115 370,305 276,305" fill="#b45309"/>
+  <!-- Second Pyramid (Center) -->
+  <polygon points="255,318 395,155 535,318" fill="#eab308"/>
+  <polygon points="395,155 535,318 452,318" fill="#a16207"/>
+  <!-- Third Pyramid (Right) -->
+  <polygon points="445,326 525,222 605,326" fill="#fbbf24"/>
+  <polygon points="525,222 605,326 558,326" fill="#b45309"/>
+  <!-- Camels silhouette in foreground -->
+  <g fill="#451a03">
+    <ellipse cx="145" cy="358" rx="22" ry="12"/>
+    <circle cx="142" cy="346" r="10"/>
+    <rect x="128" y="366" width="5" height="24"/><rect x="138" y="366" width="5" height="24"/>
+    <rect x="152" y="366" width="5" height="24"/><rect x="160" y="366" width="5" height="24"/>
+    <path d="M162,356 Q178,348 180,332 L190,334" fill="none" stroke="#451a03" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>

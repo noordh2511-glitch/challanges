@@ -1,0 +1,18 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q5-3: Autumn Orange Leaves (الخريف) -->
+  <rect width="400" height="225" fill="#fde68a"/>
+  <rect y="220" width="400" height="80" fill="#b45309"/>
+  <!-- Autumn Tree -->
+  <rect x="178" y="156" width="42" height="84" rx="6" fill="#78350f"/>
+  <circle cx="200" cy="112" r="64" fill="#ea580c"/>
+  <circle cx="146" cy="134" r="44" fill="#f97316"/>
+  <circle cx="254" cy="134" r="44" fill="#d97706"/>
+  <!-- Falling Autumn Leaves -->
+  <g>
+    <ellipse cx="86" cy="176" rx="14" ry="8" fill="#dc2626" transform="rotate(-30 86 176)"/>
+    <ellipse cx="122" cy="212" rx="13" ry="7" fill="#f59e0b" transform="rotate(24 122 212)"/>
+    <ellipse cx="292" cy="196" rx="14" ry="8" fill="#ea580c" transform="rotate(35 292 196)"/>
+    <ellipse cx="326" cy="236" rx="13" ry="7" fill="#dc2626" transform="rotate(-22 326 236)"/>
+    <ellipse cx="242" cy="252" rx="12" ry="7" fill="#facc15" transform="rotate(15 242 252)"/>
+  </g>
+</svg>

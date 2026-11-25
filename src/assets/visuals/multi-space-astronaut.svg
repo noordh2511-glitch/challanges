@@ -1,0 +1,17 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#090d24"/>
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="70" cy="48" r="2"/><circle cx="330" cy="72" r="3"/><circle cx="64" cy="222" r="2.5"/><circle cx="340" cy="235" r="2"/>
+  </g>
+  <!-- Astronaut -->
+  <rect x="150" y="168" width="100" height="86" rx="28" fill="#f8fafc"/>
+  <rect x="174" y="186" width="52" height="34" rx="8" fill="#38bdf8"/>
+  <circle cx="188" cy="203" r="6" fill="#ef4444"/><circle cx="212" cy="203" r="6" fill="#22c55e"/>
+  <!-- Helmet -->
+  <circle cx="200" cy="112" r="56" fill="#f8fafc" stroke="#cbd5e1" stroke-width="5"/>
+  <ellipse cx="200" cy="115" rx="40" ry="30" fill="#1e293b"/>
+  <path d="M174,104 Q190,94 206,100" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <!-- Arms -->
+  <rect x="115" y="176" width="40" height="22" rx="11" fill="#e2e8f0" transform="rotate(-20 135 187)"/>
+  <rect x="245" y="176" width="40" height="22" rx="11" fill="#e2e8f0" transform="rotate(20 265 187)"/>
+</svg>

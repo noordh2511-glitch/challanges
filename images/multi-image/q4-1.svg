@@ -1,0 +1,17 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Q4-1: Roasted Coffee Beans (حبوب البن) -->
+  <rect width="400" height="300" fill="#29170b"/>
+  <circle cx="200" cy="150" r="115" fill="#43230f"/>
+  <g transform="translate(135,125) rotate(-25)">
+    <ellipse cx="0" cy="0" rx="44" ry="29" fill="#7c3f18" stroke="#3b1d0a" stroke-width="4"/>
+    <path d="M-36,0 Q0,-12 36,0" fill="none" stroke="#291206" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(245,115) rotate(22)">
+    <ellipse cx="0" cy="0" rx="44" ry="29" fill="#6b3413" stroke="#3b1d0a" stroke-width="4"/>
+    <path d="M-36,0 Q0,12 36,0" fill="none" stroke="#291206" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(195,192) rotate(-8)">
+    <ellipse cx="0" cy="0" rx="48" ry="31" fill="#85441c" stroke="#3b1d0a" stroke-width="4"/>
+    <path d="M-38,0 Q0,-10 38,0" fill="none" stroke="#291206" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

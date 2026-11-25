@@ -1,0 +1,25 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- حبة فراولة ناضجة -->
+  <rect width="640" height="420" fill="#0f172a"/>
+  <circle cx="320" cy="220" r="180" fill="#1e293b"/>
+  <!-- Strawberry Body -->
+  <path d="M210,160 C210,112 265,98 320,104 C375,98 430,112 430,160 C430,248 368,365 320,365 C272,365 210,248 210,160 Z" fill="#e11d48" stroke="#9f1239" stroke-width="5"/>
+  <!-- Shine -->
+  <ellipse cx="264" cy="180" rx="18" ry="42" fill="#fb7185" opacity="0.45" transform="rotate(-14 264 180)"/>
+  <!-- Seeds -->
+  <g fill="#fde047">
+    <ellipse cx="258" cy="176" rx="4.5" ry="7"/><ellipse cx="300" cy="168" rx="4.5" ry="7"/>
+    <ellipse cx="344" cy="168" rx="4.5" ry="7"/><ellipse cx="384" cy="178" rx="4.5" ry="7"/>
+    <ellipse cx="272" cy="222" rx="4.5" ry="7"/><ellipse cx="320" cy="218" rx="4.5" ry="7"/>
+    <ellipse cx="368" cy="222" rx="4.5" ry="7"/><ellipse cx="290" cy="270" rx="4.5" ry="7"/>
+    <ellipse cx="348" cy="270" rx="4.5" ry="7"/><ellipse cx="320" cy="316" rx="4.5" ry="7"/>
+  </g>
+  <!-- Green Leafy Crown (Calyx) -->
+  <g fill="#16a34a" stroke="#14532d" stroke-width="3">
+    <path d="M320,104 C282,78 232,96 205,126 C244,132 284,134 320,122 Z"/>
+    <path d="M320,104 C358,78 408,96 435,126 C396,132 356,134 320,122 Z"/>
+    <path d="M320,104 C296,120 278,148 272,162 C302,146 314,132 320,122 Z"/>
+    <path d="M320,104 C344,120 362,148 368,162 C338,146 326,132 320,122 Z"/>
+    <path d="M320,104 L320,54" stroke="#15803d" stroke-width="11" stroke-linecap="round"/>
+  </g>
+</svg>

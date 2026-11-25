@@ -1,0 +1,31 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#0f172a"/>
+  <!-- Soft studio glow -->
+  <circle cx="300" cy="215" r="190" fill="#1e293b"/>
+  <!-- Outer dark green rind -->
+  <path d="M90,150 A210,210 0 0,0 510,150 Z" fill="#15803d"/>
+  <!-- Stripes on rind -->
+  <path d="M125,215 L145,205 M190,278 L205,260 M300,320 L300,295 M410,278 L395,260 M475,215 L455,205" stroke="#14532d" stroke-width="10" stroke-linecap="round"/>
+  <!-- Light white-green inner rind -->
+  <path d="M108,150 A192,192 0 0,0 492,150 Z" fill="#dcfce7"/>
+  <!-- Juicy red flesh -->
+  <path d="M122,150 A178,178 0 0,0 478,150 Z" fill="#ef4444"/>
+  <!-- Highlight -->
+  <path d="M148,162 A152,152 0 0,0 452,162" fill="none" stroke="#f87171" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <!-- Watermelon seeds clustered nicely around center-bottom (ideal for zoom!) -->
+  <g fill="#1c1917">
+    <ellipse cx="210" cy="195" rx="7" ry="12" transform="rotate(-25 210 195)"/>
+    <ellipse cx="255" cy="235" rx="7" ry="13" transform="rotate(-12 255 235)"/>
+    <ellipse cx="300" cy="255" rx="7" ry="13"/>
+    <ellipse cx="345" cy="235" rx="7" ry="13" transform="rotate(12 345 235)"/>
+    <ellipse cx="390" cy="195" rx="7" ry="12" transform="rotate(25 390 195)"/>
+    <ellipse cx="275" cy="192" rx="6" ry="11" transform="rotate(-8 275 192)"/>
+    <ellipse cx="325" cy="192" rx="6" ry="11" transform="rotate(8 325 192)"/>
+    <ellipse cx="300" cy="295" rx="6" ry="11"/>
+    <ellipse cx="235" cy="272" rx="6" ry="11" transform="rotate(-20 235 272)"/>
+    <ellipse cx="365" cy="272" rx="6" ry="11" transform="rotate(20 365 272)"/>
+  </g>
+  <!-- Cute tiny juice drops -->
+  <circle cx="170" cy="110" r="8" fill="#ef4444" opacity="0.8"/>
+  <circle cx="435" cy="105" r="6" fill="#ef4444" opacity="0.8"/>
+</svg>

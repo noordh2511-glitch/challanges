@@ -1,0 +1,19 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#14532d"/>
+  <circle cx="200" cy="150" r="118" fill="#166534"/>
+  <!-- Classic Soccer Ball -->
+  <circle cx="200" cy="150" r="88" fill="#f8fafc" stroke="#0f172a" stroke-width="5"/>
+  <polygon points="200,114 234,138 221,178 179,178 166,138" fill="#0f172a"/>
+  <g stroke="#0f172a" stroke-width="4">
+    <line x1="200" y1="114" x2="200" y2="70"/>
+    <line x1="234" y1="138" x2="275" y2="122"/>
+    <line x1="221" y1="178" x2="250" y2="214"/>
+    <line x1="179" y1="178" x2="150" y2="214"/>
+    <line x1="166" y1="138" x2="125" y2="122"/>
+  </g>
+  <polygon points="182,64 218,64 200,82" fill="#0f172a"/>
+  <polygon points="282,112 287,142 268,128" fill="#0f172a"/>
+  <polygon points="118,112 113,142 132,128" fill="#0f172a"/>
+  <polygon points="262,216 234,232 246,204" fill="#0f172a"/>
+  <polygon points="138,216 166,232 154,204" fill="#0f172a"/>
+</svg>

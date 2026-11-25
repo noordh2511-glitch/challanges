@@ -1,0 +1,40 @@
+<svg width="640" height="420" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <!-- البطريق القطبي -->
+  <defs>
+    <linearGradient id="iceSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#e0f2fe"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="310" fill="url(#iceSky)"/>
+  <!-- Icebergs -->
+  <polygon points="0,305 110,165 220,305" fill="#bae6fd"/>
+  <polygon points="440,305 555,148 640,305" fill="#bae6fd"/>
+  <!-- Snow Ground -->
+  <rect y="300" width="640" height="120" fill="#f8fafc"/>
+  <!-- Penguin Feet -->
+  <ellipse cx="282" cy="356" rx="28" ry="12" fill="#f97316"/>
+  <ellipse cx="358" cy="356" rx="28" ry="12" fill="#f97316"/>
+  <!-- Penguin Flippers -->
+  <ellipse cx="222" cy="242" rx="22" ry="62" fill="#0f172a" transform="rotate(20 222 242)"/>
+  <ellipse cx="418" cy="242" rx="22" ry="62" fill="#0f172a" transform="rotate(-20 418 242)"/>
+  <!-- Penguin Black Body -->
+  <ellipse cx="320" cy="252" rx="92" ry="108" fill="#0f172a"/>
+  <!-- White Belly -->
+  <ellipse cx="320" cy="264" rx="64" ry="86" fill="#ffffff"/>
+  <!-- Penguin Head -->
+  <circle cx="320" cy="134" r="64" fill="#0f172a"/>
+  <!-- White Face Patches -->
+  <ellipse cx="298" cy="136" rx="22" ry="26" fill="#ffffff"/>
+  <ellipse cx="342" cy="136" rx="22" ry="26" fill="#ffffff"/>
+  <!-- Eyes -->
+  <circle cx="296" cy="128" r="7" fill="#0f172a"/>
+  <circle cx="344" cy="128" r="7" fill="#0f172a"/>
+  <circle cx="294" cy="125" r="2.5" fill="#ffffff"/>
+  <circle cx="342" cy="125" r="2.5" fill="#ffffff"/>
+  <!-- Orange Beak -->
+  <polygon points="300,144 340,144 320,174" fill="#f97316"/>
+  <!-- Cozy Red Scarf -->
+  <rect x="256" y="176" width="128" height="22" rx="10" fill="#e11d48"/>
+  <rect x="348" y="192" width="24" height="58" rx="8" fill="#be123c"/>
+</svg>
