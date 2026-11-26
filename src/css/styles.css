@@ -13571,3 +13571,132 @@ body.player-mobile-mode {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   الحزمة الثالثة عشرة (Pack 13):
+   1) المزامنة السحابية لحساب المقدّم (Google Auth + Smart Merge)
+   2) إرسال بلاغات الأسئلة تلقائياً إلى Google Sheets
+   ========================================================= */
+.cloud-header-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cloud-header-pill.is-synced {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: rgba(6, 78, 59, 0.35);
+  color: #ecfdf5;
+}
+.cloud-header-pill.is-pending {
+  border-color: rgba(251, 191, 36, 0.65);
+  background: rgba(180, 83, 9, 0.3);
+  color: #fef3c7;
+}
+.cloud-sync-section {
+  border: 1.5px solid rgba(56, 189, 248, 0.38);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(15, 23, 42, 0.85));
+}
+.cloud-sync-desc {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.cloud-auth-actions,
+.cloud-manual-actions,
+.sheet-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cloud-user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(9, 14, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.cloud-user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #22d3ee;
+}
+.cloud-user-info {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cloud-user-email,
+.cloud-last-sync-text {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.cloud-quota-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px dashed rgba(251, 191, 36, 0.45);
+  font-size: 0.78rem;
+  color: #fde68a;
+  line-height: 1.5;
+}
+
+.sheet-report-settings-box {
+  margin: 10px 0 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(9, 14, 30, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sheet-report-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.88rem;
+}
+.sheet-report-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 10px;
+}
+.flagged-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.flagged-sync-pill.is-sent {
+  background: rgba(16, 185, 129, 0.22);
+  color: #a7f3d0;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+}
+.flagged-sync-pill.is-pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+}
+.flagged-sync-pill.is-failed {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+@media (max-width: 640px) {
+  .sheet-report-grid {
+    grid-template-columns: 1fr;
+  }
+}

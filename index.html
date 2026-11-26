@@ -94,6 +94,15 @@
             </div>
             <button
               type="button"
+              id="btn-cloud-sync-pill"
+              class="btn btn-secondary btn-xs cloud-header-pill"
+              title="المزامنة السحابية لحساب المقدّم (Google Auth)"
+            >
+              <span id="cloud-pill-icon">☁️</span>
+              <span id="cloud-pill-label">المزامنة السحابية</span>
+            </button>
+            <button
+              type="button"
               id="btn-open-wireless-setup"
               class="btn btn-secondary btn-xs"
               title="الغرفة اللاسلكية عبر QR Code (ريموت المقدّم وجرس السرعة)"
@@ -940,12 +949,11 @@
           <button type="button" id="btn-close-flag-drawer" class="btn btn-ghost btn-xxs" aria-label="إغلاق درج المراجعة">✕</button>
         </div>
         <div id="flag-reason-chips" class="flag-reason-chips" role="radiogroup" aria-label="سبب المراجعة">
-          <button type="button" class="flag-reason-chip active" data-flag-reason="typo">✏️ خطأ مطبعي</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="unclear">❓ صياغة غير واضحة</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="broken-image">🖼️ صورة لا تعمل</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="wrong-info">⚠️ معلومة تحتاج مراجعة</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="difficulty">⚖️ مستوى الصعوبة غير مناسب</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="other">📝 أخرى</button>
+          <button type="button" class="flag-reason-chip active" data-flag-reason="wrong-answer">⚠️ خطأ في الإجابة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="typo">✏️ خطأ إملائي/صياغة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="broken-media">🖼️ رابط صورة أو صوت معطّل</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="duplicate">♻️ سؤال مكرر</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="other">📝 ملاحظة أخرى</button>
         </div>
         <div class="flag-drawer-bottom">
           <input
@@ -1582,6 +1590,59 @@
 
       <!-- محتوى قابل للتمرير -->
       <div class="bank-modal-scroll-body">
+        <!-- المزامنة السحابية لحساب المقدّم (Pack 13 - Google Auth + Smart Merge) -->
+        <section id="bank-cloud-sync-section" class="bank-section cloud-sync-section" aria-label="المزامنة السحابية لحساب المقدّم">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">☁️ المزامنة السحابية لحساب المقدّم</h3>
+            <span id="cloud-sync-status-badge" class="bank-count-pill">⚪ وضع محلي فقط</span>
+          </div>
+
+          <div id="cloud-signed-out-box" class="cloud-signed-out-box">
+            <p class="cloud-sync-desc">
+              سجّل دخولك اختيارياً بحساب Google لمزامنة سجل الأسئلة الملعوبة، قاعة المشاهير، إحصائيات وفئات «برا السالفة» النصية، البلاغات، والبطولة بين أجهزتك تلقائياً — ويبقى التطبيق يعمل 100% أوفلاين بدون تسجيل دخول.
+            </p>
+            <div class="cloud-auth-actions">
+              <button type="button" id="btn-cloud-google-signin" class="btn btn-primary btn-sm">
+                🔐 تسجيل الدخول بحساب Google
+              </button>
+              <button type="button" id="btn-cloud-google-redirect" class="btn btn-secondary btn-xs" hidden>
+                ↪️ تسجيل الدخول المباشر (Redirect)
+              </button>
+            </div>
+          </div>
+
+          <div id="cloud-signed-in-box" class="cloud-signed-in-box" hidden>
+            <div class="cloud-user-card">
+              <img id="cloud-user-avatar" class="cloud-user-avatar" alt="صورة الحساب" hidden />
+              <div class="cloud-user-info">
+                <strong id="cloud-user-name">المقدّم</strong>
+                <span id="cloud-user-email" class="cloud-user-email"></span>
+                <span id="cloud-last-sync-text" class="cloud-last-sync-text">آخر مزامنة: —</span>
+              </div>
+              <button type="button" id="btn-cloud-signout" class="btn btn-ghost btn-xs">
+                🚪 تسجيل الخروج
+              </button>
+            </div>
+
+            <div class="cloud-manual-actions">
+              <button type="button" id="btn-cloud-sync-now" class="btn btn-steal-win btn-xs">
+                🔄 مزامنة الآن (دمج ذكي)
+              </button>
+              <button type="button" id="btn-cloud-push-local" class="btn btn-secondary btn-xs">
+                ⬆️ اعتماد نسخة هذا الجهاز على السحابة
+              </button>
+              <button type="button" id="btn-cloud-pull-cloud" class="btn btn-gold-outline btn-xs">
+                ⬇️ استرجاع نسخة السحابة على هذا الجهاز
+              </button>
+            </div>
+          </div>
+
+          <div id="cloud-sync-feedback" class="bank-feedback-box" hidden aria-live="polite"></div>
+          <p class="cloud-quota-note">
+            💡 <strong>حماية المساحة المجانية:</strong> صور وصوتيات «فئاتي الخاصة» (IndexedDB) تبقى محلية في المتصفح وتُنسخ عبر تصدير JSON فقط ولا تُرفع إلى Firebase RTDB.
+          </p>
+        </section>
+
         <!-- إحصائيات اللعب للملف النشط (Phase 4) -->
         <section class="bank-section bank-profile-stats-section" aria-label="إحصائيات اللعب للمجموعة النشطة">
           <div class="bank-section-header">
@@ -1731,6 +1792,9 @@
           </div>
 
           <div class="bank-flagged-actions">
+            <button type="button" id="btn-send-pending-flags" class="btn btn-steal-win btn-xs" disabled>
+              📤 إرسال جميع البلاغات المعلّقة للشيت
+            </button>
             <button type="button" id="btn-copy-flagged-report" class="btn btn-primary btn-xs" disabled>
               📋 نسخ التقرير
             </button>
@@ -1743,6 +1807,43 @@
             <button type="button" id="btn-clear-all-flagged" class="btn btn-danger-outline btn-xs" disabled>
               🗑️ مسح الكل
             </button>
+          </div>
+
+          <!-- إعدادات الإرسال التلقائي لبلاغات الأسئلة إلى Google Sheets (Pack 13) -->
+          <div id="sheet-report-settings-box" class="sheet-report-settings-box">
+            <div class="sheet-report-head">
+              <strong>🚩 إرسال البلاغات التلقائي إلى Google Sheets</strong>
+              <span class="bank-section-hint">انسخ كود <code>google-apps-script-reports.gs</code> في Apps Script ثم الصق رابط Web App هنا</span>
+            </div>
+            <div class="sheet-report-grid">
+              <div>
+                <label for="sheet-report-webhook-input" class="input-label">رابط تطبيق Google Apps Script (Web App URL):</label>
+                <input
+                  type="url"
+                  id="sheet-report-webhook-input"
+                  class="text-input"
+                  dir="ltr"
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  autocomplete="off"
+                />
+              </div>
+              <div>
+                <label for="sheet-report-secret-input" class="input-label">رمز الأمان السري (REPORT_SECRET — اختياري):</label>
+                <input
+                  type="password"
+                  id="sheet-report-secret-input"
+                  class="text-input"
+                  dir="ltr"
+                  placeholder="اختياري — يجب مطابقته في السكربت"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div class="sheet-report-actions">
+              <button type="button" id="btn-save-sheet-report-cfg" class="btn btn-primary btn-xs">💾 حفظ إعدادات الشيت</button>
+              <button type="button" id="btn-test-sheet-report" class="btn btn-amber btn-xs">🧪 اختبار الإرسال للشيت</button>
+            </div>
+            <div id="sheet-report-feedback" class="bank-feedback-box" hidden aria-live="polite"></div>
           </div>
 
           <div id="bank-flagged-list" class="bank-flagged-list">
@@ -2927,6 +3028,8 @@
   <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/audioChallengePlayer.js"></script>
   <script src="src/utils/customPacksStore.js"></script>
+  <script src="src/utils/cloudSyncManager.js"></script>
+  <script src="src/utils/sheetReportSync.js"></script>
   <script src="src/utils/pwaManager.js"></script>
   <script src="src/js/audio.js"></script>
   <script src="src/js/confetti.js"></script>

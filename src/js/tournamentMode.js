@@ -167,6 +167,9 @@
           localStorage.removeItem(STORAGE_KEY);
         }
       } catch (_err) {}
+      if (window.SeenJeemCloudSync && typeof window.SeenJeemCloudSync.scheduleAutoSync === "function") {
+        window.SeenJeemCloudSync.scheduleAutoSync();
+      }
     }
 
     isOpen() {

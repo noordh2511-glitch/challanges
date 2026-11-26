@@ -377,7 +377,7 @@
 
     // حالة أدوات الحزمة الرابعة والخامسة (مراجعة الأسئلة، النسخ الاحتياطي، الصوت، التحكيم، الجولة النهائية)
     flagDrawerOpen: false,
-    selectedFlagReason: "typo",
+    selectedFlagReason: "wrong-answer",
     pendingBackupData: null,
     backupRestoreMode: "merge",
     audioMixerOpen: false,
@@ -1062,6 +1062,32 @@
     answerCompareAImg: document.getElementById("answer-compare-a-img"),
     btnOpenCustomPackBuilder: document.getElementById("btn-open-custom-pack-builder"),
     btnBankOpenPackBuilder: document.getElementById("btn-bank-open-pack-builder"),
+
+    // الحزمة الثالثة عشرة: المزامنة السحابية وبلاغات Google Sheets التلقائية
+    btnCloudSyncPill: document.getElementById("btn-cloud-sync-pill"),
+    cloudPillIcon: document.getElementById("cloud-pill-icon"),
+    cloudPillLabel: document.getElementById("cloud-pill-label"),
+    bankCloudSyncSection: document.getElementById("bank-cloud-sync-section"),
+    cloudSyncStatusBadge: document.getElementById("cloud-sync-status-badge"),
+    cloudSignedOutBox: document.getElementById("cloud-signed-out-box"),
+    cloudSignedInBox: document.getElementById("cloud-signed-in-box"),
+    btnCloudGoogleSignin: document.getElementById("btn-cloud-google-signin"),
+    btnCloudGoogleRedirect: document.getElementById("btn-cloud-google-redirect"),
+    cloudUserAvatar: document.getElementById("cloud-user-avatar"),
+    cloudUserName: document.getElementById("cloud-user-name"),
+    cloudUserEmail: document.getElementById("cloud-user-email"),
+    cloudLastSyncText: document.getElementById("cloud-last-sync-text"),
+    btnCloudSignout: document.getElementById("btn-cloud-signout"),
+    btnCloudSyncNow: document.getElementById("btn-cloud-sync-now"),
+    btnCloudPushLocal: document.getElementById("btn-cloud-push-local"),
+    btnCloudPullCloud: document.getElementById("btn-cloud-pull-cloud"),
+    cloudSyncFeedback: document.getElementById("cloud-sync-feedback"),
+    btnSendPendingFlags: document.getElementById("btn-send-pending-flags"),
+    sheetReportWebhookInput: document.getElementById("sheet-report-webhook-input"),
+    sheetReportSecretInput: document.getElementById("sheet-report-secret-input"),
+    btnSaveSheetReportCfg: document.getElementById("btn-save-sheet-report-cfg"),
+    btnTestSheetReport: document.getElementById("btn-test-sheet-report"),
+    sheetReportFeedback: document.getElementById("sheet-report-feedback"),
 
     // الغرفة اللاسلكية (Phase 4 Pack 9)
     btnOpenWirelessSetup: document.getElementById("btn-open-wireless-setup"),
@@ -8099,6 +8125,7 @@
 
     renderWinnerAnalyticsDashboard();
     recordClassicMatchToArchive();
+    if (window.SeenJeemCloudSync) window.SeenJeemCloudSync.scheduleAutoSync();
 
     openModal(dom.winnerModal);
     broadcastLiveDisplayState();
@@ -8763,17 +8790,35 @@
       categoryId: cq.category.id,
       categoryName: cq.category.name,
       points: Number(q.points) || 200,
+      visualType: cq.visualType || q.visualType || "normal",
       questionText: q.question || "",
       answerText: q.answer || "",
-      reason: state.selectedFlagReason || "typo",
-      note: note || undefined
+      reason: state.selectedFlagReason || "wrong-answer",
+      note: note || undefined,
+      sheetSyncStatus: "pending"
     });
 
     if (saved) {
       renderQuestionFlagUI();
       closeFlagDrawer();
       const reasonMeta = flaggedStore.getReasonMeta(saved.reason);
-      showToast(`🚩 تم تحديد السؤال للمراجعة (${reasonMeta.label})`, "success");
+      const reportSync = window.SeenJeemSheetReportSync;
+      if (reportSync && reportSync.isConfigured() && navigator.onLine) {
+        showToast(`🚩 تم تسجيل البلاغ (${reasonMeta.label}) — جاري إرساله تلقائياً للشيت...`, "info");
+        reportSync.sendFlagRecord(saved).then((res) => {
+          if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
+            renderBankFlaggedSection();
+          }
+          if (res.ok) {
+            showToast("✅ تم إرسال بلاغ السؤال إلى Google Sheets تلقائياً!", "success");
+          } else {
+            showToast(`⏳ تم حفظ البلاغ محلياً كمعلّق (${res.error || "سيُرسل لاحقاً"})`, "warning");
+          }
+        });
+      } else {
+        showToast(`🚩 تم تحديد السؤال للمراجعة (${reasonMeta.label})`, "success");
+        if (window.SeenJeemCloudSync) window.SeenJeemCloudSync.scheduleAutoSync();
+      }
     }
   }
 
@@ -8783,17 +8828,102 @@
     if (removed) {
       renderQuestionFlagUI();
       closeFlagDrawer();
+      if (window.SeenJeemCloudSync) window.SeenJeemCloudSync.scheduleAutoSync();
       showToast("تمت إزالة السؤال من قائمة المراجعة", "info");
+    }
+  }
+
+  function setCloudSyncFeedback(type, text) {
+    if (!dom.cloudSyncFeedback) return;
+    dom.cloudSyncFeedback.hidden = !text;
+    dom.cloudSyncFeedback.className = `bank-feedback-box ${type ? `is-${type}` : ""}`;
+    dom.cloudSyncFeedback.textContent = text || "";
+  }
+
+  function setSheetReportFeedback(type, text) {
+    if (!dom.sheetReportFeedback) return;
+    dom.sheetReportFeedback.hidden = !text;
+    dom.sheetReportFeedback.className = `bank-feedback-box ${type ? `is-${type}` : ""}`;
+    dom.sheetReportFeedback.textContent = text || "";
+  }
+
+  function renderCloudSyncUI(cloudState = null) {
+    const cs = window.SeenJeemCloudSync;
+    const st = cloudState || (cs ? cs.getState() : { signedIn: false, status: "signed-out", user: null });
+
+    const statusMeta = {
+      "signed-out": { pill: "☁️ المزامنة السحابية", badge: "⚪ وضع محلي فقط", cls: "" },
+      synced: { pill: "🟢 متزامن", badge: "🟢 متزامن", cls: "is-synced" },
+      syncing: { pill: "🔄 جاري المزامنة", badge: "🔄 جاري المزامنة...", cls: "" },
+      "pending-offline": { pill: "🟡 بانتظار الاتصال", badge: "🟡 تغييرات محلية بانتظار الاتصال", cls: "is-pending" },
+      error: { pill: "⚠️ تنبيه المزامنة", badge: "⚠️ تعذّرت آخر مزامنة", cls: "is-pending" }
+    };
+    const meta = statusMeta[st.status] || statusMeta["signed-out"];
+
+    if (dom.btnCloudSyncPill) {
+      dom.btnCloudSyncPill.classList.remove("is-synced", "is-pending");
+      if (meta.cls) dom.btnCloudSyncPill.classList.add(meta.cls);
+    }
+    if (dom.cloudPillIcon) dom.cloudPillIcon.textContent = st.signedIn ? (st.status === "synced" ? "🟢" : st.status === "syncing" ? "🔄" : "🟡") : "☁️";
+    if (dom.cloudPillLabel) dom.cloudPillLabel.textContent = st.signedIn ? (st.user && st.user.displayName ? st.user.displayName.split(" ")[0] : "متزامن") : "المزامنة";
+
+    if (dom.cloudSyncStatusBadge) dom.cloudSyncStatusBadge.textContent = meta.badge;
+    if (dom.cloudSignedOutBox) dom.cloudSignedOutBox.hidden = Boolean(st.signedIn);
+    if (dom.cloudSignedInBox) dom.cloudSignedInBox.hidden = !st.signedIn;
+
+    if (st.signedIn && st.user) {
+      if (dom.cloudUserName) dom.cloudUserName.textContent = st.user.displayName || "المقدّم";
+      if (dom.cloudUserEmail) dom.cloudUserEmail.textContent = st.user.email || "";
+      if (dom.cloudUserAvatar) {
+        if (st.user.photoURL) {
+          dom.cloudUserAvatar.src = st.user.photoURL;
+          dom.cloudUserAvatar.hidden = false;
+        } else {
+          dom.cloudUserAvatar.hidden = true;
+        }
+      }
+      if (dom.cloudLastSyncText) {
+        dom.cloudLastSyncText.textContent = st.lastSyncedAt
+          ? `آخر مزامنة: ${formatTimestampArabic(st.lastSyncedAt)}`
+          : "آخر مزامنة: الآن";
+      }
+    }
+
+    if (st.error) {
+      setCloudSyncFeedback("warning", st.error);
     }
   }
 
   function renderBankFlaggedSection() {
     if (!flaggedStore || !dom.bankFlaggedList) return;
+    renderCloudSyncUI();
+    const reportSync = window.SeenJeemSheetReportSync;
+    if (reportSync) {
+      const cfg = reportSync.getConfig();
+      if (dom.sheetReportWebhookInput && document.activeElement !== dom.sheetReportWebhookInput) {
+        dom.sheetReportWebhookInput.value = cfg.webhookUrl || "";
+      }
+      if (dom.sheetReportSecretInput && document.activeElement !== dom.sheetReportSecretInput) {
+        dom.sheetReportSecretInput.value = cfg.secret || "";
+      }
+    }
+
     const items = flaggedStore.getAll();
     const count = items.length;
+    const pendingCount =
+      typeof flaggedStore.getPendingCount === "function"
+        ? flaggedStore.getPendingCount()
+        : items.filter((i) => i.sheetSyncStatus !== "sent").length;
 
     if (dom.bankFlaggedCount) {
       dom.bankFlaggedCount.textContent = String(count);
+    }
+    if (dom.btnSendPendingFlags) {
+      dom.btnSendPendingFlags.disabled = pendingCount === 0 || !(reportSync && reportSync.isConfigured());
+      dom.btnSendPendingFlags.textContent =
+        pendingCount > 0
+          ? `📤 إرسال جميع البلاغات المعلّقة للشيت (${pendingCount})`
+          : "📤 لا توجد بلاغات معلّقة";
     }
     if (dom.btnCopyFlaggedReport) dom.btnCopyFlaggedReport.disabled = count === 0;
     if (dom.btnExportFlaggedJson) dom.btnExportFlaggedJson.disabled = count === 0;
@@ -8812,12 +8942,21 @@
 
     items.forEach((item) => {
       const reasonMeta = flaggedStore.getReasonMeta(item.reason);
+      const syncStatus = item.sheetSyncStatus || (item.reportedToSheet ? "sent" : "pending");
+      const syncPillHtml =
+        syncStatus === "sent"
+          ? `<span class="flagged-sync-pill is-sent">✅ تم الإرسال للشيت</span>`
+          : syncStatus === "failed"
+            ? `<span class="flagged-sync-pill is-failed">⚠️ تعذّر الإرسال</span>`
+            : `<span class="flagged-sync-pill is-pending">⏳ معلّق</span>`;
+
       const row = document.createElement("div");
       row.className = "bank-flagged-item";
       row.innerHTML = `
         <div class="flagged-item-main">
           <div class="flagged-item-meta">
             <span class="flagged-reason-badge">${reasonMeta.icon} ${escapeHtml(reasonMeta.label)}</span>
+            ${syncPillHtml}
             <span class="flagged-cat-tag">${escapeHtml(item.categoryName || item.categoryId)} • ${item.points}</span>
             <code class="flagged-qid">${escapeHtml(item.questionId)}</code>
           </div>
@@ -8834,6 +8973,7 @@
       removeBtn.addEventListener("click", () => {
         flaggedStore.unflagQuestion(item.questionId);
         renderBankFlaggedSection();
+        if (window.SeenJeemCloudSync) window.SeenJeemCloudSync.scheduleAutoSync();
         if (state.currentQ && state.currentQ.question.id === item.questionId) {
           renderQuestionFlagUI();
         }
@@ -13500,6 +13640,155 @@
       });
     }
 
+    // --- ربط أحداث الحزمة الثالثة عشرة (المزامنة السحابية + بلاغات Google Sheets التلقائية) ---
+    if (dom.btnCloudSyncPill) {
+      dom.btnCloudSyncPill.addEventListener("click", () => {
+        openBankManagerModal();
+        if (dom.bankCloudSyncSection) {
+          dom.bankCloudSyncSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+    if (window.SeenJeemCloudSync) {
+      window.SeenJeemCloudSync.onChange((st) => renderCloudSyncUI(st));
+    }
+    if (dom.btnCloudGoogleSignin) {
+      dom.btnCloudGoogleSignin.addEventListener("click", async () => {
+        const cs = window.SeenJeemCloudSync;
+        if (!cs) return;
+        setCloudSyncFeedback("info", "⏳ جاري فتح نافذة تسجيل الدخول بحساب Google...");
+        const res = await cs.signInWithGoogle({ useRedirect: false });
+        if (res.ok) {
+          if (dom.btnCloudGoogleRedirect) dom.btnCloudGoogleRedirect.hidden = true;
+          setCloudSyncFeedback("success", "✅ تم تسجيل الدخول والمزامنة السحابية الذكية بنجاح!");
+          showToast("☁️ تم ربط حساب Google والمزامنة بنجاح!", "success");
+        } else {
+          if (dom.btnCloudGoogleRedirect) dom.btnCloudGoogleRedirect.hidden = !res.suggestRedirect;
+          setCloudSyncFeedback("warning", `⚠️ ${res.error || "تعذّر تسجيل الدخول."}`);
+        }
+      });
+    }
+    if (dom.btnCloudGoogleRedirect) {
+      dom.btnCloudGoogleRedirect.addEventListener("click", () => {
+        if (window.SeenJeemCloudSync) {
+          window.SeenJeemCloudSync.signInWithGoogle({ useRedirect: true });
+        }
+      });
+    }
+    if (dom.btnCloudSignout) {
+      dom.btnCloudSignout.addEventListener("click", async () => {
+        if (!window.SeenJeemCloudSync) return;
+        await window.SeenJeemCloudSync.signOut();
+        setCloudSyncFeedback("info", "تم تسجيل الخروج بنجاح — جميع بياناتك المحلية محفوظة على هذا الجهاز.");
+        showToast("🚪 تم تسجيل الخروج من المزامنة السحابية (البيانات المحلية محفوظة)", "info");
+      });
+    }
+    if (dom.btnCloudSyncNow) {
+      dom.btnCloudSyncNow.addEventListener("click", async () => {
+        if (!window.SeenJeemCloudSync) return;
+        setCloudSyncFeedback("info", "🔄 جاري الدمج الذكي مع السحابة...");
+        const res = await window.SeenJeemCloudSync.syncNow({ silent: false });
+        if (res.ok) {
+          setCloudSyncFeedback("success", "✅ اكتملت المزامنة والدمج الذكي بنجاح!");
+          showToast("🟢 تمت المزامنة السحابية بنجاح!", "success");
+        } else {
+          setCloudSyncFeedback("warning", `⚠️ ${res.error || "تعذّرت المزامنة."}`);
+        }
+      });
+    }
+    if (dom.btnCloudPushLocal) {
+      dom.btnCloudPushLocal.addEventListener("click", () => {
+        openConfirmDialog({
+          title: "اعتماد نسخة هذا الجهاز على السحابة؟",
+          message: "سيتم استبدال النسخة المحفوظة في حسابك السحابي بنسخة هذا الجهاز الحالية.",
+          confirmText: "⬆️ نعم، اعتمد نسخة هذا الجهاز",
+          onConfirm: async () => {
+            const res = await window.SeenJeemCloudSync.pushLocalOverride();
+            setCloudSyncFeedback(
+              res.ok ? "success" : "error",
+              res.ok ? "✅ تم اعتماد نسخة هذا الجهاز على السحابة." : `❌ ${res.error}`
+            );
+          }
+        });
+      });
+    }
+    if (dom.btnCloudPullCloud) {
+      dom.btnCloudPullCloud.addEventListener("click", () => {
+        openConfirmDialog({
+          title: "استرجاع نسخة السحابة على هذا الجهاز؟",
+          message: "سيتم استبدال السجلات النصية المحلية على هذا الجهاز بنسخة حسابك السحابي (دون المساس بصور وصوتيات فئاتي الخاصة).",
+          confirmText: "⬇️ نعم، استرجع نسخة السحابة",
+          onConfirm: async () => {
+            const res = await window.SeenJeemCloudSync.pullCloudOverride();
+            setCloudSyncFeedback(
+              res.ok ? "success" : "error",
+              res.ok ? "✅ تم استرجاع نسخة السحابة على هذا الجهاز." : `❌ ${res.error}`
+            );
+          }
+        });
+      });
+    }
+
+    if (dom.btnSaveSheetReportCfg) {
+      dom.btnSaveSheetReportCfg.addEventListener("click", () => {
+        const rs = window.SeenJeemSheetReportSync;
+        if (!rs) return;
+        const res = rs.saveConfig({
+          webhookUrl: dom.sheetReportWebhookInput ? dom.sheetReportWebhookInput.value : "",
+          secret: dom.sheetReportSecretInput ? dom.sheetReportSecretInput.value : ""
+        });
+        if (res.ok) {
+          setSheetReportFeedback("success", "✅ تم حفظ إعدادات إرسال البلاغات إلى Google Sheets بنجاح.");
+          renderBankFlaggedSection();
+          showToast("💾 تم حفظ رابط بلاغات Google Sheets", "success");
+        } else {
+          setSheetReportFeedback("error", `❌ ${res.error}`);
+        }
+      });
+    }
+    if (dom.btnTestSheetReport) {
+      dom.btnTestSheetReport.addEventListener("click", async () => {
+        const rs = window.SeenJeemSheetReportSync;
+        if (!rs) return;
+        const saveRes = rs.saveConfig({
+          webhookUrl: dom.sheetReportWebhookInput ? dom.sheetReportWebhookInput.value : "",
+          secret: dom.sheetReportSecretInput ? dom.sheetReportSecretInput.value : ""
+        });
+        if (!saveRes.ok) {
+          setSheetReportFeedback("error", `❌ ${saveRes.error}`);
+          return;
+        }
+        dom.btnTestSheetReport.disabled = true;
+        setSheetReportFeedback("info", "⏳ جاري إرسال صف تجريبي إلى Google Sheets...");
+        const res = await rs.testConnection();
+        dom.btnTestSheetReport.disabled = false;
+        if (res.ok) {
+          setSheetReportFeedback("success", "✅ نجح الاتصال! تم إضافة صف تجريبي في ورقة Flagged_Reports.");
+          showToast("🧪 نجح اختبار الإرسال إلى Google Sheets!", "success");
+        } else {
+          setSheetReportFeedback("error", `❌ ${res.error}`);
+        }
+      });
+    }
+    if (dom.btnSendPendingFlags) {
+      dom.btnSendPendingFlags.addEventListener("click", async () => {
+        const rs = window.SeenJeemSheetReportSync;
+        if (!rs) return;
+        dom.btnSendPendingFlags.disabled = true;
+        setSheetReportFeedback("info", "📤 جاري إرسال البلاغات المعلّقة إلى Google Sheets...");
+        const res = await rs.sendAllPending();
+        renderBankFlaggedSection();
+        if (res.total === 0) {
+          setSheetReportFeedback("info", "جميع البلاغات مرسلة مسبقاً — لا توجد بلاغات معلّقة.");
+        } else if (res.ok) {
+          setSheetReportFeedback("success", `✅ تم إرسال جميع البلاغات المعلّقة بنجاح (${res.sent} / ${res.total}).`);
+          showToast(`📤 تم إرسال ${res.sent} بلاغ إلى الشيت بنجاح!`, "success");
+        } else {
+          setSheetReportFeedback("warning", `⚠️ تم إرسال ${res.sent} وفشل ${res.failed}: ${res.error || ""}`);
+        }
+      });
+    }
+
     // --- ربط أحداث الحزمة التاسعة (الغرفة اللاسلكية + QR + إعدادات Firebase + جرس السرعة) ---
     if (dom.btnOpenWirelessSetup) dom.btnOpenWirelessSetup.addEventListener("click", openWirelessRoomModal);
     if (dom.btnOpenWirelessGame) dom.btnOpenWirelessGame.addEventListener("click", openWirelessRoomModal);
@@ -13684,6 +13973,20 @@
       openBaraResultCard: (sessionData) => openResultCardModal({ cardType: "bara-salfa", sessionData }),
       openTournamentResultCard: (tournamentData) => openResultCardModal({ cardType: "tournament", tournamentData }),
       refreshCustomPacks: () => refreshCustomPacksFromStore(),
+      onCloudDataApplied: ({ silent } = {}) => {
+        applyTheme(matchStore.loadTheme(), false);
+        applyTvScale(matchStore.loadTvScale(), false);
+        renderSetupScreen();
+        if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
+          renderBankManagerModal();
+        }
+        if (dom.hallOfFameModal && dom.hallOfFameModal.classList.contains("open")) {
+          renderHallOfFameModal();
+        }
+        if (!silent) {
+          showToast("☁️ تم تحديث بياناتك من السحابة بنجاح", "success");
+        }
+      },
       launchTournamentMatch: (matchInfo) => {
         if (!matchInfo || !matchInfo.matchId) return;
         state.activeTournamentMatch = matchInfo;
@@ -13734,6 +14037,10 @@
     }
     if (window.SeenJeemCustomPacksStore) {
       window.SeenJeemCustomPacksStore.init().then(() => refreshCustomPacksFromStore()).catch(() => {});
+    }
+    if (window.SeenJeemCloudSync) {
+      window.SeenJeemCloudSync.init();
+      renderCloudSyncUI();
     }
 
     const data = window.SEEN_JEEM_DATA;

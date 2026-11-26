@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.13.0";
+const CACHE_VERSION = "seen-jeem-v4.14.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -39,6 +39,8 @@ const APP_SHELL_URLS = [
   "./src/utils/resultCardGenerator.js",
   "./src/utils/audioChallengePlayer.js",
   "./src/utils/customPacksStore.js",
+  "./src/utils/cloudSyncManager.js",
+  "./src/utils/sheetReportSync.js",
   "./src/utils/pwaManager.js",
   "./src/js/audio.js",
   "./src/js/confetti.js",
@@ -165,6 +167,10 @@ function isFirebaseRealtimeOrAuthRequest(url) {
     url.hostname === "securetoken.googleapis.com" ||
     url.hostname === "firebase.googleapis.com" ||
     url.hostname === "firebaseinstallations.googleapis.com" ||
+    url.hostname === "accounts.google.com" ||
+    url.hostname === "script.google.com" ||
+    url.hostname === "script.googleusercontent.com" ||
+    url.pathname.startsWith("/__/auth/") ||
     (url.hostname === "www.gstatic.com" && url.pathname.startsWith("/firebasejs/"))
   );
 }

@@ -1061,6 +1061,9 @@
       if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.triggerConfetti === "function") {
         window.SeenJeemHostBridge.triggerConfetti("victory", "default");
       }
+      if (window.SeenJeemCloudSync && typeof window.SeenJeemCloudSync.scheduleAutoSync === "function") {
+        window.SeenJeemCloudSync.scheduleAutoSync();
+      }
       this._syncWirelessAndTV();
       this._render();
     }
