@@ -75,8 +75,10 @@
         "charades-solo-modal",
         "hall-of-fame-modal",
         "wireless-room-modal",
+        "bara-salfa-modal",
         "remote-host-root",
         "player-view-root",
+        "bara-player-root",
         "confirm-modal",
         "resume-match-modal",
         "image-lightbox",
@@ -429,6 +431,11 @@
           </div>
         </section>
 
+        <!-- شاشة لعبة «برا السالفة» على التلفزيون (محلي + لاسلكي — بدون أي تسريب!) -->
+        <section id="tv-screen-bara-salfa" class="tv-screen tv-side-mode-screen tv-bara-screen" hidden>
+          <div id="tv-bara-stage" class="tv-bara-stage"></div>
+        </section>
+
         <!-- طبقة شاشة الاستراحة التلفزيونية الكاملة (Intermission Overlay — بدون أي تسريب للسؤال) -->
         <section id="tv-intermission-overlay" class="tv-intermission-overlay" hidden aria-live="polite">
           <div class="tv-intermission-card">
@@ -575,6 +582,8 @@
         blitzSummaryList: $("tv-blitz-summary-list"),
 
         csoloScreen: $("tv-screen-charades-solo"),
+        baraScreen: $("tv-screen-bara-salfa"),
+        baraStage: $("tv-bara-stage"),
         csoloTeamName: $("tv-csolo-team-name"),
         csoloRoundPill: $("tv-csolo-round-pill"),
         csoloScore: $("tv-csolo-score"),
@@ -746,6 +755,7 @@
       this.dom.winnerScreen.hidden = screenName !== "winner";
       if (this.dom.blitzScreen) this.dom.blitzScreen.hidden = screenName !== "blitz";
       if (this.dom.csoloScreen) this.dom.csoloScreen.hidden = screenName !== "charades-solo";
+      if (this.dom.baraScreen) this.dom.baraScreen.hidden = screenName !== "bara-salfa";
     }
 
     _applyDisplayPrefs(prefs) {
@@ -933,6 +943,9 @@
       } else if (snap.screen === "charades-solo" && snap.charadesSoloView) {
         this.lastQuestionRenderKey = "";
         this._renderCharadesSolo(snap);
+      } else if (snap.screen === "bara-salfa" && snap.baraSalfaView) {
+        this.lastQuestionRenderKey = "";
+        this._renderBaraSalfa(snap);
       } else {
         this._renderStandby(snap.setupInfo);
       }
@@ -1794,6 +1807,183 @@
           })
           .join("");
       }
+    }
+
+    _renderBaraSalfa(snap) {
+      this._showOnlyScreen("bara-salfa");
+      const bs = snap.baraSalfaView;
+      if (!bs || !this.dom.baraStage) return;
+
+      const roster = Array.isArray(bs.playersRoster) ? bs.playersRoster : [];
+      const catBadge = bs.categoryName
+        ? `<div class="tv-q-cat-pill"><span>${escapeHtml(bs.categoryIcon || "🕵️")}</span><span>${escapeHtml(bs.categoryName)}</span></div>`
+        : "";
+
+      let html = "";
+      if (bs.phase === "setup") {
+        const showQr = Boolean(bs.playMode === "wireless" && bs.roomCode && bs.playerUrl && bs.showQrOnTv && window.SeenJeemQR);
+        const qrSvg = showQr
+          ? window.SeenJeemQR.toSVG(bs.playerUrl, { size: 220, margin: 3, ariaLabel: `QR غرفة برا السالفة ${bs.roomCode}` })
+          : "";
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🕵️ لعبة برا السالفة</div>
+            <h1 class="tv-bara-title">${bs.playMode === "wireless" && bs.roomCode ? "انضم بهاتفك للغرفة الآن!" : "استعدوا لجولة «برا السالفة»!"}</h1>
+            ${
+              bs.playMode === "wireless" && bs.roomCode
+                ? `
+                  <div class="tv-bara-lobby-grid">
+                    ${showQr ? `<div class="tv-bara-qr-box">${qrSvg}</div>` : ""}
+                    <div class="tv-bara-code-box">
+                      <span>رمز الغرفة</span>
+                      <strong>${escapeHtml(bs.roomCode)}</strong>
+                      <small>${bs.joinLocked ? "🔒 الانضمام مقفل" : "امسح QR أو أدخل الرمز"}</small>
+                    </div>
+                  </div>
+                `
+                : `<p class="tv-bara-sub">جاري اختيار الفئة وتجهيز اللاعبين على جهاز المقدّم...</p>`
+            }
+            ${
+              roster.length > 0
+                ? `<div class="tv-bara-chips">${roster.map((p) => `<span class="tv-bara-chip">👤 ${escapeHtml(p.name)}</span>`).join("")}</div>`
+                : ""
+            }
+          </div>
+        `;
+      } else if (bs.phase === "role_reveal") {
+        const readySet = new Set(bs.readyIds || []);
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🔐 توزيع الأدوار السرية — الجولة #${bs.roundNumber || 1}</div>
+            ${catBadge}
+            ${
+              bs.playMode === "wireless"
+                ? `
+                  <h1 class="tv-bara-title">اقرأ دورك السري على هاتفك!</h1>
+                  <div class="tv-bara-progress">${readySet.size} / ${roster.length} جاهزين</div>
+                  <div class="tv-bara-chips">
+                    ${roster.map((p) => `<span class="tv-bara-chip${readySet.has(p.id) ? " is-done" : ""}">${readySet.has(p.id) ? "✅" : "⏳"} ${escapeHtml(p.name)}</span>`).join("")}
+                  </div>
+                `
+                : `
+                  <h1 class="tv-bara-title">مرّر الجهاز إلى: <span class="brand-highlight">${escapeHtml(bs.localRevealPlayerName || "اللاعب")}</span></h1>
+                  <p class="tv-bara-sub">اللاعب ${(bs.localRevealIndex || 0) + 1} من ${roster.length} — الكلمة سرية تماماً ولا تظهر هنا!</p>
+                `
+            }
+          </div>
+        `;
+      } else if (bs.phase === "questions" && bs.currentPair) {
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🎤 جولة الأسئلة #${bs.questionCycle || 1} (${(bs.pairIndex || 0) + 1} / ${bs.totalPairs || 1})</div>
+            ${catBadge}
+            <div class="tv-bara-pair-hero">
+              <div class="tv-bara-pair-box is-asker"><span>السائل</span><strong>${escapeHtml(bs.currentPair.askerName)}</strong></div>
+              <div class="tv-bara-pair-arrow">⬅️ يسأل ⬅️</div>
+              <div class="tv-bara-pair-box is-target"><span>المُجاب</span><strong>${escapeHtml(bs.currentPair.targetName)}</strong></div>
+            </div>
+          </div>
+        `;
+      } else if (bs.phase === "discussion") {
+        const isUnl = !bs.discussionTotalSeconds;
+        const rem = Math.max(0, Number(bs.discussionRemainingSeconds) || 0);
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">💬 وقت النقاش والاتهام</div>
+            ${catBadge}
+            <h1 class="tv-bara-title">مين اللي «برا السالفة» برأيكم؟</h1>
+            <div class="tv-bara-giant-timer${!isUnl && rem <= 10 ? " danger" : ""}">${isUnl ? "∞" : formatTime(rem)}</div>
+          </div>
+        `;
+      } else if (bs.phase === "voting") {
+        const votedSet = new Set(bs.votedIds || []);
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🗳️ التصويت السري جارٍ الآن</div>
+            ${catBadge}
+            ${
+              bs.playMode === "wireless"
+                ? `
+                  <h1 class="tv-bara-title">صوّتوا سراً من هواتفكم!</h1>
+                  <div class="tv-bara-progress">${votedSet.size} / ${roster.length} صوّتوا</div>
+                  <div class="tv-bara-chips">
+                    ${roster.map((p) => `<span class="tv-bara-chip${votedSet.has(p.id) ? " is-done" : ""}">${votedSet.has(p.id) ? "✅" : "⏳"} ${escapeHtml(p.name)}</span>`).join("")}
+                  </div>
+                `
+                : `
+                  <h1 class="tv-bara-title">دور التصويت السري: <span class="brand-highlight">${escapeHtml(bs.localVoterName || "")}</span></h1>
+                  <p class="tv-bara-sub">المصوّت ${(bs.localVoterIndex || 0) + 1} من ${roster.length}</p>
+                `
+            }
+          </div>
+        `;
+      } else if (bs.phase === "outsider_reveal" && bs.revealData) {
+        const rd = bs.revealData;
+        const outSet = new Set(rd.outsiderIds || []);
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🥁 كشف التصويت وهوية المخادع</div>
+            <div class="tv-bara-outsider-hero">
+              <span>${(rd.outsiderNames || []).length > 1 ? "🕵️ اللي «برا السالفة» هم:" : "🕵️ اللي «برا السالفة» هو:"}</span>
+              <strong>${escapeHtml((rd.outsiderNames || []).join("  و  "))}</strong>
+            </div>
+            <div class="tv-bara-votes-grid">
+              ${(rd.voteBreakdown || [])
+                .map(
+                  (v) => `
+                <div class="tv-bara-vote-item${v.targetId && outSet.has(v.targetId) ? " is-hit" : ""}">
+                  <strong>${escapeHtml(v.voterName)}</strong> ⬅️ ${escapeHtml(v.targetName)} ${v.targetId && outSet.has(v.targetId) ? "✅" : ""}
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      } else if (bs.phase === "outsider_guess" && bs.revealData) {
+        const rd = bs.revealData;
+        const choices = Array.isArray(bs.guessChoices) ? bs.guessChoices : [];
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🎯 الفرصة الأخيرة لتخمين الكلمة السرية</div>
+            ${catBadge}
+            <h1 class="tv-bara-title">⏳ بانتظار تخمين: ${escapeHtml((rd.outsiderNames || []).join(" و "))}</h1>
+            <div class="tv-bara-choices-grid">
+              ${choices.map((w) => `<div class="tv-bara-choice-pill">${escapeHtml(w)}</div>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (bs.phase === "round_results" && bs.revealData) {
+        const rd = bs.revealData;
+        const standings = rd.standings || [];
+        if (this._lastBaraConfettiRound !== bs.roundNumber) {
+          this._lastBaraConfettiRound = bs.roundNumber;
+          this._triggerConfetti("victory", "default");
+        }
+        html = `
+          <div class="tv-bara-card">
+            <div class="tv-side-mode-tag">🏆 نتائج الجولة #${bs.roundNumber || 1}</div>
+            <div class="tv-bara-word-reveal">
+              <span>الكلمة السرية كانت:</span>
+              <strong>${escapeHtml(rd.secretWord || "")}</strong>
+            </div>
+            <div class="tv-bara-standings">
+              ${standings
+                .map(
+                  (p, idx) => `
+                <div class="tv-bara-standing-row${idx === 0 ? " is-first" : ""}">
+                  <span>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`} ${escapeHtml(p.name)}</span>
+                  <strong>${p.score} نقطة</strong>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      this.dom.baraStage.innerHTML = html;
     }
   }
 

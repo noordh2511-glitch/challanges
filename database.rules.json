@@ -74,6 +74,57 @@
           }
         }
       }
+    },
+    "baraRooms": {
+      ".read": false,
+      ".write": false,
+      "$roomCode": {
+        ".write": "auth != null && data.child('meta/ownerUid').val() === auth.uid && !newData.exists()",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))"
+        },
+        "publicState": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+        },
+        "allowedPlayers": {
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)"
+          }
+        },
+        "privateRoles": {
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
+        "playerActions": {
+          ".read": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('baraRooms').child($roomCode).child('kicked').child($uid).exists()))"
+          }
+        },
+        "players": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && (root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && (!data.exists() || $uid === auth.uid)) || (auth.uid === $uid && !root.child('baraRooms').child($roomCode).child('kicked').child($uid).exists() && (data.exists() || root.child('baraRooms').child($roomCode).child('meta/joinLocked').val() !== true || root.child('baraRooms').child($roomCode).child('allowedPlayers').child($uid).exists())))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 28)"
+          }
+        },
+        "kicked": {
+          ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('baraRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        }
+      }
     }
   }
 }

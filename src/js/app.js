@@ -6993,6 +6993,11 @@
   function broadcastLiveDisplayState({ skipWireless = false } = {}) {
     if (!liveSync || liveSync.isDisplayMode()) return;
 
+    const isBaraOpen = Boolean(
+      window.SeenJeemBaraSalfa &&
+      typeof window.SeenJeemBaraSalfa.isOpen === "function" &&
+      window.SeenJeemBaraSalfa.isOpen()
+    );
     const isBlitzOpen =
       dom.blitzModal &&
       dom.blitzModal.classList.contains("open") &&
@@ -7014,7 +7019,9 @@
 
     let screen = "setup";
     let customWinnerView = null;
-    if (isBlitzOpen) {
+    if (isBaraOpen) {
+      screen = "bara-salfa";
+    } else if (isBlitzOpen) {
       if (state.blitz.phase === "finished") {
         screen = "winner";
         customWinnerView = buildSideModeWinnerPayload(state.blitz.teams, "⚡ نهاية جولة البرق السريعة!");
@@ -7112,6 +7119,12 @@
               }
               return payload;
             })()
+          : null,
+      baraSalfaView:
+        screen === "bara-salfa" &&
+        window.SeenJeemBaraSalfa &&
+        typeof window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload === "function"
+          ? window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload()
           : null,
       intermission: {
         active: Boolean(state.intermission && state.intermission.active),
@@ -12568,6 +12581,26 @@
         window.SeenJeemPlayerView.init();
       }
       return;
+    }
+    if (urlMode === "bara-player") {
+      if (window.SeenJeemBaraPlayerView && typeof window.SeenJeemBaraPlayerView.init === "function") {
+        window.SeenJeemBaraPlayerView.init();
+      }
+      return;
+    }
+
+    // جسر خفيف يسمح لوحدة «برا السالفة» بإرسال مشاهد التلفزيون والاحتفال والإشعارات دون المساس بمنطق سين جيم
+    window.SeenJeemHostBridge = {
+      broadcastTV: () => broadcastLiveDisplayState({ skipWireless: true }),
+      triggerConfetti: (kind = "victory", theme = "default") => startVictoryConfetti(kind, theme),
+      showToast: (msg, type = "info") => showToast(msg, type),
+      openTVDisplayWindow: () => openTVDisplayWindow()
+    };
+
+    const btnLaunchBaraSalfa = document.getElementById("btn-launch-bara-salfa");
+    if (btnLaunchBaraSalfa && window.SeenJeemBaraSalfa) {
+      window.SeenJeemBaraSalfa.init();
+      btnLaunchBaraSalfa.addEventListener("click", () => window.SeenJeemBaraSalfa.open());
     }
 
     const data = window.SEEN_JEEM_DATA;

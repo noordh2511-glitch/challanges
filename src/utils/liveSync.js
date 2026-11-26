@@ -164,6 +164,7 @@
       finalRoundView: null,
       blitzView: null,
       charadesSoloView: null,
+      baraSalfaView: null,
       winnerView: rawSnapshot.winnerView || null,
       intermission:
         rawSnapshot.intermission && typeof rawSnapshot.intermission === "object"
@@ -454,6 +455,55 @@
         // منع تسريب الكلمة أو explanation نهائياً؛ التلميح فقط عند كشفه صراحةً
         hintText: cv.phase === "playing" && typeof cv.hintText === "string" ? cv.hintText : null,
         turnSummary: cv.phase === "turn-summary" && Array.isArray(cv.turnSummary) ? cv.turnSummary : []
+      };
+    }
+
+    if (rawSnapshot.baraSalfaView && typeof rawSnapshot.baraSalfaView === "object") {
+      const bsv = rawSnapshot.baraSalfaView;
+      const ph = String(bsv.phase || "setup");
+      const allowReveal = ph === "outsider_reveal" || ph === "outsider_guess" || ph === "round_results";
+      const allowSecret = ph === "round_results";
+      const allowChoices = ph === "outsider_guess" || ph === "round_results";
+
+      clean.baraSalfaView = {
+        phase: ph,
+        playMode: bsv.playMode === "wireless" ? "wireless" : "local",
+        roundNumber: Number(bsv.roundNumber) || 0,
+        roomCode: typeof bsv.roomCode === "string" ? bsv.roomCode : "",
+        playerUrl: typeof bsv.playerUrl === "string" ? bsv.playerUrl : "",
+        showQrOnTv: Boolean(bsv.showQrOnTv),
+        joinLocked: Boolean(bsv.joinLocked),
+        categoryName: typeof bsv.categoryName === "string" ? bsv.categoryName : "",
+        categoryIcon: typeof bsv.categoryIcon === "string" ? bsv.categoryIcon : "🕵️",
+        outsiderCount: Number(bsv.outsiderCount) === 2 ? 2 : 1,
+        playersRoster: Array.isArray(bsv.playersRoster) ? bsv.playersRoster : [],
+        readyIds: ph === "role_reveal" && Array.isArray(bsv.readyIds) ? bsv.readyIds : [],
+        votedIds: ph === "voting" && Array.isArray(bsv.votedIds) ? bsv.votedIds : [],
+        localRevealPlayerName: ph === "role_reveal" ? String(bsv.localRevealPlayerName || "") : "",
+        localRevealIndex: Number(bsv.localRevealIndex) || 0,
+        localVoterName: ph === "voting" ? String(bsv.localVoterName || "") : "",
+        localVoterIndex: Number(bsv.localVoterIndex) || 0,
+        currentPair: ph === "questions" && bsv.currentPair ? bsv.currentPair : null,
+        pairIndex: Number(bsv.pairIndex) || 0,
+        totalPairs: Number(bsv.totalPairs) || 0,
+        questionCycle: Number(bsv.questionCycle) || 1,
+        discussionRemainingSeconds: Math.max(0, Number(bsv.discussionRemainingSeconds) || 0),
+        discussionTotalSeconds: Math.max(0, Number(bsv.discussionTotalSeconds) || 0),
+        discussionTimerRunning: Boolean(bsv.discussionTimerRunning),
+        guessChoices: allowChoices && Array.isArray(bsv.guessChoices) ? bsv.guessChoices.slice() : null,
+        outsiderGuessedIds: ph === "outsider_guess" && Array.isArray(bsv.outsiderGuessedIds) ? bsv.outsiderGuessedIds : [],
+        revealData: allowReveal && bsv.revealData
+          ? {
+              outsiderIds: Array.isArray(bsv.revealData.outsiderIds) ? bsv.revealData.outsiderIds : [],
+              outsiderNames: Array.isArray(bsv.revealData.outsiderNames) ? bsv.revealData.outsiderNames : [],
+              voteBreakdown: Array.isArray(bsv.revealData.voteBreakdown) ? bsv.revealData.voteBreakdown : [],
+              topVotedIds: Array.isArray(bsv.revealData.topVotedIds) ? bsv.revealData.topVotedIds : [],
+              secretWord: allowSecret ? bsv.revealData.secretWord || null : null,
+              outsiderGuesses: allowSecret ? bsv.revealData.outsiderGuesses || null : null,
+              roundScores: allowSecret && Array.isArray(bsv.revealData.roundScores) ? bsv.revealData.roundScores : null,
+              standings: allowSecret && Array.isArray(bsv.revealData.standings) ? bsv.revealData.standings : null
+            }
+          : null
       };
     }
 

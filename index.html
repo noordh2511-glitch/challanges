@@ -39,6 +39,8 @@
   <div id="remote-host-root" class="remote-host-root" hidden aria-hidden="true"></div>
   <!-- جذر جرس الفرق والرهان السري على الهاتف (?mode=player - Phase 4 Pack 9) -->
   <div id="player-view-root" class="player-view-root" hidden aria-hidden="true"></div>
+  <!-- واجهة هاتف اللاعب للعبة «برا السالفة» (?mode=bara-player) -->
+  <div id="bara-player-root" class="player-view-root bara-player-root" hidden aria-hidden="true"></div>
 
   <!-- =========================================================
        الشاشة الأولى: شاشة إعداد الجولة (Setup Screen)
@@ -133,6 +135,13 @@
           <div class="mode-launch-text">
             <strong>طور «من غير كلام» المستقل</strong>
             <span>تمثيل صامت مباشر بـ 13 فئة ومؤقت حيّ</span>
+          </div>
+        </button>
+        <button type="button" id="btn-launch-bara-salfa" class="mode-launch-card mode-bara-salfa">
+          <span class="mode-launch-icon" aria-hidden="true">🕵️</span>
+          <div class="mode-launch-text">
+            <strong>برا السالفة</strong>
+            <span>اكتشف المخادع (3–12 لاعباً • محلي أو بالهواتف)</span>
           </div>
         </button>
         <button type="button" id="btn-open-hall-of-fame" class="mode-launch-card mode-hof">
@@ -2697,6 +2706,32 @@
     </div>
   </div>
 
+  <!-- =========================================================
+       نافذة لعبة «برا السالفة» (الوضع المحلي + الوضع اللاسلكي عبر Firebase + التلفزيون)
+       ========================================================= -->
+  <div id="bara-salfa-modal" class="modal-overlay bara-salfa-overlay" role="dialog" aria-modal="true" aria-labelledby="bara-salfa-title" aria-hidden="true">
+    <div class="modal-card bara-salfa-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="bara-salfa-title" class="bank-modal-title">
+            <span>🕵️</span>
+            لعبة «برا السالفة»
+          </h2>
+          <p class="bank-sources-summary">
+            12 فئة عربية/أردنية مدمجة (336 كلمة) + فئات خاصة — العب محلياً على جهاز واحد أو لاسلكياً عبر هواتف اللاعبين!
+          </p>
+        </div>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-bara-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
+            📺 التلفزيون
+          </button>
+          <button type="button" id="btn-close-bara-salfa" class="q-modal-close-btn" aria-label="إغلاق لعبة برا السالفة">✕</button>
+        </div>
+      </div>
+      <div id="bara-salfa-body" class="bank-modal-scroll-body bara-salfa-body"></div>
+    </div>
+  </div>
+
   <!-- ربط ملفات البيانات والإعدادات والوحدات المستقلة والمنطق بالترتيب الصحيح -->
   <script src="src/data/questions.js"></script>
   <script src="src/data/extra-questions.js"></script>
@@ -2715,6 +2750,8 @@
   <script src="src/utils/charadesMode.js"></script>
   <script src="src/utils/qrGenerator.js"></script>
   <script src="src/utils/realtimeSync.js"></script>
+  <script src="src/utils/baraSalfaBank.js"></script>
+  <script src="src/utils/baraSalfaSync.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/pwaManager.js"></script>
@@ -2723,6 +2760,8 @@
   <script src="src/js/displayView.js"></script>
   <script src="src/js/remoteHostView.js"></script>
   <script src="src/js/playerView.js"></script>
+  <script src="src/js/baraSalfaMode.js"></script>
+  <script src="src/js/baraSalfaPlayerView.js"></script>
   <script src="src/js/app.js"></script>
 </body>
 </html>

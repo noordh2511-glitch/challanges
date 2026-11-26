@@ -21,7 +21,9 @@
     AUDIO_ROUTE: "seen_jeem_dual_audio_route_v1",
     THEME: "seen_jeem_theme_v1",
     TV_SCALE: "seen_jeem_tv_scale_v1",
-    ARCHIVE: "seen-jeem-archive-v1"
+    ARCHIVE: "seen-jeem-archive-v1",
+    BARA_CUSTOM: "bara-salfa-custom-v1",
+    BARA_HISTORY: "bara-salfa-history-v1"
   });
 
   function safeReadJSON(key, fallback) {
@@ -52,6 +54,12 @@
     const matchArchive = window.SeenJeemArchiveStore
       ? window.SeenJeemArchiveStore.getAll()
       : safeReadJSON(KEYS.ARCHIVE, []);
+    const baraSalfaCustom = window.SeenJeemBaraSalfaBank
+      ? window.SeenJeemBaraSalfaBank.loadCustomCategories()
+      : safeReadJSON(KEYS.BARA_CUSTOM, []);
+    const baraSalfaHistory = window.SeenJeemBaraSalfaBank
+      ? window.SeenJeemBaraSalfaBank.exportBackupData().history
+      : safeReadJSON(KEYS.BARA_HISTORY, {});
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
       : safeReadJSON(KEYS.SETTINGS, null);
@@ -113,13 +121,19 @@
         playedRecordsCount: totalPlayed,
         flaggedCount: Array.isArray(flaggedItems) ? flaggedItems.length : 0,
         customCategoriesCount: Array.isArray(customCategories) ? customCategories.length : 0,
-        archiveMatchesCount: Array.isArray(matchArchive) ? matchArchive.length : 0
+        archiveMatchesCount: Array.isArray(matchArchive) ? matchArchive.length : 0,
+        baraSalfaCustomCount: Array.isArray(baraSalfaCustom) ? baraSalfaCustom.length : 0
       },
       data: {
         historyStore: historyData,
         flaggedQuestions: Array.isArray(flaggedItems) ? flaggedItems : [],
         customCategories: Array.isArray(customCategories) ? customCategories : [],
         matchArchive: Array.isArray(matchArchive) ? matchArchive : [],
+        baraSalfaCustom: Array.isArray(baraSalfaCustom) ? baraSalfaCustom : [],
+        baraSalfaHistory:
+          baraSalfaHistory && typeof baraSalfaHistory === "object" && !Array.isArray(baraSalfaHistory)
+            ? baraSalfaHistory
+            : {},
         matchSettings,
         preferences: {
           audio,
@@ -304,6 +318,27 @@
         window.SeenJeemArchiveStore.importRecords(d.matchArchive, isReplace ? "replace" : "merge");
       } else {
         safeWriteJSON(KEYS.ARCHIVE, d.matchArchive);
+      }
+    }
+
+    // 3.6) بيانات لعبة «برا السالفة» (الفئات الخاصة وسجل عدم التكرار — بتوافق رجعي آمن)
+    if (Array.isArray(d.baraSalfaCustom) || (d.baraSalfaHistory && typeof d.baraSalfaHistory === "object")) {
+      if (window.SeenJeemBaraSalfaBank && typeof window.SeenJeemBaraSalfaBank.importBackupData === "function") {
+        window.SeenJeemBaraSalfaBank.importBackupData(
+          {
+            customCategories: Array.isArray(d.baraSalfaCustom) ? d.baraSalfaCustom : undefined,
+            history:
+              d.baraSalfaHistory && typeof d.baraSalfaHistory === "object" && !Array.isArray(d.baraSalfaHistory)
+                ? d.baraSalfaHistory
+                : undefined
+          },
+          isReplace ? "replace" : "merge"
+        );
+      } else {
+        if (Array.isArray(d.baraSalfaCustom)) safeWriteJSON(KEYS.BARA_CUSTOM, d.baraSalfaCustom);
+        if (d.baraSalfaHistory && typeof d.baraSalfaHistory === "object") {
+          safeWriteJSON(KEYS.BARA_HISTORY, d.baraSalfaHistory);
+        }
       }
     }
 
