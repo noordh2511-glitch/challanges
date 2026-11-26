@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.14.0";
+const CACHE_VERSION = "seen-jeem-v4.15.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -35,6 +35,7 @@ const APP_SHELL_URLS = [
   "./src/utils/realtimeSync.js",
   "./src/utils/baraSalfaBank.js",
   "./src/utils/baraSalfaSync.js",
+  "./src/utils/mafiaSync.js",
   "./src/utils/backupManager.js",
   "./src/utils/resultCardGenerator.js",
   "./src/utils/audioChallengePlayer.js",
@@ -49,6 +50,8 @@ const APP_SHELL_URLS = [
   "./src/js/playerView.js",
   "./src/js/baraSalfaMode.js",
   "./src/js/baraSalfaPlayerView.js",
+  "./src/js/mafiaMode.js",
+  "./src/js/mafiaPlayerView.js",
   "./src/js/tournamentMode.js",
   "./src/js/customPackBuilder.js",
   "./src/js/app.js",
@@ -192,7 +195,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 1) تنقلات الصفحات (مع الحفاظ التام على معاملات الاستعلام مثل ?mode=display و?mode=remote و?mode=player في وضع الأوفلاين)
+  // 1) تنقلات الصفحات (مع الحفاظ التام على معاملات الاستعلام مثل ?mode=display و?mode=remote و?mode=player و?mode=bara-player و?mode=mafia-player في وضع الأوفلاين)
   if (request.mode === "navigate") {
     event.respondWith(
       (async () => {

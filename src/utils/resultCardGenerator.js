@@ -859,12 +859,199 @@
     }
   }
 
+  /**
+   * توليد بطاقة نتيجة جلسة «المافيا» بدقة 1080×1350 (4:5) — تدعم حتى 16 لاعباً
+   */
+  async function generateMafiaResultCard(sessionData = {}, theme = "dark-glass") {
+    await ensureArabicFontReady();
+    const palette = THEME_PALETTES[theme] || THEME_PALETTES["dark-glass"];
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    ctx.direction = "rtl";
+    ctx.textBaseline = "middle";
+
+    // الخلفية الداكنة السينمائية
+    const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    bgGrad.addColorStop(0, palette.bgTop);
+    bgGrad.addColorStop(0.5, palette.bgMid);
+    bgGrad.addColorStop(1, palette.bgBot);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const faction = sessionData.winnerFaction || "citizens";
+    const factionAccent = faction === "mafia" ? "#f43f5e" : faction === "jester" ? "#c084fc" : "#22d3ee";
+
+    const orb1 = ctx.createRadialGradient(WIDTH * 0.8, HEIGHT * 0.14, 10, WIDTH * 0.8, HEIGHT * 0.14, 440);
+    orb1.addColorStop(0, faction === "mafia" ? "rgba(244, 63, 94, 0.3)" : faction === "jester" ? "rgba(192, 132, 252, 0.3)" : "rgba(34, 211, 238, 0.28)");
+    orb1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb1;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    drawRoundedRect(ctx, 32, 32, WIDTH - 64, HEIGHT - 64, 38);
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // 1) الترويسة
+    const headerY = 104;
+    drawRoundedRect(ctx, WIDTH - 320, headerY - 34, 252, 68, 20);
+    const brandGrad = ctx.createLinearGradient(WIDTH - 320, headerY - 34, WIDTH - 68, headerY + 34);
+    brandGrad.addColorStop(0, factionAccent);
+    brandGrad.addColorStop(1, palette.accent2);
+    ctx.fillStyle = brandGrad;
+    ctx.fill();
+
+    ctx.fillStyle = "#060b19";
+    ctx.font = `900 32px ${FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.fillText("🎭 المافيا", WIDTH - 194, headerY + 2);
+
+    const nights = Math.max(1, Number(sessionData.nightsPlayed) || 1);
+    ctx.textAlign = "left";
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText(`عدد الليالي: ${nights}`, 74, headerY - 14);
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `600 22px ${FONT_FAMILY}`;
+    ctx.fillText(formatArabicDate(sessionData.timestamp || Date.now()), 74, headerY + 20);
+
+    // 2) لافتة الفصيل الفائز
+    const heroX = 68;
+    const heroY = 176;
+    const heroW = WIDTH - 136;
+    const heroH = 224;
+    drawRoundedRect(ctx, heroX, heroY, heroW, heroH, 30);
+    ctx.fillStyle = palette.heroBg;
+    ctx.fill();
+    ctx.strokeStyle = factionAccent;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    drawTrophyIcon(ctx, WIDTH / 2, heroY + 60, false, factionAccent);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = factionAccent;
+    ctx.font = `800 24px ${FONT_FAMILY}`;
+    ctx.fillText("نتيجة جلسة الراوي الآلي", WIDTH / 2, heroY + 116);
+
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `900 46px ${FONT_FAMILY}`;
+    ctx.fillText(truncateToWidth(ctx, sessionData.title || "انتهت الجولة!", heroW - 60), WIDTH / 2, heroY + 168);
+
+    const players = (Array.isArray(sessionData.players) ? sessionData.players : []).slice(0, 16);
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `700 21px ${FONT_FAMILY}`;
+    ctx.fillText(`${players.length} لاعبين  •  ${nights} ${nights === 1 ? "ليلة" : "ليالٍ"}`, WIDTH / 2, heroY + 204);
+
+    // 3) جدول اللاعبين وأدوارهم الحقيقية (عمودان حتى 16 لاعباً)
+    ctx.textAlign = "right";
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText("كشف الأدوار الحقيقية لجميع اللاعبين", WIDTH - 74, 444);
+
+    const listY = 474;
+    const listH = 540;
+    const twoCols = players.length > 6;
+    const colGap = 16;
+    const colW = twoCols ? Math.floor((WIDTH - 136 - colGap) / 2) : WIDTH - 136;
+    const rows = twoCols ? Math.ceil(players.length / 2) : Math.max(1, players.length);
+    const rowGap = 10;
+    const rowH = Math.min(76, Math.floor((listH - rowGap * (rows - 1)) / rows));
+
+    players.forEach((p, idx) => {
+      const col = twoCols ? idx % 2 : 0;
+      const row = twoCols ? Math.floor(idx / 2) : idx;
+      const x = twoCols ? (col === 0 ? WIDTH - 68 - colW : 68) : 68;
+      const y = listY + row * (rowH + rowGap);
+      const isMafia = p.role === "mafia";
+      const isJester = p.role === "jester";
+      const roleColor = isMafia ? "#fb7185" : isJester ? "#d8b4fe" : p.role === "doctor" ? "#34d399" : p.role === "detective" ? "#38bdf8" : palette.textSecondary;
+
+      drawRoundedRect(ctx, x, y, colW, rowH, 16);
+      ctx.fillStyle = isMafia ? "rgba(244, 63, 94, 0.14)" : palette.cardBg;
+      ctx.fill();
+      ctx.strokeStyle = isMafia ? "rgba(251, 113, 133, 0.55)" : palette.cardBorder;
+      ctx.lineWidth = isMafia ? 2 : 1.2;
+      ctx.stroke();
+
+      const cy = y + rowH / 2;
+      ctx.textAlign = "right";
+      ctx.fillStyle = palette.textPrimary;
+      ctx.font = `800 ${rowH < 60 ? 21 : 24}px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, p.name || "لاعب", colW - 210), x + colW - 18, cy);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = roleColor;
+      ctx.font = `800 ${rowH < 60 ? 19 : 22}px ${FONT_FAMILY}`;
+      const badgeText = `${p.roleIcon || ""} ${p.roleLabel || "مواطن"}  ${p.alive ? "🟢" : "💀"}`;
+      ctx.fillText(truncateToWidth(ctx, badgeText, 195), x + 16, cy);
+    });
+
+    // 4) أبرز لقطات الجلسة (إنقاذات الطبيب + كشوفات المحقق)
+    const hi = sessionData.highlights || {};
+    const hiY = 1044;
+    const hiGap = 22;
+    const hiW = Math.floor((WIDTH - 136 - hiGap) / 2);
+    const hiH = 158;
+    const hiCards = [
+      {
+        title: "🩺 إنقاذات الطبيب الناجحة",
+        value: `${Number(hi.doctorSaves) || 0} إنقاذ`,
+        color: "#34d399"
+      },
+      {
+        title: "🔍 كشوفات المحقق للمافيا",
+        value: `${Number(hi.detectiveHits) || 0} من ${Number(hi.detectiveChecks) || 0} فحص`,
+        color: "#38bdf8"
+      }
+    ];
+
+    hiCards.forEach((card, idx) => {
+      const x = idx === 0 ? WIDTH - 68 - hiW : 68;
+      drawRoundedRect(ctx, x, hiY, hiW, hiH, 22);
+      ctx.fillStyle = palette.cardBg;
+      ctx.fill();
+      ctx.strokeStyle = palette.cardBorder;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = palette.textMuted;
+      ctx.font = `700 22px ${FONT_FAMILY}`;
+      ctx.fillText(card.title, x + hiW / 2, hiY + 46);
+
+      ctx.fillStyle = card.color;
+      ctx.font = `900 36px ${FONT_FAMILY}`;
+      ctx.fillText(card.value, x + hiW / 2, hiY + 106);
+    });
+
+    // 5) التذييل
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(96, HEIGHT - 102);
+    ctx.lineTo(WIDTH - 96, HEIGHT - 102);
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText("سين جيم  •  لعبة «المافيا» اللاسلكية (الراوي الآلي)", WIDTH / 2, HEIGHT - 66);
+
+    return canvas;
+  }
+
   window.SeenJeemResultCard = {
     WIDTH,
     HEIGHT,
     generateCanvas,
     generateBaraSalfaResultCard,
     generateTournamentResultCard,
+    generateMafiaResultCard,
     canvasToBlob,
     getDefaultFilename,
     downloadBlobAsPNG,

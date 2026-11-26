@@ -151,6 +151,79 @@
         ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
         ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider != 'anonymous'"
       }
+    },
+    "mafiaRooms": {
+      ".read": false,
+      ".write": false,
+      "$roomCode": {
+        ".write": "auth != null && data.child('meta/ownerUid').val() === auth.uid && !newData.exists()",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))"
+        },
+        "publicState": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+        },
+        "allowedPlayers": {
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)"
+          }
+        },
+        "privateRoles": {
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
+        "privateIntel": {
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
+        "nightActions": {
+          ".read": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child($uid).exists()))"
+          }
+        },
+        "dayVotes": {
+          ".read": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child($uid).exists()))"
+          }
+        },
+        "vipCommands": {
+          ".read": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || root.child('mafiaRooms').child($roomCode).child('meta/vipUid').val() === auth.uid)",
+          ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('mafiaRooms').child($roomCode).child('meta/vipEnabled').val() !== false && root.child('mafiaRooms').child($roomCode).child('meta/vipUid').val() === auth.uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child(auth.uid).exists()))",
+          "$cmdId": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['type', 'uid', 'ts']) && newData.child('type').isString() && newData.child('uid').val() === auth.uid)"
+          }
+        },
+        "players": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && (!data.exists() || $uid === auth.uid)) || (auth.uid === $uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child($uid).exists() && (data.exists() || root.child('mafiaRooms').child($roomCode).child('meta/joinLocked').val() !== true || root.child('mafiaRooms').child($roomCode).child('allowedPlayers').child($uid).exists())))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 28)"
+          }
+        },
+        "kicked": {
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        }
+      }
     }
   }
 }

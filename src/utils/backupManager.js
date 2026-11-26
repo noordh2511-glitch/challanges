@@ -25,6 +25,7 @@
     BARA_CUSTOM: "bara-salfa-custom-v1",
     BARA_HISTORY: "bara-salfa-history-v1",
     BARA_STATS: "bara-salfa-stats-v1",
+    MAFIA_STATS: "mafia-stats-v1",
     TOURNAMENT: "seen-jeem-tournament-v1"
   });
 
@@ -69,6 +70,10 @@
       window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllBaraSalfaRounds === "function"
         ? window.SeenJeemArchiveStore.getAllBaraSalfaRounds()
         : safeReadJSON(KEYS.BARA_STATS, []);
+    const mafiaStats =
+      window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllMafiaSessions === "function"
+        ? window.SeenJeemArchiveStore.getAllMafiaSessions()
+        : safeReadJSON(KEYS.MAFIA_STATS, []);
     const activeTournament = safeReadJSON(KEYS.TOURNAMENT, null);
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
@@ -145,6 +150,7 @@
             ? baraSalfaHistory
             : {},
         baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
+        mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
         activeTournament: activeTournament && typeof activeTournament === "object" ? activeTournament : null,
         matchSettings,
         preferences: {
@@ -356,12 +362,19 @@
       }
     }
 
-    // 3.7) إحصائيات برا السالفة والبطولة النشطة (بتوافق رجعي آمن)
+    // 3.7) إحصائيات برا السالفة والمافيا والبطولة النشطة (بتوافق رجعي آمن)
     if (Array.isArray(d.baraSalfaStats)) {
       if (window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.importBaraSalfaRounds === "function") {
         window.SeenJeemArchiveStore.importBaraSalfaRounds(d.baraSalfaStats, isReplace ? "replace" : "merge");
       } else {
         safeWriteJSON(KEYS.BARA_STATS, d.baraSalfaStats);
+      }
+    }
+    if (Array.isArray(d.mafiaStats)) {
+      if (window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.importMafiaSessions === "function") {
+        window.SeenJeemArchiveStore.importMafiaSessions(d.mafiaStats, isReplace ? "replace" : "merge");
+      } else {
+        safeWriteJSON(KEYS.MAFIA_STATS, d.mafiaStats);
       }
     }
     if (d.activeTournament && typeof d.activeTournament === "object") {

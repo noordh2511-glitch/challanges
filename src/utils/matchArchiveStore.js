@@ -9,8 +9,10 @@
 
   const STORAGE_KEY = "seen-jeem-archive-v1";
   const BARA_STATS_STORAGE_KEY = "bara-salfa-stats-v1";
+  const MAFIA_STATS_STORAGE_KEY = "mafia-stats-v1";
   const MAX_PER_PROFILE = 50;
   const MAX_BARA_ROUNDS_PER_PROFILE = 200;
+  const MAX_MAFIA_SESSIONS_PER_PROFILE = 200;
   const VALID_MODES = new Set(["classic", "blitz", "charades"]);
   const DEFAULT_TEAM_COLORS = ["#22d3ee", "#fbbf24", "#34d399", "#e879f9"];
 
@@ -94,8 +96,11 @@
       this._records = [];
       /** @type {Array<Object>} */
       this._baraRounds = [];
+      /** @type {Array<Object>} */
+      this._mafiaSessions = [];
       this._load();
       this._loadBaraRounds();
+      this._loadMafiaSessions();
     }
 
     _load() {
@@ -573,6 +578,228 @@
       return {
         totalRounds: rounds.length,
         records: { topDetective, topInfiltrator, topScorer },
+        leaderboard
+      };
+    }
+
+    /* =========================================================
+       إحصائيات «المافيا» لقاعة المشاهير (mafia-stats-v1)
+       ========================================================= */
+    _sanitizeMafiaSession(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+      if (!sessionId) return null;
+      const profileId =
+        typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId.trim() : "default";
+      const validFactions = new Set(["mafia", "citizens", "jester"]);
+      const winnerFaction = validFactions.has(raw.winnerFaction) ? raw.winnerFaction : "citizens";
+      const validRoles = new Set(["mafia", "doctor", "detective", "jester", "citizen"]);
+      const players = Array.isArray(raw.players)
+        ? raw.players
+            .filter((p) => p && typeof p.name === "string" && p.name.trim())
+            .map((p) => ({
+              name: p.name.trim().slice(0, 28),
+              role: validRoles.has(p.role) ? p.role : "citizen",
+              won: Boolean(p.won),
+              alive: Boolean(p.alive)
+            }))
+        : [];
+      if (players.length === 0) return null;
+      return {
+        sessionId,
+        profileId,
+        playedAt:
+          Number.isFinite(Number(raw.playedAt)) && Number(raw.playedAt) > 0
+            ? Math.floor(Number(raw.playedAt))
+            : Date.now(),
+        winnerFaction,
+        nightsPlayed: Math.max(1, Math.floor(Number(raw.nightsPlayed) || 1)),
+        doctorSaves: Math.max(0, Math.floor(Number(raw.doctorSaves) || 0)),
+        detectiveHits: Math.max(0, Math.floor(Number(raw.detectiveHits) || 0)),
+        detectiveChecks: Math.max(0, Math.floor(Number(raw.detectiveChecks) || 0)),
+        players
+      };
+    }
+
+    _loadMafiaSessions() {
+      try {
+        const raw = localStorage.getItem(MAFIA_STATS_STORAGE_KEY);
+        if (!raw) {
+          this._mafiaSessions = [];
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : [];
+        const seen = new Set();
+        this._mafiaSessions = [];
+        arr.forEach((item) => {
+          const clean = this._sanitizeMafiaSession(item);
+          if (clean && !seen.has(clean.sessionId)) {
+            seen.add(clean.sessionId);
+            this._mafiaSessions.push(clean);
+          }
+        });
+        this._mafiaSessions.sort((a, b) => b.playedAt - a.playedAt);
+      } catch (_err) {
+        this._mafiaSessions = [];
+      }
+    }
+
+    _saveMafiaSessions() {
+      try {
+        localStorage.setItem(MAFIA_STATS_STORAGE_KEY, JSON.stringify(this._mafiaSessions));
+      } catch (_err) {}
+    }
+
+    recordMafiaSession(rawSession) {
+      const clean = this._sanitizeMafiaSession(rawSession);
+      if (!clean) return { ok: false, duplicate: false };
+      if (this._mafiaSessions.some((s) => s.sessionId === clean.sessionId)) {
+        return { ok: true, duplicate: true };
+      }
+      this._mafiaSessions.unshift(clean);
+      let countForProfile = 0;
+      this._mafiaSessions = this._mafiaSessions.filter((s) => {
+        if (s.profileId !== clean.profileId) return true;
+        countForProfile++;
+        return countForProfile <= MAX_MAFIA_SESSIONS_PER_PROFILE;
+      });
+      this._saveMafiaSessions();
+      return { ok: true, duplicate: false };
+    }
+
+    getAllMafiaSessions() {
+      return this._mafiaSessions.slice();
+    }
+
+    importMafiaSessions(rawList, mode = "merge") {
+      const incoming = (Array.isArray(rawList) ? rawList : [])
+        .map((s) => this._sanitizeMafiaSession(s))
+        .filter(Boolean);
+      if (mode === "replace") {
+        const seen = new Set();
+        this._mafiaSessions = [];
+        incoming.forEach((s) => {
+          if (!seen.has(s.sessionId)) {
+            seen.add(s.sessionId);
+            this._mafiaSessions.push(s);
+          }
+        });
+      } else {
+        const byId = new Map(this._mafiaSessions.map((s) => [s.sessionId, s]));
+        incoming.forEach((s) => {
+          if (!byId.has(s.sessionId)) byId.set(s.sessionId, s);
+        });
+        this._mafiaSessions = Array.from(byId.values());
+      }
+      this._mafiaSessions.sort((a, b) => b.playedAt - a.playedAt);
+      this._saveMafiaSessions();
+      return this._mafiaSessions.length;
+    }
+
+    clearMafiaProfileStats(profileId) {
+      const pid = profileId || "default";
+      const prev = this._mafiaSessions.length;
+      this._mafiaSessions = this._mafiaSessions.filter((s) => s.profileId !== pid);
+      if (this._mafiaSessions.length !== prev) this._saveMafiaSessions();
+      return prev - this._mafiaSessions.length;
+    }
+
+    computeMafiaHallOfFame(profileId) {
+      const pid = profileId || "default";
+      const sessions = this._mafiaSessions.filter((s) => s.profileId === pid);
+      if (sessions.length === 0) {
+        return {
+          totalSessions: 0,
+          summary: {
+            mafiaWins: 0,
+            citizenWins: 0,
+            jesterWins: 0,
+            totalDoctorSaves: 0,
+            detectiveHits: 0,
+            detectiveChecks: 0,
+            detectiveAccuracy: 0
+          },
+          leaderboard: []
+        };
+      }
+
+      let mafiaWins = 0;
+      let citizenWins = 0;
+      let jesterWins = 0;
+      let totalDoctorSaves = 0;
+      let detectiveHits = 0;
+      let detectiveChecks = 0;
+
+      const agg = new Map();
+      sessions.forEach((s) => {
+        if (s.winnerFaction === "mafia") mafiaWins += 1;
+        else if (s.winnerFaction === "jester") jesterWins += 1;
+        else citizenWins += 1;
+        totalDoctorSaves += Number(s.doctorSaves) || 0;
+        detectiveHits += Number(s.detectiveHits) || 0;
+        detectiveChecks += Number(s.detectiveChecks) || 0;
+
+        s.players.forEach((p) => {
+          const key = normalizeTeamKey(p.name);
+          if (!key) return;
+          if (!agg.has(key)) {
+            agg.set(key, {
+              key,
+              displayName: p.name,
+              sessions: 0,
+              totalWins: 0,
+              mafiaGames: 0,
+              mafiaWins: 0,
+              citizenGames: 0,
+              citizenWins: 0,
+              jesterGames: 0,
+              jesterWins: 0,
+              survivedCount: 0
+            });
+          }
+          const rec = agg.get(key);
+          rec.displayName = p.name;
+          rec.sessions += 1;
+          if (p.won) rec.totalWins += 1;
+          if (p.alive) rec.survivedCount += 1;
+          if (p.role === "mafia") {
+            rec.mafiaGames += 1;
+            if (p.won) rec.mafiaWins += 1;
+          } else if (p.role === "jester") {
+            rec.jesterGames += 1;
+            if (p.won) rec.jesterWins += 1;
+          } else {
+            rec.citizenGames += 1;
+            if (p.won) rec.citizenWins += 1;
+          }
+        });
+      });
+
+      const leaderboard = Array.from(agg.values())
+        .map((r) => ({
+          ...r,
+          winRate: r.sessions > 0 ? Math.round((r.totalWins / r.sessions) * 100) : 0,
+          mafiaWinRate: r.mafiaGames > 0 ? Math.round((r.mafiaWins / r.mafiaGames) * 100) : null,
+          citizenWinRate: r.citizenGames > 0 ? Math.round((r.citizenWins / r.citizenGames) * 100) : null
+        }))
+        .sort((a, b) => {
+          if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
+          if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+          return b.sessions - a.sessions;
+        });
+
+      return {
+        totalSessions: sessions.length,
+        summary: {
+          mafiaWins,
+          citizenWins,
+          jesterWins,
+          totalDoctorSaves,
+          detectiveHits,
+          detectiveChecks,
+          detectiveAccuracy: detectiveChecks > 0 ? Math.round((detectiveHits / detectiveChecks) * 100) : 0
+        },
         leaderboard
       };
     }

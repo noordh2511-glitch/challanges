@@ -76,11 +76,13 @@
         "hall-of-fame-modal",
         "wireless-room-modal",
         "bara-salfa-modal",
+        "mafia-modal",
         "tournament-modal",
         "custom-pack-builder-modal",
         "remote-host-root",
         "player-view-root",
         "bara-player-root",
+        "mafia-player-root",
         "confirm-modal",
         "resume-match-modal",
         "image-lightbox",
@@ -480,6 +482,11 @@
           <div id="tv-tournament-stage" class="tv-tournament-stage"></div>
         </section>
 
+        <!-- شاشة لعبة «المافيا» على التلفزيون (الراوي الآلي — بدون أي تسريب للأدوار السرية!) -->
+        <section id="tv-screen-mafia" class="tv-screen tv-side-mode-screen tv-mafia-screen" hidden>
+          <div id="tv-mafia-stage" class="tv-mafia-stage"></div>
+        </section>
+
         <!-- طبقة شاشة الاستراحة التلفزيونية الكاملة (Intermission Overlay — بدون أي تسريب للسؤال) -->
         <section id="tv-intermission-overlay" class="tv-intermission-overlay" hidden aria-live="polite">
           <div class="tv-intermission-card">
@@ -642,6 +649,8 @@
         baraStage: $("tv-bara-stage"),
         tournamentScreen: $("tv-screen-tournament"),
         tournamentStage: $("tv-tournament-stage"),
+        mafiaScreen: $("tv-screen-mafia"),
+        mafiaStage: $("tv-mafia-stage"),
         csoloTeamName: $("tv-csolo-team-name"),
         csoloRoundPill: $("tv-csolo-round-pill"),
         csoloScore: $("tv-csolo-score"),
@@ -835,6 +844,7 @@
       if (this.dom.csoloScreen) this.dom.csoloScreen.hidden = screenName !== "charades-solo";
       if (this.dom.baraScreen) this.dom.baraScreen.hidden = screenName !== "bara-salfa";
       if (this.dom.tournamentScreen) this.dom.tournamentScreen.hidden = screenName !== "tournament";
+      if (this.dom.mafiaScreen) this.dom.mafiaScreen.hidden = screenName !== "mafia";
     }
 
     _triggerConfetti(kind = "victory", theme = "default") {
@@ -1129,6 +1139,9 @@
       } else if (snap.screen === "tournament" && snap.tournamentView) {
         this.lastQuestionRenderKey = "";
         this._renderTournament(snap);
+      } else if (snap.screen === "mafia" && snap.mafiaView) {
+        this.lastQuestionRenderKey = "";
+        this._renderMafia(snap);
       } else {
         this._renderStandby(snap.setupInfo);
       }
@@ -2449,6 +2462,159 @@
           ${bodyHtml}
         </div>
       `;
+    }
+
+    _renderMafia(snap) {
+      this._showOnlyScreen("mafia");
+      const mv = snap.mafiaView;
+      if (!mv || !this.dom.mafiaStage) return;
+
+      const roster = Array.isArray(mv.playersRoster) ? mv.playersRoster : [];
+      const prog = mv.progressCounts || {};
+      const alive = roster.filter((p) => p.alive);
+      const dead = roster.filter((p) => !p.alive);
+      const rem = Math.max(0, Number(mv.remainingSeconds) || 0);
+      const isNight = mv.phase === "night";
+
+      this.dom.mafiaScreen.classList.toggle("is-night-sky", isNight);
+
+      let html = "";
+      if (mv.phase === "setup") {
+        const showQr = Boolean(mv.roomCode && mv.playerUrl && mv.showQrOnTv && window.SeenJeemQR);
+        const qrSvg = showQr
+          ? window.SeenJeemQR.toSVG(mv.playerUrl, { size: 230, margin: 3, ariaLabel: `QR غرفة المافيا ${mv.roomCode}` })
+          : "";
+        html = `
+          <div class="tv-bara-card tv-mafia-card">
+            <div class="tv-side-mode-tag">🎭 لعبة المافيا — الراوي الآلي</div>
+            <h1 class="tv-bara-title">${mv.roomCode ? "انضم بهاتفك لغرفة المافيا!" : "استعدوا لليلة المافيا الغامضة!"}</h1>
+            ${
+              mv.roomCode
+                ? `
+                  <div class="tv-bara-lobby-grid">
+                    ${showQr ? `<div class="tv-bara-qr-box">${qrSvg}</div>` : ""}
+                    <div class="tv-bara-code-box">
+                      <span>رمز الغرفة</span>
+                      <strong>${escapeHtml(mv.roomCode)}</strong>
+                      <small>${mv.joinLocked ? "🔒 الانضمام مقفل" : "امسح QR أو أدخل الرمز"}</small>
+                    </div>
+                  </div>
+                `
+                : `<p class="tv-bara-sub">جاري فتح غرفة المافيا على جهاز المقدّم...</p>`
+            }
+            ${roster.length > 0 ? `<div class="tv-bara-chips">${roster.map((p) => `<span class="tv-bara-chip">👤 ${escapeHtml(p.name)}</span>`).join("")}</div>` : ""}
+          </div>
+        `;
+      } else if (mv.phase === "role_reveal") {
+        const readySet = new Set(prog.readyUids || []);
+        html = `
+          <div class="tv-bara-card tv-mafia-card">
+            <div class="tv-side-mode-tag">🔐 توزيع الأدوار السرية</div>
+            <h1 class="tv-bara-title">تفقدوا هواتفكم لمعرفة أدواركم سراً!</h1>
+            <div class="tv-bara-progress">${readySet.size} / ${roster.length} جاهزين</div>
+            <div class="tv-bara-chips">
+              ${roster.map((p) => `<span class="tv-bara-chip${readySet.has(p.uid) ? " is-done" : ""}">${readySet.has(p.uid) ? "✅" : "⏳"} ${escapeHtml(p.name)}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (mv.phase === "night") {
+        html = `
+          <div class="tv-bara-card tv-mafia-card is-night-card">
+            <div class="tv-mafia-moon">🌙</div>
+            <div class="tv-side-mode-tag">🌙 الليلة رقم ${mv.roundNumber || 1}</div>
+            <h1 class="tv-bara-title">الليلة رقم ${mv.roundNumber || 1} — أغمضوا أعينكم وانظروا لهواتفكم</h1>
+            <div class="tv-bara-giant-timer${rem <= 10 ? " danger" : ""}">${formatTime(rem)}</div>
+            <div class="tv-bara-progress">🔒 ${prog.nightDoneCount || 0} / ${alive.length} أكملوا إجراء الليل</div>
+          </div>
+        `;
+      } else if (mv.phase === "dawn_report" && mv.dawnSummary) {
+        const ds = mv.dawnSummary;
+        html = `
+          <div class="tv-bara-card tv-mafia-card is-dawn-card">
+            <div class="tv-side-mode-tag">☀️ تقرير فجر اليوم ${mv.roundNumber || 1}</div>
+            <div class="tv-mafia-moon">${ds.saved ? "🩺✨" : ds.eliminated ? "💀" : "☀️"}</div>
+            <h1 class="tv-bara-title">${escapeHtml(ds.headline || "")}</h1>
+            <p class="tv-bara-sub">${escapeHtml(ds.subtitle || "")}</p>
+            <div class="tv-bara-chips">
+              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${escapeHtml(p.name)}</span>`).join("")}
+              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${escapeHtml(p.name)}${p.revealedRole ? ` (${escapeHtml(p.revealedRole.icon)} ${escapeHtml(p.revealedRole.label)})` : ""}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (mv.phase === "day_discussion") {
+        const isUnl = mv.timer && mv.timer.status === "unlimited";
+        html = `
+          <div class="tv-bara-card tv-mafia-card">
+            <div class="tv-side-mode-tag">💬 نقاش النهار — اليوم ${mv.roundNumber || 1}</div>
+            <h1 class="tv-bara-title">من المافيا بينكم؟ تناقشوا الآن!</h1>
+            <div class="tv-bara-giant-timer${!isUnl && rem <= 10 ? " danger" : ""}">${isUnl ? "∞" : formatTime(rem)}</div>
+            <div class="tv-bara-chips">
+              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${escapeHtml(p.name)}</span>`).join("")}
+              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${escapeHtml(p.name)}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (mv.phase === "day_voting") {
+        const votedSet = new Set(prog.votedUids || []);
+        html = `
+          <div class="tv-bara-card tv-mafia-card">
+            <div class="tv-side-mode-tag">🗳️ التصويت النهاري السري — اليوم ${mv.roundNumber || 1}</div>
+            <h1 class="tv-bara-title">صوّتوا سراً من هواتفكم!</h1>
+            <div class="tv-bara-giant-timer${rem <= 10 ? " danger" : ""}">${formatTime(rem)}</div>
+            <div class="tv-bara-progress">${votedSet.size} / ${alive.length} صوّتوا</div>
+            <div class="tv-bara-chips">
+              ${alive.map((p) => `<span class="tv-bara-chip${votedSet.has(p.uid) ? " is-done" : ""}">${votedSet.has(p.uid) ? "✅" : "⏳"} ${escapeHtml(p.name)}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (mv.phase === "vote_result" && mv.voteResult) {
+        const vr = mv.voteResult;
+        html = `
+          <div class="tv-bara-card tv-mafia-card">
+            <div class="tv-side-mode-tag">📊 نتائج تصويت اليوم ${mv.roundNumber || 1}</div>
+            <h1 class="tv-bara-title">${escapeHtml(vr.headline || "")}</h1>
+            <p class="tv-bara-sub">${escapeHtml(vr.subtitle || "")}</p>
+            <div class="tv-bara-votes-grid">
+              ${(vr.voteBreakdown || [])
+                .map(
+                  (v) => `
+                <div class="tv-bara-vote-item${vr.eliminated && v.targetUid === vr.eliminated.uid ? " is-hit" : ""}">
+                  <strong>${escapeHtml(v.voterName)}</strong> ⬅️ ${escapeHtml(v.targetName)}
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      } else if (mv.phase === "game_over" && mv.gameOverData) {
+        const go = mv.gameOverData;
+        if (this._lastMafiaConfettiId !== go.sessionId) {
+          this._lastMafiaConfettiId = go.sessionId;
+          this._triggerConfetti("victory", "default");
+        }
+        html = `
+          <div class="tv-bara-card tv-mafia-card is-gameover-card">
+            <div class="tv-side-mode-tag">🏆 نهاية الجلسة وكشف جميع الأدوار</div>
+            <h1 class="tv-bara-title">${escapeHtml(go.title || "")}</h1>
+            <p class="tv-bara-sub">${escapeHtml(go.subtitle || "")}</p>
+            <div class="tv-mafia-reveal-grid">
+              ${(go.players || [])
+                .map(
+                  (p) => `
+                <div class="tv-mafia-reveal-pill team-${escapeHtml(p.team)}">
+                  <span>${escapeHtml(p.roleIcon)} <strong>${escapeHtml(p.name)}</strong></span>
+                  <span>${escapeHtml(p.roleLabel)} ${p.alive ? "🟢" : "💀"}</span>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      this.dom.mafiaStage.innerHTML = html;
     }
   }
 

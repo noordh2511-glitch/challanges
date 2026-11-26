@@ -769,6 +769,50 @@
       else if (sfxId === "attention_chime") this.playAttentionChime();
       else if (sfxId === "fanfare") this.playFanfare();
     }
+
+    /* =========================================================
+       مؤثرات الراوي الآلي للعبة «المافيا» (Pack 14)
+       ========================================================= */
+    /** دخول الليل — وتر هابط عميق غامض */
+    playMafiaNight() {
+      try {
+        this.playTone({ freq: 220, freqEnd: 110, duration: 0.75, type: "sine", volume: 0.14, delay: 0, category: "uiEffects" });
+        this.playTone({ freq: 164.81, freqEnd: 98, duration: 0.9, type: "triangle", volume: 0.1, delay: 0.18, category: "uiEffects" });
+      } catch (_err) {}
+    }
+
+    /** شروق الفجر — وتر صاعد مشرق */
+    playMafiaDawn() {
+      try {
+        const notes = [329.63, 440, 554.37, 659.25];
+        notes.forEach((f, idx) => {
+          this.playTone({
+            freq: f,
+            duration: idx === 3 ? 0.5 : 0.22,
+            type: "triangle",
+            volume: 0.12,
+            delay: idx * 0.12,
+            category: "celebrations"
+          });
+        });
+      } catch (_err) {}
+    }
+
+    /** نبض التصويت المشوّق */
+    playMafiaVotePulse() {
+      try {
+        this.playTone({ freq: 185, freqEnd: 130, duration: 0.16, type: "triangle", volume: 0.13, delay: 0, category: "timerTicks" });
+        this.playTone({ freq: 246.94, freqEnd: 196, duration: 0.2, type: "sine", volume: 0.11, delay: 0.14, category: "timerTicks" });
+      } catch (_err) {}
+    }
+
+    /** إقصاء لاعب — ضربة درامية ثقيلة */
+    playMafiaElimination() {
+      try {
+        this.playTone({ freq: 155.56, freqEnd: 65, duration: 0.6, type: "sawtooth", volume: 0.11, delay: 0, category: "celebrations" });
+        this.playTone({ freq: 110, freqEnd: 55, duration: 0.72, type: "triangle", volume: 0.15, delay: 0.08, category: "celebrations" });
+      } catch (_err) {}
+    }
   }
 
   window.SeenJeemAudio = new SoundEngine();

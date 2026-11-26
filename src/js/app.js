@@ -1019,6 +1019,10 @@
     hofBaraTotalRoundsPill: document.getElementById("hof-bara-total-rounds-pill"),
     hofBaraRecordsGrid: document.getElementById("hof-bara-records-grid"),
     hofBaraLeaderboardWrap: document.getElementById("hof-bara-leaderboard-wrap"),
+    hofMafiaSection: document.getElementById("hof-mafia-section"),
+    hofMafiaTotalSessionsPill: document.getElementById("hof-mafia-total-sessions-pill"),
+    hofMafiaRecordsGrid: document.getElementById("hof-mafia-records-grid"),
+    hofMafiaLeaderboardWrap: document.getElementById("hof-mafia-leaderboard-wrap"),
     hofTotalMatchesPill: document.getElementById("hof-total-matches-pill"),
     hofRecordsGrid: document.getElementById("hof-records-grid"),
     hofLeaderboardWrap: document.getElementById("hof-leaderboard-wrap"),
@@ -7490,6 +7494,11 @@
       typeof window.SeenJeemBaraSalfa.isOpen === "function" &&
       window.SeenJeemBaraSalfa.isOpen()
     );
+    const isMafiaOpen = Boolean(
+      window.SeenJeemMafia &&
+      typeof window.SeenJeemMafia.isOpen === "function" &&
+      window.SeenJeemMafia.isOpen()
+    );
     const isTournamentOpen = Boolean(
       window.SeenJeemTournament &&
       typeof window.SeenJeemTournament.isOpen === "function" &&
@@ -7516,7 +7525,9 @@
 
     let screen = "setup";
     let customWinnerView = null;
-    if (isBaraOpen) {
+    if (isMafiaOpen) {
+      screen = "mafia";
+    } else if (isBaraOpen) {
       screen = "bara-salfa";
     } else if (isTournamentOpen) {
       screen = "tournament";
@@ -7624,6 +7635,12 @@
         window.SeenJeemBaraSalfa &&
         typeof window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload === "function"
           ? window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload()
+          : null,
+      mafiaView:
+        screen === "mafia" &&
+        window.SeenJeemMafia &&
+        typeof window.SeenJeemMafia.buildSanitizedDisplayPayload === "function"
+          ? window.SeenJeemMafia.buildSanitizedDisplayPayload()
           : null,
       tournamentView:
         screen === "tournament" &&
@@ -9960,6 +9977,9 @@
       if (customPayload && customPayload.cardType === "bara-salfa" && typeof resultCardGen.generateBaraSalfaResultCard === "function") {
         state.currentResultCardPrefix = "bara-salfa-result";
         canvas = await resultCardGen.generateBaraSalfaResultCard(customPayload.sessionData, state.theme);
+      } else if (customPayload && customPayload.cardType === "mafia" && typeof resultCardGen.generateMafiaResultCard === "function") {
+        state.currentResultCardPrefix = "mafia-result";
+        canvas = await resultCardGen.generateMafiaResultCard(customPayload.sessionData, state.theme);
       } else if (customPayload && customPayload.cardType === "tournament" && typeof resultCardGen.generateTournamentResultCard === "function") {
         state.currentResultCardPrefix = "seen-jeem-tournament";
         canvas = await resultCardGen.generateTournamentResultCard(customPayload.tournamentData, state.theme);
@@ -11124,16 +11144,102 @@
     if (!archiveStore) return;
     const profile = historyStore.getActiveProfile();
     const isBaraView = state.hofActiveView === "bara-salfa";
+    const isMafiaView = state.hofActiveView === "mafia";
+    const activeTabName = isMafiaView ? "mafia" : isBaraView ? "bara-salfa" : "seen-jeem";
 
     if (dom.hofViewTabs) {
       dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
-        const active = tab.dataset.hofView === (isBaraView ? "bara-salfa" : "seen-jeem");
+        const active = tab.dataset.hofView === activeTabName;
         tab.classList.toggle("active", active);
         tab.setAttribute("aria-selected", String(active));
       });
     }
-    if (dom.hofSeenJeemSections) dom.hofSeenJeemSections.hidden = isBaraView;
+    if (dom.hofSeenJeemSections) dom.hofSeenJeemSections.hidden = isBaraView || isMafiaView;
     if (dom.hofBaraSalfaSection) dom.hofBaraSalfaSection.hidden = !isBaraView;
+    if (dom.hofMafiaSection) dom.hofMafiaSection.hidden = !isMafiaView;
+
+    if (isMafiaView) {
+      const mafiaHof =
+        typeof archiveStore.computeMafiaHallOfFame === "function"
+          ? archiveStore.computeMafiaHallOfFame(profile.id)
+          : { totalSessions: 0, summary: {}, leaderboard: [] };
+      const sm = mafiaHof.summary || {};
+
+      if (dom.hofProfileSubtitle) {
+        dom.hofProfileSubtitle.textContent = `المجموعة النشطة: ${profile.name} • إحصائيات جلسات «المافيا» المحفوظة`;
+      }
+      if (dom.hofMafiaTotalSessionsPill) {
+        dom.hofMafiaTotalSessionsPill.textContent = `${mafiaHof.totalSessions} جلسة`;
+      }
+      if (dom.btnHofClearArchive) {
+        dom.btnHofClearArchive.textContent = "🗑️ تصفير إحصائيات المافيا للمجموعة";
+        dom.btnHofClearArchive.disabled = mafiaHof.totalSessions === 0;
+      }
+
+      if (dom.hofMafiaRecordsGrid) {
+        dom.hofMafiaRecordsGrid.innerHTML = `
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🕵️</div>
+            <div class="hof-rec-val">${sm.mafiaWins || 0}</div>
+            <div class="hof-rec-lbl">انتصارات المافيا</div>
+            <div class="hof-rec-sub">مقابل ${sm.citizenWins || 0} للمواطنين${sm.jesterWins ? ` • ${sm.jesterWins} للمهرج` : ""}</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🩺</div>
+            <div class="hof-rec-val">${sm.totalDoctorSaves || 0}</div>
+            <div class="hof-rec-lbl">إنقاذات الطبيب</div>
+            <div class="hof-rec-sub">عمليات حماية ليلية ناجحة</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🔍</div>
+            <div class="hof-rec-val">${sm.detectiveChecks > 0 ? `${sm.detectiveAccuracy}%` : "—"}</div>
+            <div class="hof-rec-lbl">دقة كشوفات المحقق</div>
+            <div class="hof-rec-sub">${sm.detectiveChecks > 0 ? `${sm.detectiveHits} كشف مافيا من ${sm.detectiveChecks}` : "لا توجد فحوصات بعد"}</div>
+          </div>
+        `;
+      }
+
+      if (dom.hofMafiaLeaderboardWrap) {
+        if (!mafiaHof.leaderboard || mafiaHof.leaderboard.length === 0) {
+          dom.hofMafiaLeaderboardWrap.innerHTML = `<div class="empty-inline-note">أكمل أول جلسة «المافيا» لتظهر إحصائيات اللاعبين ونسب الفوز كمافيا ومواطنين لمجموعة «${escapeHtml(profile.name)}».</div>`;
+        } else {
+          dom.hofMafiaLeaderboardWrap.innerHTML = `
+            <div class="hof-table-scroll">
+              <table class="hof-leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>اللاعب</th>
+                    <th>الجولات</th>
+                    <th>الفوز العام</th>
+                    <th>فوز كمافيا</th>
+                    <th>فوز كمواطن</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${mafiaHof.leaderboard
+                    .slice(0, 20)
+                    .map(
+                      (row, idx) => `
+                    <tr class="${idx === 0 ? "is-rank-1" : ""}">
+                      <td><strong>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}</strong></td>
+                      <td><strong>${escapeHtml(row.displayName)}</strong></td>
+                      <td>${row.sessions}</td>
+                      <td><strong>${row.winRate}%</strong> (${row.totalWins}/${row.sessions})</td>
+                      <td>${row.mafiaWinRate !== null ? `${row.mafiaWinRate}% (${row.mafiaWins}/${row.mafiaGames})` : "—"}</td>
+                      <td>${row.citizenWinRate !== null ? `${row.citizenWinRate}% (${row.citizenWins}/${row.citizenGames})` : "—"}</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+      return;
+    }
 
     if (isBaraView) {
       const baraHof =
@@ -13501,7 +13607,8 @@
     if (dom.hofViewTabs) {
       dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
         tab.addEventListener("click", () => {
-          state.hofActiveView = tab.dataset.hofView === "bara-salfa" ? "bara-salfa" : "seen-jeem";
+          const v = tab.dataset.hofView;
+          state.hofActiveView = v === "bara-salfa" ? "bara-salfa" : v === "mafia" ? "mafia" : "seen-jeem";
           renderHallOfFameModal();
         });
       });
@@ -13517,6 +13624,21 @@
     if (dom.btnHofClearArchive) {
       dom.btnHofClearArchive.addEventListener("click", () => {
         const profile = historyStore.getActiveProfile();
+        if (state.hofActiveView === "mafia") {
+          openConfirmDialog({
+            title: `تصفير إحصائيات «المافيا» لمجموعة «${profile.name}»؟`,
+            message: "سيتم حذف جميع جلسات وإحصائيات «المافيا» المحفوظة لهذه المجموعة فقط.",
+            confirmText: "نعم، صفّر الإحصائيات",
+            onConfirm: () => {
+              if (typeof archiveStore.clearMafiaProfileStats === "function") {
+                archiveStore.clearMafiaProfileStats(profile.id);
+              }
+              renderHallOfFameModal();
+              showToast(`🗑️ تم تصفير إحصائيات «المافيا» لمجموعة «${profile.name}»`, "info");
+            }
+          });
+          return;
+        }
         if (state.hofActiveView === "bara-salfa") {
           openConfirmDialog({
             title: `تصفير إحصائيات «برا السالفة» لمجموعة «${profile.name}»؟`,
@@ -13963,14 +14085,21 @@
       }
       return;
     }
+    if (urlMode === "mafia-player") {
+      if (window.SeenJeemMafiaPlayerView && typeof window.SeenJeemMafiaPlayerView.init === "function") {
+        window.SeenJeemMafiaPlayerView.init();
+      }
+      return;
+    }
 
-    // جسر خفيف يسمح لوحدتي «برا السالفة» و«نظام البطولة» بإرسال مشاهد التلفزيون وبطاقة النتيجة وإطلاق المباريات دون المساس بمنطق سين جيم
+    // جسر خفيف يسمح لوحدتي «برا السالفة» و«المافيا» و«نظام البطولة» بإرسال مشاهد التلفزيون وبطاقة النتيجة وإطلاق المباريات دون المساس بمنطق سين جيم
     window.SeenJeemHostBridge = {
       broadcastTV: () => broadcastLiveDisplayState({ skipWireless: true }),
       triggerConfetti: (kind = "victory", theme = "default") => startVictoryConfetti(kind, theme),
       showToast: (msg, type = "info") => showToast(msg, type),
       openTVDisplayWindow: () => openTVDisplayWindow(),
       openBaraResultCard: (sessionData) => openResultCardModal({ cardType: "bara-salfa", sessionData }),
+      openMafiaResultCard: (sessionData) => openResultCardModal({ cardType: "mafia", sessionData }),
       openTournamentResultCard: (tournamentData) => openResultCardModal({ cardType: "tournament", tournamentData }),
       refreshCustomPacks: () => refreshCustomPacksFromStore(),
       onCloudDataApplied: ({ silent } = {}) => {
@@ -14026,6 +14155,11 @@
     if (btnLaunchBaraSalfa && window.SeenJeemBaraSalfa) {
       window.SeenJeemBaraSalfa.init();
       btnLaunchBaraSalfa.addEventListener("click", () => window.SeenJeemBaraSalfa.open());
+    }
+    const btnLaunchMafia = document.getElementById("btn-launch-mafia");
+    if (btnLaunchMafia && window.SeenJeemMafia) {
+      window.SeenJeemMafia.init();
+      btnLaunchMafia.addEventListener("click", () => window.SeenJeemMafia.open());
     }
     const btnLaunchTournament = document.getElementById("btn-launch-tournament");
     if (btnLaunchTournament && window.SeenJeemTournament) {

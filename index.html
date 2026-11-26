@@ -41,6 +41,8 @@
   <div id="player-view-root" class="player-view-root" hidden aria-hidden="true"></div>
   <!-- واجهة هاتف اللاعب للعبة «برا السالفة» (?mode=bara-player) -->
   <div id="bara-player-root" class="player-view-root bara-player-root" hidden aria-hidden="true"></div>
+  <!-- واجهة هاتف اللاعب للعبة «المافيا» (?mode=mafia-player) -->
+  <div id="mafia-player-root" class="player-view-root mafia-player-root" hidden aria-hidden="true"></div>
 
   <!-- =========================================================
        الشاشة الأولى: شاشة إعداد الجولة (Setup Screen)
@@ -151,6 +153,13 @@
           <div class="mode-launch-text">
             <strong>برا السالفة</strong>
             <span>اكتشف المخادع (3–12 لاعباً • محلي أو بالهواتف)</span>
+          </div>
+        </button>
+        <button type="button" id="btn-launch-mafia" class="mode-launch-card mode-mafia">
+          <span class="mode-launch-icon" aria-hidden="true">🎭</span>
+          <div class="mode-launch-text">
+            <strong>المافيا</strong>
+            <span>الراوي الآلي بالهواتف والتلفزيون (4–16 لاعباً)</span>
           </div>
         </button>
         <button type="button" id="btn-launch-tournament" class="mode-launch-card mode-tournament">
@@ -2482,13 +2491,16 @@
       </div>
 
       <div class="bank-modal-scroll-body">
-        <!-- تبويب التبديل بين إحصائيات «سين جيم» وإحصائيات «برا السالفة» -->
+        <!-- تبويب التبديل بين إحصائيات «سين جيم» و«برا السالفة» و«المافيا» -->
         <div id="hof-view-tabs" class="hof-view-tabs" role="tablist" aria-label="اختر نوع الإحصائيات">
           <button type="button" class="hof-view-tab active" data-hof-view="seen-jeem" role="tab" aria-selected="true">
             🏆 إحصائيات سين جيم
           </button>
           <button type="button" class="hof-view-tab" data-hof-view="bara-salfa" role="tab" aria-selected="false">
             🕵️ إحصائيات برا السالفة
+          </button>
+          <button type="button" class="hof-view-tab" data-hof-view="mafia" role="tab" aria-selected="false">
+            🎭 إحصائيات المافيا
           </button>
         </div>
 
@@ -2540,6 +2552,24 @@
               <h3 class="bank-section-title">📊 جدول متصدري «برا السالفة»</h3>
             </div>
             <div id="hof-bara-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
+          </section>
+        </div>
+
+        <!-- قسم إحصائيات «المافيا» (Pack 14) -->
+        <div id="hof-mafia-section" hidden>
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">🎭 ملخص جلسات «المافيا»</h3>
+              <span id="hof-mafia-total-sessions-pill" class="bank-count-pill">0 جلسة</span>
+            </div>
+            <div id="hof-mafia-records-grid" class="hof-records-grid"></div>
+          </section>
+
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">📊 سجل لاعبي «المافيا» التراكمي</h3>
+            </div>
+            <div id="hof-mafia-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
           </section>
         </div>
       </div>
@@ -2958,6 +2988,38 @@
   </div>
 
   <!-- =========================================================
+       نافذة لعبة «المافيا» اللاسلكية بالهواتف والتلفزيون (الراوي الآلي - Pack 14)
+       ========================================================= -->
+  <div id="mafia-modal" class="modal-overlay mafia-overlay" role="dialog" aria-modal="true" aria-labelledby="mafia-modal-title" aria-hidden="true">
+    <div class="modal-card mafia-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="mafia-modal-title" class="bank-modal-title">
+            <span>🎭</span>
+            لعبة «المافيا» — الراوي الآلي
+          </h2>
+          <p class="bank-sources-summary">
+            4 إلى 16 لاعباً بالهواتف والتلفزيون — توزيع سري، تمويه ليلي ذكي، طبيب ومحقق ومهرج، وتحكم VIP دون كشف أي دور!
+          </p>
+        </div>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-mafia-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة عند التحكم من هاتف VIP">
+            📺 وضع العرض الكامل (بدون أزرار)
+          </button>
+          <button type="button" id="btn-mafia-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
+            📺 التلفزيون
+          </button>
+          <button type="button" id="btn-close-mafia" class="q-modal-close-btn" aria-label="إغلاق لعبة المافيا">✕</button>
+        </div>
+      </div>
+      <div id="mafia-body" class="bank-modal-scroll-body mafia-body"></div>
+    </div>
+    <button type="button" id="btn-mafia-exit-clean-tv" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
+  </div>
+
+  <!-- =========================================================
        نافذة نظام البطولات والدوري (Tournament & League Mode - Pack 11)
        ========================================================= -->
   <div id="tournament-modal" class="modal-overlay tournament-overlay" role="dialog" aria-modal="true" aria-labelledby="tournament-modal-title" aria-hidden="true">
@@ -3024,6 +3086,7 @@
   <script src="src/utils/realtimeSync.js"></script>
   <script src="src/utils/baraSalfaBank.js"></script>
   <script src="src/utils/baraSalfaSync.js"></script>
+  <script src="src/utils/mafiaSync.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/audioChallengePlayer.js"></script>
@@ -3038,6 +3101,8 @@
   <script src="src/js/playerView.js"></script>
   <script src="src/js/baraSalfaMode.js"></script>
   <script src="src/js/baraSalfaPlayerView.js"></script>
+  <script src="src/js/mafiaMode.js"></script>
+  <script src="src/js/mafiaPlayerView.js"></script>
   <script src="src/js/tournamentMode.js"></script>
   <script src="src/js/customPackBuilder.js"></script>
   <script src="src/js/app.js"></script>
