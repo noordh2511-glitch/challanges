@@ -571,19 +571,29 @@
       const sig = JSON.stringify(cfg);
 
       if (!this._app || this._activeConfigSignature !== sig) {
-        if (this._app) {
+        const mode = getUrlMode();
+        const isHostMode = mode === "host";
+        // في وضع المقدّم: مشاركة نفس Firebase App مع cloudSyncManager لضمان تعايش GoogleAuthProvider مع الغرف اللاسلكية
+        const appName = isHostMode
+          ? `seen-jeem-host-${sanitizeFirebaseKey(cfg.projectId || "default")}`
+          : `seen-jeem-rt-${mode}-${sanitizeFirebaseKey(cfg.projectId || "default")}`;
+        const existingApp = sdk.appMod.getApps().find((a) => a.name === appName);
+        if (this._app && !isHostMode && this._app.name !== appName) {
           try {
             await sdk.appMod.deleteApp(this._app);
           } catch (_err) {}
         }
-        const appName = `seen-jeem-rt-${getUrlMode()}-${sanitizeFirebaseKey(cfg.projectId || "default")}`;
-        this._app = sdk.appMod.initializeApp(cfg, appName);
+        this._app = existingApp || sdk.appMod.initializeApp(cfg, appName);
         this._auth = sdk.authMod.getAuth(this._app);
         this._db = sdk.dbMod.getDatabase(this._app);
         this._activeConfigSignature = sig;
       }
 
-      if (!this._auth.currentUser) {
+      if (typeof this._auth.authStateReady === "function") {
+        await this._auth.authStateReady();
+      }
+      // نقطة حرجة: لا نستدعي signInAnonymously إلا إذا كان auth.currentUser === null لحماية جلسة Google للمقدّم
+      if (this._auth.currentUser === null) {
         const cred = await sdk.authMod.signInAnonymously(this._auth);
         this._uid = cred && cred.user ? cred.user.uid : null;
       } else {

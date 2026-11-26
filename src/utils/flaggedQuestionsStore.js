@@ -22,15 +22,20 @@
   const VALID_POINTS = new Set([200, 400, 600]);
 
   const FLAG_REASONS = Object.freeze([
-    { id: "typo", label: "خطأ مطبعي", icon: "✏️" },
-    { id: "unclear", label: "صياغة غير واضحة", icon: "❓" },
-    { id: "broken-image", label: "صورة لا تعمل", icon: "🖼️" },
-    { id: "wrong-info", label: "معلومة تحتاج مراجعة", icon: "⚠️" },
-    { id: "difficulty", label: "مستوى الصعوبة غير مناسب", icon: "⚖️" },
-    { id: "other", label: "أخرى", icon: "📝" }
+    { id: "wrong-answer", label: "خطأ في الإجابة", icon: "⚠️" },
+    { id: "typo", label: "خطأ إملائي/صياغة", icon: "✏️" },
+    { id: "broken-media", label: "رابط صورة أو صوت معطّل", icon: "🖼️" },
+    { id: "duplicate", label: "سؤال مكرر", icon: "♻️" },
+    { id: "other", label: "ملاحظة أخرى", icon: "📝" },
+    // توافق رجعي مع السجلات القديمة
+    { id: "unclear", label: "صياغة غير واضحة", icon: "❓", legacy: true },
+    { id: "broken-image", label: "صورة لا تعمل", icon: "🖼️", legacy: true },
+    { id: "wrong-info", label: "معلومة تحتاج مراجعة", icon: "⚠️", legacy: true },
+    { id: "difficulty", label: "مستوى الصعوبة غير مناسب", icon: "⚖️", legacy: true }
   ]);
 
   const VALID_REASON_IDS = new Set(FLAG_REASONS.map((r) => r.id));
+  const VALID_SYNC_STATUSES = new Set(["pending", "sent", "failed"]);
 
   function sanitizeFlagRecord(raw) {
     if (!raw || typeof raw !== "object") return null;
@@ -41,6 +46,7 @@
     const categoryName = typeof raw.categoryName === "string" ? raw.categoryName.trim() : "";
     const ptsNum = Number(raw.points);
     const points = VALID_POINTS.has(ptsNum) ? ptsNum : 200;
+    const visualType = typeof raw.visualType === "string" && raw.visualType.trim() ? raw.visualType.trim() : "normal";
     const questionText = typeof raw.questionText === "string" ? raw.questionText.trim() : "";
     const answerText = typeof raw.answerText === "string" ? raw.answerText.trim() : "";
     const reason = VALID_REASON_IDS.has(raw.reason) ? raw.reason : "other";
@@ -49,19 +55,34 @@
         ? raw.note.trim().slice(0, 240)
         : undefined;
     const flaggedAt =
-      Number.isFinite(Number(raw.flaggedAt)) && Number(raw.flaggedAt) > 0
-        ? Math.floor(Number(raw.flaggedAt))
+      Number.isFinite(Number(raw.flaggedAt || raw.reportedAt)) && Number(raw.flaggedAt || raw.reportedAt) > 0
+        ? Math.floor(Number(raw.flaggedAt || raw.reportedAt))
         : Date.now();
+    const reportId =
+      typeof raw.reportId === "string" && raw.reportId.trim()
+        ? raw.reportId.trim()
+        : `rep_${questionId}_${flaggedAt.toString(36)}`;
+    const sheetSyncStatus =
+      VALID_SYNC_STATUSES.has(raw.sheetSyncStatus)
+        ? raw.sheetSyncStatus
+        : raw.reportedToSheet === true
+          ? "sent"
+          : "pending";
 
     const record = {
+      reportId,
       questionId,
       categoryId,
       categoryName,
       points,
+      visualType,
       questionText,
       answerText,
       reason,
-      flaggedAt
+      flaggedAt,
+      reportedAt: flaggedAt,
+      sheetSyncStatus,
+      reportedToSheet: sheetSyncStatus === "sent"
     };
     if (note) {
       record.note = note;
@@ -162,6 +183,22 @@
       this._items.sort((a, b) => b.flaggedAt - a.flaggedAt);
       this._save();
       return { ...clean };
+    }
+
+    updateSyncStatus(questionId, status = "pending") {
+      if (typeof questionId !== "string" || !questionId.trim()) return false;
+      const id = questionId.trim();
+      const nextStatus = VALID_SYNC_STATUSES.has(status) ? status : "pending";
+      const found = this._items.find((item) => item.questionId === id);
+      if (!found) return false;
+      found.sheetSyncStatus = nextStatus;
+      found.reportedToSheet = nextStatus === "sent";
+      this._save();
+      return true;
+    }
+
+    getPendingCount() {
+      return this._items.filter((item) => item.sheetSyncStatus !== "sent" && !item.reportedToSheet).length;
     }
 
     unflagQuestion(questionId) {
