@@ -540,7 +540,7 @@
             await sdk.appMod.deleteApp(this._app);
           } catch (_err) {}
         }
-        const appName = `seen-jeem-rt-${Date.now().toString(36)}`;
+        const appName = `seen-jeem-rt-${getUrlMode()}-${sanitizeFirebaseKey(cfg.projectId || "default")}`;
         this._app = sdk.appMod.initializeApp(cfg, appName);
         this._auth = sdk.authMod.getAuth(this._app);
         this._db = sdk.dbMod.getDatabase(this._app);
@@ -1166,7 +1166,7 @@
       const pRef = dbMod.ref(this._db, `rooms/${this.roomCode}/players/${this.deviceId}`);
       this._lastPlayerPresence = { teamIdx: idx, teamName: String(teamName || ""), label: cleanLabel };
       try {
-        await dbMod.onDisconnect(pRef).remove();
+        // نكتب العقدة أولاً حتى تتحقق قاعدة data.child('uid').val() === auth.uid قبل تسجيل onDisconnect().remove()
         await dbMod.set(pRef, {
           deviceId: this.deviceId,
           uid: this._uid || "",
@@ -1177,6 +1177,9 @@
           joinedAt: dbMod.serverTimestamp(),
           online: true
         });
+        try {
+          await dbMod.onDisconnect(pRef).remove();
+        } catch (_odErr) {}
         return { ok: true };
       } catch (err) {
         const msg = String((err && (err.code || err.message)) || "").toLowerCase();

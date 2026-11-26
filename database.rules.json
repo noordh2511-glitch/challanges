@@ -69,7 +69,7 @@
           ".read": "auth != null",
           ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
           "$deviceId": {
-            ".write": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && data.child('uid').val() === auth.uid) || (!root.child('rooms').child($roomCode).child('kicked').child($deviceId).exists() && newData.child('uid').val() === auth.uid && (!data.exists() || data.child('uid').val() === auth.uid) && (data.exists() || root.child('rooms').child($roomCode).child('meta/joinLocked').val() !== true || root.child('rooms').child($roomCode).child('allowedDevices').child($deviceId).exists())))",
+            ".write": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && (!data.exists() || data.child('uid').val() === auth.uid)) || (!root.child('rooms').child($roomCode).child('kicked').child($deviceId).exists() && newData.child('uid').val() === auth.uid && (!data.exists() || data.child('uid').val() === auth.uid) && (data.exists() || root.child('rooms').child($roomCode).child('meta/joinLocked').val() !== true || root.child('rooms').child($roomCode).child('allowedDevices').child($deviceId).exists())))",
             ".validate": "!newData.exists() || (newData.hasChildren(['deviceId', 'uid', 'teamId', 'teamIdx', 'label']) && newData.child('deviceId').isString() && newData.child('deviceId').val() === $deviceId && newData.child('uid').val() === auth.uid && newData.child('teamId').isString() && newData.child('teamIdx').isNumber() && newData.child('label').isString() && newData.child('label').val().length <= 32)"
           }
         }
