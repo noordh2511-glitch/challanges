@@ -8,7 +8,9 @@
   "use strict";
 
   const STORAGE_KEY = "seen-jeem-archive-v1";
+  const BARA_STATS_STORAGE_KEY = "bara-salfa-stats-v1";
   const MAX_PER_PROFILE = 50;
+  const MAX_BARA_ROUNDS_PER_PROFILE = 200;
   const VALID_MODES = new Set(["classic", "blitz", "charades"]);
   const DEFAULT_TEAM_COLORS = ["#22d3ee", "#fbbf24", "#34d399", "#e879f9"];
 
@@ -90,7 +92,10 @@
     constructor() {
       /** @type {Array<Object>} */
       this._records = [];
+      /** @type {Array<Object>} */
+      this._baraRounds = [];
       this._load();
+      this._loadBaraRounds();
     }
 
     _load() {
@@ -363,6 +368,211 @@
           mostWinsTeam,
           longestWinStreak
         },
+        leaderboard
+      };
+    }
+
+    /* =========================================================
+       إحصائيات «برا السالفة» لقاعة المشاهير (bara-salfa-stats-v1)
+       ========================================================= */
+    _sanitizeBaraRound(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      const roundId = typeof raw.roundId === "string" ? raw.roundId.trim() : "";
+      if (!roundId) return null;
+      const profileId =
+        typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId.trim() : "default";
+      const players = Array.isArray(raw.players)
+        ? raw.players
+            .filter((p) => p && typeof p.name === "string" && p.name.trim())
+            .map((p) => ({
+              name: p.name.trim().slice(0, 28),
+              isOutsider: Boolean(p.isOutsider),
+              points: Math.max(0, Math.round(Number(p.points) || 0)),
+              correctVote: Boolean(p.correctVote),
+              correctGuess: Boolean(p.correctGuess)
+            }))
+        : [];
+      if (players.length === 0) return null;
+      return {
+        roundId,
+        profileId,
+        playedAt:
+          Number.isFinite(Number(raw.playedAt)) && Number(raw.playedAt) > 0
+            ? Math.floor(Number(raw.playedAt))
+            : Date.now(),
+        categoryName: typeof raw.categoryName === "string" ? raw.categoryName.trim().slice(0, 48) : "",
+        players
+      };
+    }
+
+    _loadBaraRounds() {
+      try {
+        const raw = localStorage.getItem(BARA_STATS_STORAGE_KEY);
+        if (!raw) {
+          this._baraRounds = [];
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : [];
+        const seen = new Set();
+        this._baraRounds = [];
+        arr.forEach((item) => {
+          const clean = this._sanitizeBaraRound(item);
+          if (clean && !seen.has(clean.roundId)) {
+            seen.add(clean.roundId);
+            this._baraRounds.push(clean);
+          }
+        });
+        this._baraRounds.sort((a, b) => b.playedAt - a.playedAt);
+      } catch (_err) {
+        this._baraRounds = [];
+      }
+    }
+
+    _saveBaraRounds() {
+      try {
+        localStorage.setItem(BARA_STATS_STORAGE_KEY, JSON.stringify(this._baraRounds));
+      } catch (_err) {}
+    }
+
+    recordBaraSalfaRound(rawRound) {
+      const clean = this._sanitizeBaraRound(rawRound);
+      if (!clean) return { ok: false, duplicate: false };
+      if (this._baraRounds.some((r) => r.roundId === clean.roundId)) {
+        return { ok: true, duplicate: true };
+      }
+      this._baraRounds.unshift(clean);
+      // حد أقصى 200 جولة لكل ملف
+      let countForProfile = 0;
+      this._baraRounds = this._baraRounds.filter((r) => {
+        if (r.profileId !== clean.profileId) return true;
+        countForProfile++;
+        return countForProfile <= MAX_BARA_ROUNDS_PER_PROFILE;
+      });
+      this._saveBaraRounds();
+      return { ok: true, duplicate: false };
+    }
+
+    getAllBaraSalfaRounds() {
+      return this._baraRounds.slice();
+    }
+
+    importBaraSalfaRounds(rawList, mode = "merge") {
+      const incoming = (Array.isArray(rawList) ? rawList : [])
+        .map((r) => this._sanitizeBaraRound(r))
+        .filter(Boolean);
+      if (mode === "replace") {
+        const seen = new Set();
+        this._baraRounds = [];
+        incoming.forEach((r) => {
+          if (!seen.has(r.roundId)) {
+            seen.add(r.roundId);
+            this._baraRounds.push(r);
+          }
+        });
+      } else {
+        const byId = new Map(this._baraRounds.map((r) => [r.roundId, r]));
+        incoming.forEach((r) => {
+          if (!byId.has(r.roundId)) byId.set(r.roundId, r);
+        });
+        this._baraRounds = Array.from(byId.values());
+      }
+      this._baraRounds.sort((a, b) => b.playedAt - a.playedAt);
+      this._saveBaraRounds();
+      return this._baraRounds.length;
+    }
+
+    clearBaraSalfaProfileStats(profileId) {
+      const pid = profileId || "default";
+      const prev = this._baraRounds.length;
+      this._baraRounds = this._baraRounds.filter((r) => r.profileId !== pid);
+      if (this._baraRounds.length !== prev) this._saveBaraRounds();
+      return prev - this._baraRounds.length;
+    }
+
+    computeBaraSalfaHallOfFame(profileId) {
+      const pid = profileId || "default";
+      const rounds = this._baraRounds.filter((r) => r.profileId === pid);
+      if (rounds.length === 0) {
+        return {
+          totalRounds: 0,
+          records: { topDetective: null, topInfiltrator: null, topScorer: null },
+          leaderboard: []
+        };
+      }
+
+      const agg = new Map();
+      rounds.forEach((rd) => {
+        rd.players.forEach((p) => {
+          const key = normalizeTeamKey(p.name);
+          if (!key) return;
+          if (!agg.has(key)) {
+            agg.set(key, {
+              key,
+              displayName: p.name,
+              rounds: 0,
+              totalScore: 0,
+              insiderRounds: 0,
+              correctVotes: 0,
+              outsiderRounds: 0,
+              correctGuesses: 0
+            });
+          }
+          const rec = agg.get(key);
+          rec.displayName = p.name;
+          rec.rounds += 1;
+          rec.totalScore += p.points;
+          if (p.isOutsider) {
+            rec.outsiderRounds += 1;
+            if (p.correctGuess) rec.correctGuesses += 1;
+          } else {
+            rec.insiderRounds += 1;
+            if (p.correctVote) rec.correctVotes += 1;
+          }
+        });
+      });
+
+      const leaderboard = Array.from(agg.values())
+        .map((item) => ({
+          ...item,
+          detectionRate: item.insiderRounds > 0 ? Math.round((item.correctVotes / item.insiderRounds) * 100) : 0,
+          guessRate: item.outsiderRounds > 0 ? Math.round((item.correctGuesses / item.outsiderRounds) * 100) : 0
+        }))
+        .sort((a, b) => {
+          if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+          if (b.correctVotes !== a.correctVotes) return b.correctVotes - a.correctVotes;
+          return b.rounds - a.rounds;
+        });
+
+      let topDetective = null;
+      let topInfiltrator = null;
+      leaderboard.forEach((p) => {
+        if (
+          p.correctVotes > 0 &&
+          (!topDetective ||
+            p.correctVotes > topDetective.correctVotes ||
+            (p.correctVotes === topDetective.correctVotes && p.detectionRate > topDetective.detectionRate))
+        ) {
+          topDetective = { name: p.displayName, correctVotes: p.correctVotes, rate: p.detectionRate };
+        }
+        if (
+          p.correctGuesses > 0 &&
+          (!topInfiltrator ||
+            p.guessRate > topInfiltrator.rate ||
+            (p.guessRate === topInfiltrator.rate && p.correctGuesses > topInfiltrator.correctGuesses))
+        ) {
+          topInfiltrator = { name: p.displayName, correctGuesses: p.correctGuesses, rate: p.guessRate };
+        }
+      });
+
+      const topScorer =
+        leaderboard.length > 0 && leaderboard[0].totalScore > 0
+          ? { name: leaderboard[0].displayName, score: leaderboard[0].totalScore, rounds: leaderboard[0].rounds }
+          : null;
+
+      return {
+        totalRounds: rounds.length,
+        records: { topDetective, topInfiltrator, topScorer },
         leaderboard
       };
     }

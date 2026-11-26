@@ -33,6 +33,8 @@
     const vType = typeof q.visualType === "string" ? q.visualType.trim().toLowerCase() : "normal";
     if (vType && vType !== "normal") return false;
     if (typeof q.questionImage === "string" && q.questionImage.trim()) return false;
+    if (typeof q.audioUrl === "string" && q.audioUrl.trim()) return false;
+    if (Number(q.differencesCount) > 0) return false;
     if (Array.isArray(q.images) && q.images.length > 0) return false;
     return true;
   }

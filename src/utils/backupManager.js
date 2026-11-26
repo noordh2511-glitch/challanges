@@ -23,7 +23,9 @@
     TV_SCALE: "seen_jeem_tv_scale_v1",
     ARCHIVE: "seen-jeem-archive-v1",
     BARA_CUSTOM: "bara-salfa-custom-v1",
-    BARA_HISTORY: "bara-salfa-history-v1"
+    BARA_HISTORY: "bara-salfa-history-v1",
+    BARA_STATS: "bara-salfa-stats-v1",
+    TOURNAMENT: "seen-jeem-tournament-v1"
   });
 
   function safeReadJSON(key, fallback) {
@@ -50,7 +52,10 @@
     const flaggedItems = window.SeenJeemFlaggedStore
       ? window.SeenJeemFlaggedStore.getAll()
       : safeReadJSON(KEYS.FLAGGED, []);
-    const customCategories = safeReadJSON(KEYS.CUSTOM_CATS, []);
+    const customCategories =
+      window.SeenJeemCustomPacksStore && typeof window.SeenJeemCustomPacksStore.getAllSync === "function"
+        ? window.SeenJeemCustomPacksStore.getAllSync()
+        : safeReadJSON(KEYS.CUSTOM_CATS, []);
     const matchArchive = window.SeenJeemArchiveStore
       ? window.SeenJeemArchiveStore.getAll()
       : safeReadJSON(KEYS.ARCHIVE, []);
@@ -60,6 +65,11 @@
     const baraSalfaHistory = window.SeenJeemBaraSalfaBank
       ? window.SeenJeemBaraSalfaBank.exportBackupData().history
       : safeReadJSON(KEYS.BARA_HISTORY, {});
+    const baraSalfaStats =
+      window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllBaraSalfaRounds === "function"
+        ? window.SeenJeemArchiveStore.getAllBaraSalfaRounds()
+        : safeReadJSON(KEYS.BARA_STATS, []);
+    const activeTournament = safeReadJSON(KEYS.TOURNAMENT, null);
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
       : safeReadJSON(KEYS.SETTINGS, null);
@@ -134,6 +144,8 @@
           baraSalfaHistory && typeof baraSalfaHistory === "object" && !Array.isArray(baraSalfaHistory)
             ? baraSalfaHistory
             : {},
+        baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
+        activeTournament: activeTournament && typeof activeTournament === "object" ? activeTournament : null,
         matchSettings,
         preferences: {
           audio,
@@ -302,9 +314,11 @@
       }
     }
 
-    // 3) الفئات المخصّصة المستوردة
+    // 3) الفئات المخصّصة المستوردة (مع دعم IndexedDB في customPacksStore)
     if (Array.isArray(d.customCategories)) {
-      if (isReplace) {
+      if (window.SeenJeemCustomPacksStore && typeof window.SeenJeemCustomPacksStore.importPacks === "function") {
+        window.SeenJeemCustomPacksStore.importPacks(d.customCategories, isReplace ? "replace" : "merge").catch(() => {});
+      } else if (isReplace) {
         safeWriteJSON(KEYS.CUSTOM_CATS, d.customCategories);
       } else {
         const curCats = safeReadJSON(KEYS.CUSTOM_CATS, []);
@@ -339,6 +353,20 @@
         if (d.baraSalfaHistory && typeof d.baraSalfaHistory === "object") {
           safeWriteJSON(KEYS.BARA_HISTORY, d.baraSalfaHistory);
         }
+      }
+    }
+
+    // 3.7) إحصائيات برا السالفة والبطولة النشطة (بتوافق رجعي آمن)
+    if (Array.isArray(d.baraSalfaStats)) {
+      if (window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.importBaraSalfaRounds === "function") {
+        window.SeenJeemArchiveStore.importBaraSalfaRounds(d.baraSalfaStats, isReplace ? "replace" : "merge");
+      } else {
+        safeWriteJSON(KEYS.BARA_STATS, d.baraSalfaStats);
+      }
+    }
+    if (d.activeTournament && typeof d.activeTournament === "object") {
+      if (isReplace || !safeReadJSON(KEYS.TOURNAMENT, null)) {
+        safeWriteJSON(KEYS.TOURNAMENT, d.activeTournament);
       }
     }
 

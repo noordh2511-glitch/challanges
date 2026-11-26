@@ -59,7 +59,23 @@
   function saveDisplaySnapshotToSession(snapshot) {
     if (!snapshot || typeof snapshot !== "object") return;
     try {
-      sessionStorage.setItem(DISPLAY_SNAPSHOT_KEY, JSON.stringify(snapshot));
+      // عدم تخزين DataURL صوتي ضخم داخل sessionStorage لتفادي البطء أو تجاوز الحصة
+      let toSave = snapshot;
+      if (
+        snapshot.questionView &&
+        snapshot.questionView.audioChallenge &&
+        typeof snapshot.questionView.audioChallenge.audioSrc === "string" &&
+        /^data:audio\//i.test(snapshot.questionView.audioChallenge.audioSrc)
+      ) {
+        toSave = {
+          ...snapshot,
+          questionView: {
+            ...snapshot.questionView,
+            audioChallenge: { ...snapshot.questionView.audioChallenge, audioSrc: null }
+          }
+        };
+      }
+      sessionStorage.setItem(DISPLAY_SNAPSHOT_KEY, JSON.stringify(toSave));
     } catch (_err) {
       // تجاهل
     }
@@ -165,6 +181,8 @@
       blitzView: null,
       charadesSoloView: null,
       baraSalfaView: null,
+      tournamentView: null,
+      allPlay: null,
       winnerView: rawSnapshot.winnerView || null,
       intermission:
         rawSnapshot.intermission && typeof rawSnapshot.intermission === "object"
@@ -296,6 +314,26 @@
         images: isDailyDoubleWagerLocked ? null : Array.isArray(qv.images) ? qv.images.slice() : null,
         showPlus: Boolean(qv.showPlus),
         differencesCount: qv.differencesCount || null,
+        differencesFound: Math.max(0, Math.floor(Number(qv.differencesFound) || 0)),
+        audioChallenge:
+          !isDailyDoubleWagerLocked && qv.audioChallenge && typeof qv.audioChallenge === "object"
+            ? {
+                hasAudio: Boolean(qv.audioChallenge.hasAudio),
+                audioSrc: typeof qv.audioChallenge.audioSrc === "string" ? qv.audioChallenge.audioSrc : null,
+                clipStart: Math.max(0, Number(qv.audioChallenge.clipStart) || 0),
+                clipEnd:
+                  Number.isFinite(Number(qv.audioChallenge.clipEnd)) && Number(qv.audioChallenge.clipEnd) > 0
+                    ? Number(qv.audioChallenge.clipEnd)
+                    : null,
+                playing: Boolean(qv.audioChallenge.playing),
+                teaserActive: Boolean(qv.audioChallenge.teaserActive),
+                currentTime: Math.max(0, Number(qv.audioChallenge.currentTime) || 0),
+                duration: Math.max(0, Number(qv.audioChallenge.duration) || 0),
+                volume: Number.isFinite(Number(qv.audioChallenge.volume)) ? Number(qv.audioChallenge.volume) : 0.85,
+                route: qv.audioChallenge.route === "host" ? "host" : "display"
+              }
+            : null,
+        answerImageMode: qv.answerImageMode === "question" || qv.answerImageMode === "compare" ? qv.answerImageMode : "answer",
         blurLevel: qv.blurLevel || 18,
         halfBlur: qv.halfBlur || 9,
         blurReduced: Boolean(qv.blurReduced),
@@ -505,6 +543,34 @@
             }
           : null
       };
+    }
+
+    // وضع «الكل يجاوب» (منع تسريب نصوص إجابات الفرق قبل الإغلاق والكشف الصريح!)
+    if (rawSnapshot.allPlay && typeof rawSnapshot.allPlay === "object") {
+      const ap = rawSnapshot.allPlay;
+      const apPhase = ap.phase === "revealed" ? "revealed" : ap.phase === "open" ? "open" : "idle";
+      clean.allPlay = {
+        active: Boolean(ap.active),
+        phase: apPhase,
+        questionId: typeof ap.questionId === "string" ? ap.questionId : "",
+        submittedTeamIndices: Array.isArray(ap.submittedTeamIndices)
+          ? ap.submittedTeamIndices.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 0)
+          : [],
+        // نصوص الإجابات والتقييمات لا تُمرَّر مطلقاً إلا بعد phase === "revealed"
+        revealedAnswers:
+          apPhase === "revealed" && Array.isArray(ap.revealedAnswers)
+            ? ap.revealedAnswers.map((a) => ({
+                teamIdx: Number(a.teamIdx) || 0,
+                teamName: String(a.teamName || ""),
+                text: String(a.text || ""),
+                correct: a.correct === true ? true : a.correct === false ? false : null
+              }))
+            : null
+      };
+    }
+
+    if (rawSnapshot.tournamentView && typeof rawSnapshot.tournamentView === "object") {
+      clean.tournamentView = rawSnapshot.tournamentView;
     }
 
     return clean;
@@ -743,6 +809,16 @@
     broadcastConfetti(kind = "victory", theme = "default") {
       if (this._role !== "host" || !this._channel) return false;
       return this.post("TRIGGER_CONFETTI", { kind, theme });
+    }
+
+    broadcastAudioControl(action, payload = {}) {
+      if (this._role !== "host" || !this._channel) return false;
+      return this.post("AUDIO_CHALLENGE_CMD", { action, payload });
+    }
+
+    reportDisplayAudioStatus(statusPayload) {
+      if (this._role !== "display" || !this._channel) return false;
+      return this.post("AUDIO_CHALLENGE_STATUS", statusPayload);
     }
 
     requestSyncFromHost() {

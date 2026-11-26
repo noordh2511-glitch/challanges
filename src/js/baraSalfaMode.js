@@ -103,13 +103,17 @@
       this.outsiderCount = 1; // 1 | 2 (فقط عند >= 6 لاعبين)
       this.discussionSeconds = 90; // 0 | 60 | 90 | 120 | 180
       this.showQrOnTv = true;
+      this.vipControlEnabled = true;
+      this.cleanTvMode = false;
       this.customPanelOpen = false;
       this.editingCustomId = "";
       this.customFeedback = "";
 
-      // اللاعبون والنقاط التراكمية
+      // اللاعبون والنقاط التراكمية وإحصائيات الجلسة لبطاقة النتيجة
       this.localNames = loadSavedLocalNames();
       this.scoresById = {}; // { playerId: number }
+      this.sessionStatsById = {}; // { playerId: { name, insiderRounds, correctVotes, outsiderRounds, correctGuesses } }
+      this.sessionId = `bs_sess_${Date.now().toString(36)}`;
       this.players = []; // [{ id, name }]
 
       // حالة الوضع اللاسلكي
@@ -119,7 +123,8 @@
         roomCode: "",
         playerUrl: "",
         joinLocked: false,
-        playersMap: {}, // { uid: { uid, name, online } }
+        vipUid: null,
+        playersMap: {}, // { uid: { uid, name, online, joinedAt } }
         actionsMap: {}, // { uid: { readyRound, voteRound, voteTargetUid, guessRound, guessWord } }
         feedback: "",
         feedbackKind: "info"
@@ -147,9 +152,17 @@
       this.bodyEl = document.getElementById("bara-salfa-body");
       const closeBtn = document.getElementById("btn-close-bara-salfa");
       const openTvBtn = document.getElementById("btn-bara-open-tv");
+      const cleanTvBtn = document.getElementById("btn-bara-clean-tv");
+      const exitCleanBtn = document.getElementById("btn-bara-exit-clean-tv");
 
       if (closeBtn) {
         closeBtn.addEventListener("click", () => this.requestClose());
+      }
+      if (cleanTvBtn) {
+        cleanTvBtn.addEventListener("click", () => this.toggleCleanTvMode(true));
+      }
+      if (exitCleanBtn) {
+        exitCleanBtn.addEventListener("click", () => this.toggleCleanTvMode(false));
       }
       if (openTvBtn) {
         openTvBtn.addEventListener("click", () => {
@@ -195,6 +208,7 @@
     close() {
       this._stopDiscussionTimer();
       this._setHoldReveal(false);
+      this.toggleCleanTvMode(false);
       this.isOpenFlag = false;
       if (this.modalEl) {
         this.modalEl.classList.remove("open");
@@ -203,6 +217,17 @@
       const anyOpen = document.querySelector(".modal-overlay.open");
       if (!anyOpen) document.body.style.overflow = "";
       this._syncTV();
+    }
+
+    toggleCleanTvMode(forceState = null) {
+      const next = typeof forceState === "boolean" ? forceState : !this.cleanTvMode;
+      this.cleanTvMode = next;
+      if (this.modalEl) {
+        this.modalEl.classList.toggle("is-clean-tv-mode", next);
+      }
+      const exitBtn = document.getElementById("btn-bara-exit-clean-tv");
+      if (exitBtn) exitBtn.hidden = !next;
+      if (this.isOpenFlag) this._render();
     }
 
     _toast(msg, kind = "info") {
@@ -266,11 +291,13 @@
       try {
         const info = await sync.createRoom({
           initialPublicState: this._buildFirebasePublicState(),
+          vipEnabled: this.vipControlEnabled,
           onPlayers: (map) => {
             this.wireless.playersMap = map && typeof map === "object" ? map : {};
             if (!this.wireless.joinLocked) {
               Object.keys(this.wireless.playersMap).forEach((uid) => sync.approvePlayerUid(uid));
             }
+            this._reconcileVipUid();
             if (this.phase === "setup") {
               this._syncWirelessAndTV();
             }
@@ -280,6 +307,7 @@
             this.wireless.actionsMap = map && typeof map === "object" ? map : {};
             this._handleIncomingWirelessActions();
           },
+          onVipCommand: (cmd) => this._handleVipCommand(cmd),
           onConnectionState: (isConn) => {
             this.wireless.connected = isConn;
             this._render();
@@ -291,6 +319,7 @@
         this.wireless.roomCode = info.roomCode;
         this.wireless.playerUrl = info.playerUrl;
         this.wireless.joinLocked = false;
+        this.wireless.vipUid = null;
         this.wireless.playersMap = {};
         this.wireless.actionsMap = {};
         this.wireless.feedbackKind = "success";
@@ -313,6 +342,7 @@
       this.wireless.roomCode = "";
       this.wireless.playerUrl = "";
       this.wireless.joinLocked = false;
+      this.wireless.vipUid = null;
       this.wireless.playersMap = {};
       this.wireless.actionsMap = {};
       this.wireless.feedback = "تم إغلاق وحذف الغرفة اللاسلكية بنجاح.";
@@ -339,6 +369,106 @@
       );
     }
 
+    _reconcileVipUid() {
+      const sync = window.SeenJeemBaraSalfaSync;
+      if (!this.wireless.active || !sync) return;
+      const connectedSorted = Object.values(this.wireless.playersMap || {})
+        .filter((p) => p && p.uid && p.name)
+        .sort((a, b) => (Number(a.joinedAt) || 0) - (Number(b.joinedAt) || 0));
+
+      let nextVip = null;
+      if (this.vipControlEnabled && connectedSorted.length > 0) {
+        const stillHere = connectedSorted.find((p) => p.uid === this.wireless.vipUid);
+        nextVip = stillHere ? stillHere.uid : connectedSorted[0].uid;
+      }
+
+      if (nextVip !== this.wireless.vipUid) {
+        this.wireless.vipUid = nextVip;
+        sync.setVipMeta({ vipUid: nextVip, vipEnabled: this.vipControlEnabled });
+      }
+    }
+
+    async setVipManually(targetUid) {
+      if (!this.wireless.active || !targetUid || !this.wireless.playersMap[targetUid]) return;
+      this.vipControlEnabled = true;
+      this.wireless.vipUid = targetUid;
+      if (window.SeenJeemBaraSalfaSync) {
+        await window.SeenJeemBaraSalfaSync.setVipMeta({ vipUid: targetUid, vipEnabled: true });
+      }
+      const pName = this.wireless.playersMap[targetUid].name || "اللاعب";
+      this._syncWirelessAndTV();
+      this._render();
+      this._toast(`👑 تم نقل شارة التحكم (VIP) إلى «${pName}»`, "success");
+    }
+
+    async toggleVipControlEnabled() {
+      this.vipControlEnabled = !this.vipControlEnabled;
+      if (this.wireless.active) {
+        this._reconcileVipUid();
+        if (window.SeenJeemBaraSalfaSync) {
+          await window.SeenJeemBaraSalfaSync.setVipMeta({
+            vipEnabled: this.vipControlEnabled,
+            vipUid: this.vipControlEnabled ? this.wireless.vipUid : null
+          });
+        }
+        this._syncWirelessAndTV();
+      }
+      this._render();
+    }
+
+    _handleVipCommand(cmd) {
+      if (!cmd || typeof cmd.type !== "string" || !this.wireless.active || !this.vipControlEnabled) return;
+      if (!this.wireless.vipUid || cmd.uid !== this.wireless.vipUid) return;
+      const p = cmd.payload && typeof cmd.payload === "object" ? cmd.payload : {};
+
+      switch (cmd.type) {
+        case "SET_CATEGORY":
+          if (this.phase === "setup" && typeof p.categoryId === "string") {
+            this.selectedCategoryId = p.categoryId || "random";
+            this._syncWirelessAndTV();
+            this._render();
+          }
+          break;
+        case "TOGGLE_LOCK":
+          if (this.phase === "setup") this.toggleWirelessLock();
+          break;
+        case "START_ROUND":
+          if (this.phase === "setup" && this._getActivePlayersList().length >= MIN_PLAYERS) {
+            this.startRound();
+          }
+          break;
+        case "ADVANCE_TO_QUESTIONS":
+          if (this.phase === "role_reveal") this.enterQuestionsPhase();
+          break;
+        case "NEXT_PAIR":
+          if (this.phase === "questions") this.stepQuestionPair(1);
+          break;
+        case "PREV_PAIR":
+          if (this.phase === "questions") this.stepQuestionPair(-1);
+          break;
+        case "SKIP_TO_DISCUSSION":
+          if (this.phase === "questions") this.enterDiscussionPhase();
+          break;
+        case "TOGGLE_TIMER":
+          if (this.phase === "discussion") this.toggleDiscussionTimer();
+          break;
+        case "GO_VOTING":
+          if (this.phase === "discussion") this.enterVotingPhase();
+          break;
+        case "CLOSE_VOTING":
+          if (this.phase === "voting") this.enterOutsiderRevealPhase();
+          break;
+        case "GO_GUESS":
+          if (this.phase === "outsider_reveal") this.enterOutsiderGuessPhase();
+          break;
+        case "NEW_ROUND":
+          if (this.phase === "round_results") this.startRound();
+          break;
+        default:
+          break;
+      }
+    }
+
     async kickWirelessPlayer(uid) {
       if (!this.wireless.active || !window.SeenJeemBaraSalfaSync || !uid) return;
       const pName =
@@ -347,6 +477,7 @@
       if (res && res.ok) {
         delete this.wireless.playersMap[uid];
         delete this.wireless.actionsMap[uid];
+        this._reconcileVipUid();
         this._syncWirelessAndTV();
         this._render();
         this._toast(`🚫 تم طرد «${pName}» من الغرفة`, "warning");
@@ -423,10 +554,22 @@
       const currentPair =
         r && r.pairs && r.pairs[r.pairIndex] ? r.pairs[r.pairIndex] : null;
 
+      const bank = window.SeenJeemBaraSalfaBank;
+      const availableCategories =
+        this.phase === "setup" && bank
+          ? [
+              { id: "random", name: "فئة عشوائية", icon: "🎲" },
+              ...bank.getAllCategories().map((c) => ({ id: c.id, name: c.name, icon: c.icon }))
+            ]
+          : null;
+
       return {
         phase: this.phase,
         roundNumber: this.roundNumber,
         joinLocked: Boolean(this.wireless.joinLocked),
+        vipUid: this.vipControlEnabled ? this.wireless.vipUid || null : null,
+        selectedCategoryId: this.selectedCategoryId,
+        availableCategories,
         categoryName: r ? r.category.name : "",
         categoryIcon: r ? r.category.icon : "🕵️",
         outsiderCount: r ? r.outsiderIds.length : this.outsiderCount,
@@ -860,6 +1003,25 @@
           }
         }
         this.scoresById[p.id] = (Number(this.scoresById[p.id]) || 0) + delta;
+        if (!this.sessionStatsById[p.id]) {
+          this.sessionStatsById[p.id] = {
+            id: p.id,
+            name: p.name,
+            insiderRounds: 0,
+            correctVotes: 0,
+            outsiderRounds: 0,
+            correctGuesses: 0
+          };
+        }
+        const st = this.sessionStatsById[p.id];
+        st.name = p.name;
+        if (isOutsider) {
+          st.outsiderRounds += 1;
+          if (delta > 0) st.correctGuesses += 1;
+        } else {
+          st.insiderRounds += 1;
+          if (delta > 0) st.correctVotes += 1;
+        }
         return {
           id: p.id,
           name: p.name,
@@ -869,6 +1031,30 @@
           reason
         };
       });
+
+      // حفظ إحصائيات الجولة في قاعة المشاهير (matchArchiveStore.js) بمعرّف فريد لمنع التكرار
+      if (
+        window.SeenJeemArchiveStore &&
+        typeof window.SeenJeemArchiveStore.recordBaraSalfaRound === "function"
+      ) {
+        const profileId =
+          window.SeenJeemHistoryStore && typeof window.SeenJeemHistoryStore.getActiveProfileId === "function"
+            ? window.SeenJeemHistoryStore.getActiveProfileId()
+            : "default";
+        window.SeenJeemArchiveStore.recordBaraSalfaRound({
+          roundId: `${this.sessionId}_r${this.roundNumber}`,
+          profileId,
+          playedAt: Date.now(),
+          categoryName: r.category.name,
+          players: r.roundScores.map((s) => ({
+            name: s.name,
+            isOutsider: s.isOutsider,
+            points: s.delta,
+            correctVote: !s.isOutsider && s.delta > 0,
+            correctGuess: s.isOutsider && s.delta > 0
+          }))
+        });
+      }
 
       this.phase = "round_results";
       this._playSfx("playVictory");
@@ -999,6 +1185,11 @@
               ? `<div class="wireless-feedback-box is-${escapeHtml(wl.feedbackKind)}">${escapeHtml(wl.feedback)}</div>`
               : ""
           }
+          <div class="bs-wl-init-row">
+            <button type="button" id="bs-btn-toggle-vip-enabled" class="btn ${this.vipControlEnabled ? "btn-amber" : "btn-secondary"} btn-xs">
+              ${this.vipControlEnabled ? "👑 تحكم اللاعب الأول (VIP): مفعّل" : "👑 تحكم اللاعب الأول (VIP): معطّل"}
+            </button>
+          </div>
           ${
             !wl.active
               ? `<div class="bs-wl-init-row">
@@ -1023,6 +1214,9 @@
                       <button type="button" id="bs-btn-toggle-tv-qr" class="btn btn-gold-outline btn-xs">
                         ${this.showQrOnTv ? "🙈 إخفاء QR من التلفزيون" : "📺 إظهار QR على التلفزيون"}
                       </button>
+                      <button type="button" id="bs-btn-enter-clean-tv" class="btn btn-primary btn-xs">
+                        📺 وضع العرض الكامل (بدون أزرار)
+                      </button>
                       <button type="button" id="bs-btn-close-room" class="btn btn-danger-outline btn-xs">🔴 إغلاق وحذف الغرفة الآن</button>
                     </div>
                     <div class="bs-wl-roster-head">اللاعبون المنضمّون (${wlPlayers.length} / ${MAX_PLAYERS}):</div>
@@ -1031,18 +1225,27 @@
                         wlPlayers.length === 0
                           ? `<div class="wireless-device-empty">بانتظار انضمام اللاعبين عبر مسح QR أو إدخال رمز الغرفة...</div>`
                           : wlPlayers
-                              .map(
-                                (p) => `
-                              <div class="wireless-device-row">
-                                <div class="wireless-device-meta">
-                                  <span class="wireless-device-online-dot"></span>
-                                  <strong>${escapeHtml(p.name)}</strong>
-                                  <span class="bs-mini-score">${Number(this.scoresById[p.id]) || 0} نقطة</span>
-                                </div>
-                                <button type="button" class="btn btn-danger-outline btn-xxs" data-bs-kick="${escapeHtml(p.id)}">🚫 طرد</button>
-                              </div>
-                            `
-                              )
+                              .map((p) => {
+                                const isVip = Boolean(this.vipControlEnabled && wl.vipUid === p.id);
+                                return `
+                                  <div class="wireless-device-row${isVip ? " is-vip-row" : ""}">
+                                    <div class="wireless-device-meta">
+                                      <span class="wireless-device-online-dot"></span>
+                                      <strong>${isVip ? "👑 " : ""}${escapeHtml(p.name)}</strong>
+                                      ${isVip ? `<span class="bs-vip-tag">VIP</span>` : ""}
+                                      <span class="bs-mini-score">${Number(this.scoresById[p.id]) || 0} نقطة</span>
+                                    </div>
+                                    <div class="bs-row-btns">
+                                      ${
+                                        !isVip
+                                          ? `<button type="button" class="btn btn-gold-outline btn-xxs" data-bs-make-vip="${escapeHtml(p.id)}" title="نقل شارة تحكم الجلسة إلى هذا اللاعب">👑 VIP</button>`
+                                          : ""
+                                      }
+                                      <button type="button" class="btn btn-danger-outline btn-xxs" data-bs-kick="${escapeHtml(p.id)}">🚫 طرد</button>
+                                    </div>
+                                  </div>
+                                `;
+                              })
                               .join("")
                       }
                     </div>
@@ -1239,6 +1442,13 @@
           }
         });
       }
+      const vipToggleBtn = document.getElementById("bs-btn-toggle-vip-enabled");
+      if (vipToggleBtn) vipToggleBtn.addEventListener("click", () => this.toggleVipControlEnabled());
+      const cleanTvBtn = document.getElementById("bs-btn-enter-clean-tv");
+      if (cleanTvBtn) cleanTvBtn.addEventListener("click", () => this.toggleCleanTvMode(true));
+      this.bodyEl.querySelectorAll("[data-bs-make-vip]").forEach((btn) => {
+        btn.addEventListener("click", () => this.setVipManually(btn.dataset.bsMakeVip));
+      });
       this.bodyEl.querySelectorAll("[data-bs-kick]").forEach((btn) => {
         btn.addEventListener("click", () => this.kickWirelessPlayer(btn.dataset.bsKick));
       });
@@ -1766,6 +1976,7 @@
 
           <div class="bs-stage-actions">
             <button type="button" id="bs-btn-next-round" class="btn btn-primary btn-lg">🔄 جولة جديدة (نفس اللاعبين)</button>
+            <button type="button" id="bs-btn-result-card" class="btn btn-amber btn-sm">📸 حفظ / مشاركة بطاقة النتيجة</button>
             <button type="button" id="bs-btn-change-cat" class="btn btn-gold-outline btn-sm">🎯 تغيير الفئة</button>
             <button type="button" id="bs-btn-finish-game" class="btn btn-danger-outline btn-sm">🏠 إنهاء اللعبة والعودة للرئيسية</button>
           </div>
@@ -1773,9 +1984,38 @@
       `;
     }
 
+    openBaraResultCard() {
+      const standings = this._getStandingsList();
+      const statsList = standings.map((p) => {
+        const st = this.sessionStatsById[p.id] || {
+          insiderRounds: 0,
+          correctVotes: 0,
+          outsiderRounds: 0,
+          correctGuesses: 0
+        };
+        return {
+          name: p.name,
+          score: p.score,
+          insiderRounds: st.insiderRounds,
+          correctVotes: st.correctVotes,
+          outsiderRounds: st.outsiderRounds,
+          correctGuesses: st.correctGuesses
+        };
+      });
+      if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.openBaraResultCard === "function") {
+        window.SeenJeemHostBridge.openBaraResultCard({
+          roundsCount: this.roundNumber,
+          players: statsList,
+          timestamp: Date.now()
+        });
+      }
+    }
+
     _bindResultsEvents() {
       const nextBtn = document.getElementById("bs-btn-next-round");
       if (nextBtn) nextBtn.addEventListener("click", () => this.startRound());
+      const cardBtn = document.getElementById("bs-btn-result-card");
+      if (cardBtn) cardBtn.addEventListener("click", () => this.openBaraResultCard());
       const changeCatBtn = document.getElementById("bs-btn-change-cat");
       if (changeCatBtn) changeCatBtn.addEventListener("click", () => this.returnToCategorySelect());
       const finishBtn = document.getElementById("bs-btn-finish-game");
@@ -1784,6 +2024,8 @@
           if (this.wireless.active) await this.closeWirelessRoom();
           this.roundNumber = 0;
           this.scoresById = {};
+          this.sessionStatsById = {};
+          this.sessionId = `bs_sess_${Date.now().toString(36)}`;
           this.phase = "setup";
           this.round = null;
           this.close();

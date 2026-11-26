@@ -714,6 +714,54 @@
       } catch (_err) {}
     }
 
+    playDiffFound() {
+      try {
+        if (!this._canPlay("uiEffects")) return;
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const dest = this.masterGain || this._masterGain || ctx.destination;
+        const now = ctx.currentTime;
+        [587.33, 880].forEach((f, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          const t = now + idx * 0.055;
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(0.15, t + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(t);
+          osc.stop(t + 0.18);
+        });
+      } catch (_err) {}
+    }
+
+    playDiffComplete() {
+      try {
+        if (!this._canPlay("celebrations")) return;
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const dest = this.masterGain || this._masterGain || ctx.destination;
+        const now = ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          const t = now + idx * 0.07;
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(0.18, t + 0.012);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(t);
+          osc.stop(t + 0.3);
+        });
+      } catch (_err) {}
+    }
+
     playSoundboard(sfxId) {
       if (sfxId === "drumroll") this.playDrumroll();
       else if (sfxId === "applause") this.playApplause();

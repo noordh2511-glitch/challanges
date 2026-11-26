@@ -319,13 +319,109 @@
       `;
     }
 
-    _wrapChrome(bodyHtml) {
+    _isVip() {
+      const sync = window.SeenJeemBaraSalfaSync;
+      const myUid = sync ? sync.getUid() : "";
+      if (!myUid || !this.joined || this.kicked) return false;
+      const metaVip = this.meta && this.meta.vipUid ? this.meta.vipUid : null;
+      const pubVip = this.publicState && this.publicState.vipUid ? this.publicState.vipUid : null;
+      const activeVip = metaVip || pubVip;
+      if (this.meta && this.meta.vipEnabled === false) return false;
+      return Boolean(activeVip && activeVip === myUid);
+    }
+
+    async _sendVipCmd(type, payload = {}) {
+      const sync = window.SeenJeemBaraSalfaSync;
+      if (!sync || !this._isVip()) return;
+      this._safeVibrate(25);
+      await sync.sendVipCommand(type, payload);
+    }
+
+    _renderVipBar(pub) {
+      if (!this._isVip()) return "";
+      const phase = (pub && pub.phase) || "setup";
+      const playersCount = Object.keys(this.playersMap || {}).length;
+      const isLocked = Boolean((this.meta && this.meta.joinLocked) || (pub && pub.joinLocked));
+      let controlsHtml = "";
+
+      if (phase === "setup") {
+        const cats = Array.isArray(pub && pub.availableCategories) ? pub.availableCategories : [];
+        const selId = (pub && pub.selectedCategoryId) || "random";
+        const catSelect = cats.length
+          ? `<select id="bp-vip-cat-select" class="bp-vip-select" aria-label="اختيار الفئة">
+              ${cats
+                .map(
+                  (c) =>
+                    `<option value="${escapeHtml(c.id)}"${c.id === selId ? " selected" : ""}>${escapeHtml(c.icon || "")} ${escapeHtml(c.name)}</option>`
+                )
+                .join("")}
+            </select>`
+          : "";
+        controlsHtml = `
+          ${catSelect}
+          <div class="bp-vip-btn-row">
+            <button type="button" class="btn ${isLocked ? "btn-amber" : "btn-secondary"} pl-touch-btn" data-vip-cmd="TOGGLE_LOCK">
+              ${isLocked ? "🔓 فتح الانضمام" : "🔒 قفل الانضمام"}
+            </button>
+            <button type="button" class="btn btn-primary pl-touch-btn" data-vip-cmd="START_ROUND" ${playersCount < 3 ? "disabled" : ""}>
+              ▶️ ابدأ الجولة (${playersCount})
+            </button>
+          </div>
+        `;
+      } else if (phase === "role_reveal") {
+        controlsHtml = `<button type="button" class="btn btn-primary pl-touch-btn pl-full-btn" data-vip-cmd="ADVANCE_TO_QUESTIONS">🎤 الانتقال للأسئلة ←</button>`;
+      } else if (phase === "questions") {
+        controlsHtml = `
+          <div class="bp-vip-btn-row bp-vip-cols-3">
+            <button type="button" class="btn btn-secondary pl-touch-btn" data-vip-cmd="PREV_PAIR">→ السابق</button>
+            <button type="button" class="btn btn-primary pl-touch-btn" data-vip-cmd="NEXT_PAIR">⬅️ التالي</button>
+            <button type="button" class="btn btn-gold-outline pl-touch-btn" data-vip-cmd="SKIP_TO_DISCUSSION">💬 النقاش</button>
+          </div>
+        `;
+      } else if (phase === "discussion") {
+        controlsHtml = `
+          <div class="bp-vip-btn-row">
+            <button type="button" class="btn btn-secondary pl-touch-btn" data-vip-cmd="TOGGLE_TIMER">⏯️ المؤقت</button>
+            <button type="button" class="btn btn-amber pl-touch-btn" data-vip-cmd="GO_VOTING">🗳️ فتح التصويت</button>
+          </div>
+        `;
+      } else if (phase === "voting") {
+        controlsHtml = `<button type="button" class="btn btn-amber pl-touch-btn pl-full-btn" data-vip-cmd="CLOSE_VOTING">🔒 إغلاق التصويت وكشف النتائج</button>`;
+      } else if (phase === "outsider_reveal") {
+        controlsHtml = `<button type="button" class="btn btn-amber pl-touch-btn pl-full-btn" data-vip-cmd="GO_GUESS">🎯 الانتقال لتخمين الكلمة</button>`;
+      } else if (phase === "round_results") {
+        controlsHtml = `<button type="button" class="btn btn-primary pl-touch-btn pl-full-btn" data-vip-cmd="NEW_ROUND">🔄 جولة جديدة</button>`;
+      } else {
+        return "";
+      }
+
       return `
-        <div class="pl-shell">
+        <footer class="bp-vip-dock" aria-label="تحكم الجلسة VIP">
+          <div class="bp-vip-dock-head">👑 تحكم الجلسة (اللاعب الأول VIP)</div>
+          ${controlsHtml}
+        </footer>
+      `;
+    }
+
+    _bindVipEvents() {
+      const sel = document.getElementById("bp-vip-cat-select");
+      if (sel) {
+        sel.addEventListener("change", () => this._sendVipCmd("SET_CATEGORY", { categoryId: sel.value }));
+      }
+      this.root.querySelectorAll("[data-vip-cmd]").forEach((btn) => {
+        btn.addEventListener("click", () => this._sendVipCmd(btn.dataset.vipCmd));
+      });
+    }
+
+    _wrapChrome(bodyHtml) {
+      const isVip = this._isVip();
+      const vipDock = this._renderVipBar(this.publicState);
+      return `
+        <div class="pl-shell${vipDock ? " has-vip-dock" : ""}">
           <header class="pl-topbar">
             <div class="pl-topbar-team">
               <span class="brand-dot"></span>
-              <strong class="pl-team-title">🕵️ ${escapeHtml(this.playerName || "برا السالفة")}</strong>
+              <strong class="pl-team-title">${isVip ? "👑 " : "🕵️ "}${escapeHtml(this.playerName || "برا السالفة")}</strong>
               <span class="pl-team-score">${escapeHtml(this.roomCode)}</span>
             </div>
             <div class="pl-topbar-right">
@@ -335,6 +431,7 @@
             </div>
           </header>
           <main class="pl-main">${bodyHtml}</main>
+          ${vipDock}
         </div>
       `;
     }
@@ -446,6 +543,7 @@
           </section>
         `;
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         return;
       }
 
@@ -468,6 +566,7 @@
           </section>
         `;
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         document.getElementById("bp-btn-toggle-role")?.addEventListener("click", () => {
           this.roleVisible = !this.roleVisible;
           this._render();
@@ -509,6 +608,7 @@
           </section>
         `;
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         const holdBtn = document.getElementById("bp-btn-hold-reminder");
         const box = document.getElementById("bp-reminder-box");
         if (holdBtn && box) {
@@ -561,6 +661,7 @@
             </section>
           `;
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         this.root.querySelectorAll("[data-bp-vote]").forEach((btn) => {
           btn.addEventListener("click", () => this._sendVote(btn.dataset.bpVote, btn.dataset.bpName));
         });
@@ -579,6 +680,7 @@
           </section>
         `;
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         return;
       }
 
@@ -625,6 +727,7 @@
           `;
         }
         this.root.innerHTML = this._wrapChrome(body);
+        this._bindVipEvents();
         this.root.querySelectorAll("[data-bp-guess]").forEach((btn) => {
           btn.addEventListener("click", () => this._sendGuess(btn.dataset.bpGuess));
         });
@@ -665,6 +768,7 @@
         </section>
       `;
       this.root.innerHTML = this._wrapChrome(body);
+      this._bindVipEvents();
     }
   }
 

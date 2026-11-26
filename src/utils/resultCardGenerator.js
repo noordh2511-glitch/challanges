@@ -491,9 +491,308 @@
     });
   }
 
-  function getDefaultFilename() {
+  function getDefaultFilename(prefix = "seen-jeem-result") {
     const dateStr = new Date().toISOString().slice(0, 10);
-    return `seen-jeem-result-${dateStr}.png`;
+    return `${prefix}-${dateStr}.png`;
+  }
+
+  /**
+   * توليد بطاقة نتيجة جلسة «برا السالفة» بدقة 1080×1350 (4:5) — تدعم حتى 12 لاعباً
+   */
+  async function generateBaraSalfaResultCard(sessionData = {}, theme = "dark-glass") {
+    await ensureArabicFontReady();
+    const palette = THEME_PALETTES[theme] || THEME_PALETTES["dark-glass"];
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    ctx.direction = "rtl";
+    ctx.textBaseline = "middle";
+
+    // الخلفية والهالات
+    const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    bgGrad.addColorStop(0, palette.bgTop);
+    bgGrad.addColorStop(0.5, palette.bgMid);
+    bgGrad.addColorStop(1, palette.bgBot);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const orb1 = ctx.createRadialGradient(WIDTH * 0.8, HEIGHT * 0.14, 10, WIDTH * 0.8, HEIGHT * 0.14, 420);
+    orb1.addColorStop(0, "rgba(168, 85, 247, 0.28)");
+    orb1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb1;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const orb2 = ctx.createRadialGradient(WIDTH * 0.18, HEIGHT * 0.85, 10, WIDTH * 0.18, HEIGHT * 0.85, 420);
+    orb2.addColorStop(0, palette.orb2);
+    orb2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb2;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    drawRoundedRect(ctx, 32, 32, WIDTH - 64, HEIGHT - 64, 38);
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // 1) الترويسة
+    const headerY = 104;
+    drawRoundedRect(ctx, WIDTH - 320, headerY - 34, 252, 68, 20);
+    const brandGrad = ctx.createLinearGradient(WIDTH - 320, headerY - 34, WIDTH - 68, headerY + 34);
+    brandGrad.addColorStop(0, "#c084fc");
+    brandGrad.addColorStop(1, palette.accent1);
+    ctx.fillStyle = brandGrad;
+    ctx.fill();
+
+    ctx.fillStyle = "#060b19";
+    ctx.font = `900 32px ${FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.fillText("برا السالفة", WIDTH - 194, headerY + 2);
+
+    const roundsCount = Math.max(1, Number(sessionData.roundsCount) || 1);
+    ctx.textAlign = "left";
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText(`عدد الجولات: ${roundsCount}`, 74, headerY - 14);
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `600 22px ${FONT_FAMILY}`;
+    ctx.fillText(formatArabicDate(sessionData.timestamp || Date.now()), 74, headerY + 20);
+
+    // ترتيب اللاعبين
+    const players = (Array.isArray(sessionData.players) ? sessionData.players : [])
+      .map((p) => ({
+        name: String(p.name || "لاعب").slice(0, 26),
+        score: Math.max(0, Math.round(Number(p.score) || 0)),
+        insiderRounds: Math.max(0, Number(p.insiderRounds) || 0),
+        correctVotes: Math.max(0, Number(p.correctVotes) || 0),
+        outsiderRounds: Math.max(0, Number(p.outsiderRounds) || 0),
+        correctGuesses: Math.max(0, Number(p.correctGuesses) || 0)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12);
+
+    const topScore = players[0] ? players[0].score : 0;
+    const leaders = players.filter((p) => p.score === topScore);
+    const isDraw = leaders.length !== 1;
+
+    // 2) لافتة بطل الجلسة
+    const heroX = 68;
+    const heroY = 180;
+    const heroW = WIDTH - 136;
+    const heroH = 250;
+    drawRoundedRect(ctx, heroX, heroY, heroW, heroH, 30);
+    ctx.fillStyle = palette.heroBg;
+    ctx.fill();
+    ctx.strokeStyle = isDraw ? palette.accent1 : palette.heroBorder;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    drawTrophyIcon(ctx, WIDTH / 2, heroY + 66, isDraw, palette.accent2);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.accent2;
+    ctx.font = `800 25px ${FONT_FAMILY}`;
+    ctx.fillText(isDraw ? "تعادل مثير في الصدارة!" : "بطل جلسة برا السالفة", WIDTH / 2, heroY + 128);
+
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `900 46px ${FONT_FAMILY}`;
+    const heroHeadline = isDraw
+      ? leaders.slice(0, 2).map((l) => l.name).join(" و ") + (leaders.length > 2 ? ` (+${leaders.length - 2})` : "")
+      : (leaders[0] && leaders[0].name) || "—";
+    ctx.fillText(truncateToWidth(ctx, heroHeadline, heroW - 80), WIDTH / 2, heroY + 184);
+
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText(`أعلى رصيد: ${topScore} نقطة  •  ${players.length} لاعبين`, WIDTH / 2, heroY + 224);
+
+    // 3) جدول الترتيب (عمود واحد <= 5، شبكي 2 عمود لـ 6–12 لاعباً)
+    ctx.textAlign = "right";
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText("الترتيب النهائي للاعبين", WIDTH - 74, 474);
+
+    const listY = 508;
+    const listH = 492;
+    const twoCols = players.length >= 6;
+
+    if (twoCols) {
+      const colGap = 18;
+      const colW = Math.floor((WIDTH - 136 - colGap) / 2);
+      const rows = Math.ceil(players.length / 2);
+      const rowGap = 12;
+      const rowH = Math.min(82, Math.floor((listH - rowGap * (rows - 1)) / rows));
+
+      players.forEach((p, idx) => {
+        const col = idx % 2; // 0 يمين، 1 يسار (RTL)
+        const row = Math.floor(idx / 2);
+        const x = col === 0 ? WIDTH - 68 - colW : 68;
+        const y = listY + row * (rowH + rowGap);
+        const isLead = p.score === topScore && topScore > 0;
+
+        drawRoundedRect(ctx, x, y, colW, rowH, 16);
+        ctx.fillStyle = isLead ? "rgba(245, 158, 11, 0.16)" : palette.cardBg;
+        ctx.fill();
+        ctx.strokeStyle = isLead ? "rgba(251, 191, 36, 0.65)" : palette.cardBorder;
+        ctx.lineWidth = isLead ? 2 : 1.2;
+        ctx.stroke();
+
+        const cy = y + rowH / 2;
+        ctx.textAlign = "right";
+        ctx.fillStyle = isLead ? "#fde68a" : palette.accent1;
+        ctx.font = `900 24px ${FONT_FAMILY}`;
+        ctx.fillText(`#${idx + 1}`, x + colW - 16, cy);
+
+        ctx.fillStyle = palette.textPrimary;
+        ctx.font = `800 24px ${FONT_FAMILY}`;
+        ctx.fillText(truncateToWidth(ctx, p.name, colW - 175), x + colW - 64, cy);
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = isLead ? "#fbbf24" : "#38bdf8";
+        ctx.font = `900 28px ${FONT_FAMILY}`;
+        ctx.fillText(`${p.score}`, x + 18, cy);
+      });
+    } else {
+      const count = Math.max(1, players.length);
+      const rowGap = 16;
+      const rowH = Math.min(92, Math.floor((listH - rowGap * (count - 1)) / count));
+      players.forEach((p, idx) => {
+        const y = listY + idx * (rowH + rowGap);
+        const isLead = p.score === topScore && topScore > 0;
+        drawRoundedRect(ctx, 68, y, WIDTH - 136, rowH, 20);
+        ctx.fillStyle = isLead ? "rgba(245, 158, 11, 0.16)" : palette.cardBg;
+        ctx.fill();
+        ctx.strokeStyle = isLead ? "rgba(251, 191, 36, 0.65)" : palette.cardBorder;
+        ctx.lineWidth = isLead ? 2.2 : 1.5;
+        ctx.stroke();
+
+        const cy = y + rowH / 2;
+        ctx.textAlign = "right";
+        ctx.fillStyle = isLead ? "#fde68a" : palette.accent1;
+        ctx.font = `900 28px ${FONT_FAMILY}`;
+        ctx.fillText(`#${idx + 1}`, WIDTH - 94, cy);
+
+        ctx.fillStyle = palette.textPrimary;
+        ctx.font = `900 32px ${FONT_FAMILY}`;
+        ctx.fillText(truncateToWidth(ctx, p.name, 520), WIDTH - 156, cy);
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = isLead ? "#fbbf24" : "#38bdf8";
+        ctx.font = `900 40px ${FONT_FAMILY}`;
+        ctx.fillText(`${p.score} نقطة`, 96, cy);
+      });
+    }
+
+    // 4) شريط ألقاب الجلسة: أفضل محقق + أخطر متسلّل
+    let bestDetective = null;
+    let bestInfiltrator = null;
+    players.forEach((p) => {
+      if (p.correctVotes > 0) {
+        const rate = p.insiderRounds > 0 ? Math.round((p.correctVotes / p.insiderRounds) * 100) : 100;
+        if (
+          !bestDetective ||
+          p.correctVotes > bestDetective.correctVotes ||
+          (p.correctVotes === bestDetective.correctVotes && rate > bestDetective.rate)
+        ) {
+          bestDetective = { name: p.name, correctVotes: p.correctVotes, rate };
+        }
+      }
+      if (p.correctGuesses > 0) {
+        const rate = p.outsiderRounds > 0 ? Math.round((p.correctGuesses / p.outsiderRounds) * 100) : 100;
+        if (
+          !bestInfiltrator ||
+          p.correctGuesses > bestInfiltrator.correctGuesses ||
+          (p.correctGuesses === bestInfiltrator.correctGuesses && rate > bestInfiltrator.rate)
+        ) {
+          bestInfiltrator = { name: p.name, correctGuesses: p.correctGuesses, rate };
+        }
+      }
+    });
+
+    const awardY = 1036;
+    const awardGap = 22;
+    const awardW = Math.floor((WIDTH - 136 - awardGap) / 2);
+    const awardH = 166;
+    const awardCards = [
+      {
+        title: "أفضل محقق (كشف المتسلّل)",
+        name: bestDetective ? bestDetective.name : "—",
+        sub: bestDetective ? `${bestDetective.correctVotes} تصويت صحيح (${bestDetective.rate}%)` : "لا يوجد تصويت صحيح بعد",
+        color: "#34d399"
+      },
+      {
+        title: "أخطر متسلّل (تخمين الكلمة)",
+        name: bestInfiltrator ? bestInfiltrator.name : "—",
+        sub: bestInfiltrator ? `${bestInfiltrator.correctGuesses} تخمين ناجح (${bestInfiltrator.rate}%)` : "لم ينجح متسلّل في التخمين",
+        color: "#fbbf24"
+      }
+    ];
+
+    awardCards.forEach((card, idx) => {
+      const x = idx === 0 ? WIDTH - 68 - awardW : 68;
+      drawRoundedRect(ctx, x, awardY, awardW, awardH, 22);
+      ctx.fillStyle = palette.cardBg;
+      ctx.fill();
+      ctx.strokeStyle = palette.cardBorder;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = palette.textMuted;
+      ctx.font = `700 22px ${FONT_FAMILY}`;
+      ctx.fillText(card.title, x + awardW / 2, awardY + 40);
+
+      ctx.fillStyle = card.color;
+      ctx.font = `900 34px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, card.name, awardW - 36), x + awardW / 2, awardY + 92);
+
+      ctx.fillStyle = palette.textSecondary;
+      ctx.font = `700 20px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, card.sub, awardW - 36), x + awardW / 2, awardY + 136);
+    });
+
+    // 5) التذييل
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(96, HEIGHT - 102);
+    ctx.lineTo(WIDTH - 96, HEIGHT - 102);
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText("سين جيم  •  لعبة «برا السالفة» الجماعية", WIDTH / 2, HEIGHT - 66);
+
+    return canvas;
+  }
+
+  /**
+   * توليد بطاقة تتويج بطل البطولة (1080×1350)
+   */
+  async function generateTournamentResultCard(tData = {}, theme = "dark-glass") {
+    const teams = Array.isArray(tData.standings) ? tData.standings : [];
+    return generateCanvas({
+      teams: teams.slice(0, 4).map((t, i) => ({
+        id: `t-${i}`,
+        name: t.name,
+        score: Number(t.points !== undefined ? t.points : t.score) || 0
+      })),
+      analytics: {
+        totalQuestions: Number(tData.completedMatches) || 0,
+        overallAccuracy: 100,
+        totalSteals: 0,
+        teamStats: teams.slice(0, 4).map((t) => ({
+          name: t.name,
+          accuracy: 100,
+          correct: Number(t.wins) || 0
+        }))
+      },
+      matchEvents: [],
+      profileName: `🏆 ${tData.name || "بطولة سين جيم"}`,
+      theme,
+      timestamp: tData.timestamp || Date.now()
+    });
   }
 
   function downloadBlobAsPNG(blob, filename = getDefaultFilename()) {
@@ -564,6 +863,8 @@
     WIDTH,
     HEIGHT,
     generateCanvas,
+    generateBaraSalfaResultCard,
+    generateTournamentResultCard,
     canvasToBlob,
     getDefaultFilename,
     downloadBlobAsPNG,

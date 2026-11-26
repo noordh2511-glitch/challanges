@@ -44,7 +44,9 @@
     invert: { icon: "🎨", label: "ألوان معكوسة" },
     silhouette: { icon: "👤", label: "تحدي الظل" },
     memory: { icon: "🧠", label: "اختبار الذاكرة" },
+    differences: { icon: "🔍", label: "أوجد الفروقات" },
     "spot-diff": { icon: "👀", label: "أوجد الفروقات" },
+    audio: { icon: "🎵", label: "تحدي صوتي" },
     "multi-image": { icon: "🔗", label: "اربط الصور" }
   };
 
@@ -393,9 +395,11 @@
     intermissionSelectedMinutes: 0,
     currentResultCardBlob: null,
     currentResultCardUrl: "",
+    currentResultCardPrefix: "seen-jeem-result",
     customResultCardPayload: null,
     // حالة الحزمة السابعة (المعرف الفريد للمباراة، البرق السريع، من غير كلام المستقل، قاعة المشاهير)
     matchId: "",
+    activeTournamentMatch: null,
     blitz: null,
     blitzTimerInterval: null,
     blitzConfig: { teamCount: 1, durationSeconds: 60, roundsPerTeam: 1, groupId: "all" },
@@ -406,6 +410,19 @@
     csoloHoldActive: false,
     csoloLastFeedback: null,
     hofModeFilter: "all",
+    hofActiveView: "seen-jeem",
+    audioChallenge: {
+      route: "display", // "display" (افتراضي مانع للصدى عند اتصال التلفزيون) | "host"
+      status: {
+        playing: false,
+        teaserActive: false,
+        currentTime: 0,
+        duration: 0,
+        volume: 0.85,
+        autoplayBlocked: false,
+        error: ""
+      }
+    },
     // حالة الحزمة التاسعة والعاشرة (الغرفة اللاسلكية عبر Firebase + تحصين الحزمة وإدارة الأجهزة)
     timerStatus: "idle", // "idle" | "running" | "paused" | "finished" | "unlimited"
     timerDurationMs: 0,
@@ -436,7 +453,14 @@
         runnerUpDeltaMs: null
       },
       playersMap: {},
-      receivedWagers: {}
+      receivedWagers: {},
+      allPlay: {
+        active: false,
+        phase: "idle", // "idle" | "open" | "revealed"
+        questionId: "",
+        answers: {}, // { [teamIdx]: { teamIdx, text, submittedAt, manual } }
+        judgments: {} // { [teamIdx]: true | false | null }
+      }
     }
   };
 
@@ -989,6 +1013,12 @@
     hallOfFameModal: document.getElementById("hall-of-fame-modal"),
     hofProfileSubtitle: document.getElementById("hof-profile-subtitle"),
     btnCloseHof: document.getElementById("btn-close-hof"),
+    hofViewTabs: document.getElementById("hof-view-tabs"),
+    hofSeenJeemSections: document.getElementById("hof-seen-jeem-sections"),
+    hofBaraSalfaSection: document.getElementById("hof-bara-salfa-section"),
+    hofBaraTotalRoundsPill: document.getElementById("hof-bara-total-rounds-pill"),
+    hofBaraRecordsGrid: document.getElementById("hof-bara-records-grid"),
+    hofBaraLeaderboardWrap: document.getElementById("hof-bara-leaderboard-wrap"),
     hofTotalMatchesPill: document.getElementById("hof-total-matches-pill"),
     hofRecordsGrid: document.getElementById("hof-records-grid"),
     hofLeaderboardWrap: document.getElementById("hof-leaderboard-wrap"),
@@ -996,6 +1026,42 @@
     hofArchiveList: document.getElementById("hof-archive-list"),
     btnHofClearArchive: document.getElementById("btn-hof-clear-archive"),
     btnHofFooterClose: document.getElementById("btn-hof-footer-close"),
+
+    // الحزمة الحادية عشرة: نظام البطولة ووضع «الكل يجاوب»
+    btnLaunchTournament: document.getElementById("btn-launch-tournament"),
+    btnWinnerReturnTournament: document.getElementById("btn-winner-return-tournament"),
+    btnBlitzReturnTournament: document.getElementById("btn-blitz-return-tournament"),
+    btnAllPlayOpen: document.getElementById("btn-allplay-open"),
+    allPlayHostPanel: document.getElementById("allplay-host-panel"),
+
+    // الحزمة الثانية عشرة: صورة الإجابة، أوجد الفروقات، التحدي الصوتي، وصانع الفئات
+    diffLiveDots: document.getElementById("diff-live-dots"),
+    diffHostControls: document.getElementById("diff-host-controls"),
+    btnDiffIncrement: document.getElementById("btn-diff-increment"),
+    btnDiffDecrement: document.getElementById("btn-diff-decrement"),
+    btnDiffReset: document.getElementById("btn-diff-reset"),
+    audioChallengePanel: document.getElementById("audio-challenge-panel"),
+    audioChStatusText: document.getElementById("audio-ch-status-text"),
+    btnAudioChRoute: document.getElementById("btn-audio-ch-route"),
+    audioChVisualizer: document.getElementById("audio-ch-visualizer"),
+    audioChCurTime: document.getElementById("audio-ch-cur-time"),
+    audioChSeek: document.getElementById("audio-ch-seek"),
+    audioChDurTime: document.getElementById("audio-ch-dur-time"),
+    btnAudioChPlay: document.getElementById("btn-audio-ch-play"),
+    btnAudioChPause: document.getElementById("btn-audio-ch-pause"),
+    btnAudioChReplay: document.getElementById("btn-audio-ch-replay"),
+    btnAudioChTeaser: document.getElementById("btn-audio-ch-teaser"),
+    audioChVolume: document.getElementById("audio-ch-volume"),
+    audioChError: document.getElementById("audio-ch-error"),
+    answerImageToggleBar: document.getElementById("answer-image-toggle-bar"),
+    btnAnsViewAnswer: document.getElementById("btn-ans-view-answer"),
+    btnAnsViewQuestion: document.getElementById("btn-ans-view-question"),
+    btnAnsViewCompare: document.getElementById("btn-ans-view-compare"),
+    answerCompareGrid: document.getElementById("answer-compare-grid"),
+    answerCompareQImg: document.getElementById("answer-compare-q-img"),
+    answerCompareAImg: document.getElementById("answer-compare-a-img"),
+    btnOpenCustomPackBuilder: document.getElementById("btn-open-custom-pack-builder"),
+    btnBankOpenPackBuilder: document.getElementById("btn-bank-open-pack-builder"),
 
     // الغرفة اللاسلكية (Phase 4 Pack 9)
     btnOpenWirelessSetup: document.getElementById("btn-open-wireless-setup"),
@@ -1923,13 +1989,16 @@
   }
 
   function loadCustomCategoriesFromStorage() {
+    if (window.SeenJeemCustomPacksStore && window.SeenJeemCustomPacksStore._ready) {
+      return window.SeenJeemCustomPacksStore.getAllSync();
+    }
     try {
       const raw = localStorage.getItem(CUSTOM_CATEGORIES_STORAGE_KEY);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         const sanitized = sanitizer.sanitizeCategoriesTree(parsed, {
-          allowLegacyLocalVisuals: false
+          allowLegacyLocalVisuals: true
         });
         return sanitized.categories;
       }
@@ -1939,9 +2008,28 @@
     return [];
   }
 
-  function saveCustomCategoriesToStorage() {
+  async function refreshCustomPacksFromStore() {
+    if (!window.SeenJeemCustomPacksStore) return;
     try {
-      localStorage.setItem(CUSTOM_CATEGORIES_STORAGE_KEY, JSON.stringify(state.customCategories));
+      const packs = await window.SeenJeemCustomPacksStore.getAll();
+      state.customCategories = Array.isArray(packs) ? packs : [];
+      rebuildMergedCategories();
+      renderSetupScreen();
+      if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
+        renderBankManagerModal();
+      }
+    } catch (_err) {}
+  }
+
+  function saveCustomCategoriesToStorage() {
+    if (window.SeenJeemCustomPacksStore && typeof window.SeenJeemCustomPacksStore.importPacks === "function") {
+      window.SeenJeemCustomPacksStore.importPacks(state.customCategories, "replace").catch(() => {});
+    }
+    try {
+      const json = JSON.stringify(state.customCategories);
+      if (json.length <= 3 * 1024 * 1024) {
+        localStorage.setItem(CUSTOM_CATEGORIES_STORAGE_KEY, json);
+      }
     } catch (err) {
       console.warn("تعذر حفظ الفئات المستوردة في localStorage:", err);
     }
@@ -2895,6 +2983,8 @@
       charadesTimerStarted: Boolean(cq.charadesTimerStarted),
       blurReduced: Boolean(cq.blurReduced),
       zoomReduced: Boolean(cq.zoomReduced),
+      differencesFound: Math.max(0, Math.floor(Number(cq.differencesFound) || 0)),
+      answerImageMode: cq.answerImageMode || "answer",
       preQuestionSnapshot: state.preQuestionSnapshot
         ? {
             teams: cloneTeamsState(state.preQuestionSnapshot.teams),
@@ -3301,8 +3391,16 @@
     return { totalRecycledCount };
   }
 
-  function startNewGame() {
-    if (state.selectedCategoryIds.length !== REQUIRED_CATEGORIES) return;
+  function startNewGame(options = null) {
+    const reqCount =
+      options && Number.isInteger(options.requiredCategories) && options.requiredCategories > 0
+        ? options.requiredCategories
+        : REQUIRED_CATEGORIES;
+    if (state.selectedCategoryIds.length !== reqCount) return;
+
+    if (!options || !options.keepTournamentMatch) {
+      state.activeTournamentMatch = null;
+    }
 
     clearClosingRevealTimer();
     stopFinalRoundTimer();
@@ -4153,8 +4251,25 @@
 
   function resetVisualModalState() {
     stopMemoryInterval();
+    stopActiveAudioChallenge();
     hideCharadesSecret();
     state.memoryPhase = null;
+    if (dom.diffHostControls) dom.diffHostControls.hidden = true;
+    if (dom.diffLiveDots) dom.diffLiveDots.innerHTML = "";
+    if (dom.spotDiffBadgeWrap) {
+      dom.spotDiffBadgeWrap.hidden = true;
+      dom.spotDiffBadgeWrap.classList.remove("is-complete");
+    }
+    if (dom.audioChallengePanel) dom.audioChallengePanel.hidden = true;
+    if (dom.audioChError) {
+      dom.audioChError.hidden = true;
+      dom.audioChError.textContent = "";
+    }
+    if (dom.answerImageToggleBar) dom.answerImageToggleBar.hidden = true;
+    if (dom.answerCompareGrid) dom.answerCompareGrid.hidden = true;
+    if (dom.answerCompareQImg) dom.answerCompareQImg.removeAttribute("src");
+    if (dom.answerCompareAImg) dom.answerCompareAImg.removeAttribute("src");
+    if (dom.answerImageStage) dom.answerImageStage.hidden = false;
     state.questionImageRequestId++;
     state.answerImageRequestId++;
     state.questionImageRetryCount = 0;
@@ -4491,6 +4606,8 @@
       hintUsed: Boolean(cq.hintUsed),
       blurReduced: Boolean(cq.blurReduced),
       zoomReduced: Boolean(cq.zoomReduced),
+      differencesFound: Math.max(0, Math.floor(Number(cq.differencesFound) || 0)),
+      answerImageMode: cq.answerImageMode || "answer",
       swappedOutIds: cq.swappedOutIds.slice(),
       phase: cq.phase,
       stealConsumed: Boolean(cq.stealConsumed),
@@ -4525,6 +4642,7 @@
     cq.hintUsed = Boolean(snap.hintUsed);
     cq.blurReduced = Boolean(snap.blurReduced);
     cq.zoomReduced = Boolean(snap.zoomReduced);
+    cq.differencesFound = Math.max(0, Math.floor(Number(snap.differencesFound) || 0));
     cq.swappedOutIds = Array.isArray(snap.swappedOutIds) ? snap.swappedOutIds.slice() : [];
     cq.phase = snap.phase || "answering";
     cq.stealConsumed = Boolean(snap.stealConsumed);
@@ -4538,6 +4656,7 @@
     applyCurrentQuestionStage({
       blurReduced: cq.blurReduced,
       zoomReduced: cq.zoomReduced,
+      differencesFound: cq.differencesFound,
       hintUsed: cq.hintUsed,
       phase: cq.phase,
       stealConsumed: cq.stealConsumed,
@@ -4569,7 +4688,8 @@
       const labelMap = {
         steal: "فرصة السرقة",
         swap: "تبديل السؤال",
-        hint: "كشف التلميح"
+        hint: "كشف التلميح",
+        diff: "تعديل عدّاد الفروقات"
       };
       showToast(`↶ تم التراجع عن ${labelMap[lastSnap.reason] || "آخر خطوة"}`, "info");
       return true;
@@ -4684,6 +4804,7 @@
     }
 
     // حفظ لقطة داخلية للتراجع قبل التبديل (دون تسجيل السؤال المُستبدَل كملعوب!)
+    stopActiveAudioChallenge();
     cq.inModalSnapshots.push(captureInModalSnapshot("swap"));
 
     const oldQuestionId = cq.question.id;
@@ -5019,14 +5140,27 @@
     } else {
       dom.modalQuestionText.textContent = q.question;
 
-      if (visualType === "spot-diff") {
+      if (visualType === "audio") {
         loadQuestionStageImage("");
-        const diffLabel = formatDifferencesBadge(q.differencesCount);
-        if (diffLabel) {
-          dom.spotDiffCountBadge.textContent = diffLabel;
-          dom.spotDiffBadgeWrap.hidden = false;
-        }
+        setupAudioChallengeForQuestion(q);
+      } else if (visualType === "spot-diff") {
+        loadQuestionStageImage("");
+        renderDifferencesLiveUI();
         renderSpotDiffGallery(q.images);
+      } else if (visualType === "differences") {
+        renderDifferencesLiveUI();
+        if (q.questionImage) {
+          loadQuestionStageImage(q.questionImage, {
+            retryAttempt: 0,
+            loadingLabel: "جاري تحميل صورة الفروقات...",
+            isMemory: false,
+            onLoaded: () => {
+              updateSingleImageZoomability();
+            }
+          });
+        } else {
+          loadQuestionStageImage("");
+        }
       } else if (visualType === "multi-image") {
         loadQuestionStageImage("");
         renderMultiImageConnectionGallery(q.images, Boolean(q.showPlus));
@@ -5333,6 +5467,8 @@
       halfZoom: 2,
       zoomOrigin: "center",
       zoomReduced: Boolean(restoredOpenState && restoredOpenState.zoomReduced),
+      differencesFound: Math.max(0, Math.floor(Number(restoredOpenState && restoredOpenState.differencesFound) || 0)),
+      answerImageMode: (restoredOpenState && restoredOpenState.answerImageMode) || "answer",
       doubleActive,
       hintUsed: Boolean(
         restoredOpenState && (restoredOpenState.hintUsed || restoredOpenState.hintShown)
@@ -5364,7 +5500,9 @@
     };
 
     openModal(dom.questionModal);
+    resetAllPlayState(false);
     applyCurrentQuestionStage(restoredOpenState);
+    renderWirelessBuzzerBars();
     persistActiveMatch();
 
     if (!restoredOpenState && window.SeenJeemAudio) {
@@ -5908,11 +6046,292 @@
           ? q.questionImage
           : "";
     loadAnswerStageImage(answerImgSrc, 0);
+
+    // تفعيل شريط التبديل/المقارنة السلس عند وجود صورة السؤال وصورة الإجابة معاً (Pack 12)
+    const hasBothImgs = Boolean(
+      q.questionImage && q.questionImage.trim() && q.answerImage && q.answerImage.trim() && vType !== "memory" && vType !== "audio"
+    );
+    if (dom.answerImageToggleBar) {
+      dom.answerImageToggleBar.hidden = !hasBothImgs;
+    }
+    if (hasBothImgs && state.currentQ) {
+      setAnswerImageViewMode(state.currentQ.answerImageMode || "answer", true);
+    } else {
+      if (dom.answerCompareGrid) dom.answerCompareGrid.hidden = true;
+      if (dom.answerImageStage) dom.answerImageStage.hidden = !Boolean(answerImgSrc);
+    }
+  }
+
+  /* =========================================================
+     الحزمة الثانية عشرة:
+     1) التبديل والمقارنة السلسة بين صورة السؤال وصورة الإجابة
+     2) عدّاد «أوجد الفروقات» الحي المتزامن
+     3) التحديات الصوتية المتزامنة (Anti-Echo + BroadcastChannel)
+     ========================================================= */
+  function setAnswerImageViewMode(mode = "answer", silentBroadcast = false) {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const cleanMode = mode === "question" || mode === "compare" ? mode : "answer";
+    state.currentQ.answerImageMode = cleanMode;
+    const q = state.currentQ.question;
+    const qSrc = normalizeAssetPath(q.questionImage || "");
+    const aSrc = normalizeAssetPath(q.answerImage || "");
+
+    [
+      [dom.btnAnsViewAnswer, "answer"],
+      [dom.btnAnsViewQuestion, "question"],
+      [dom.btnAnsViewCompare, "compare"]
+    ].forEach(([btn, key]) => {
+      if (!btn) return;
+      btn.classList.toggle("active", cleanMode === key);
+      btn.classList.toggle("btn-amber", cleanMode === key);
+      btn.classList.toggle("btn-secondary", cleanMode !== key);
+    });
+
+    if (cleanMode === "compare" && qSrc && aSrc) {
+      if (dom.answerCompareQImg) dom.answerCompareQImg.src = qSrc;
+      if (dom.answerCompareAImg) dom.answerCompareAImg.src = aSrc;
+      if (dom.answerCompareGrid) dom.answerCompareGrid.hidden = false;
+      if (dom.answerImageStage) dom.answerImageStage.hidden = true;
+    } else {
+      if (dom.answerCompareGrid) dom.answerCompareGrid.hidden = true;
+      if (dom.answerImageStage) dom.answerImageStage.hidden = false;
+      const targetSrc = cleanMode === "question" && qSrc ? qSrc : aSrc;
+      if (targetSrc) {
+        loadAnswerStageImage(targetSrc, 0);
+      }
+    }
+
+    if (!silentBroadcast) {
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function renderDifferencesLiveUI() {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const cq = state.currentQ;
+    const q = cq.question;
+    const isDiff = (cq.visualType === "differences" || cq.visualType === "spot-diff") && Number(q.differencesCount) > 0;
+    if (!isDiff) {
+      if (dom.spotDiffBadgeWrap) dom.spotDiffBadgeWrap.hidden = true;
+      if (dom.diffHostControls) dom.diffHostControls.hidden = true;
+      return;
+    }
+    const total = Math.min(20, Math.max(1, Math.round(Number(q.differencesCount) || 5)));
+    const found = Math.min(total, Math.max(0, Math.floor(Number(cq.differencesFound) || 0)));
+    cq.differencesFound = found;
+
+    if (dom.spotDiffCountBadge) {
+      dom.spotDiffCountBadge.textContent = `🔍 أوجد الفروقات: ${found} / ${total}`;
+    }
+    if (dom.spotDiffBadgeWrap) {
+      dom.spotDiffBadgeWrap.hidden = false;
+      dom.spotDiffBadgeWrap.classList.toggle("is-complete", found >= total);
+    }
+    if (dom.diffLiveDots) {
+      dom.diffLiveDots.innerHTML = Array.from(
+        { length: total },
+        (_, i) => `<span class="diff-dot${i < found ? " is-found" : ""}"></span>`
+      ).join("");
+    }
+    if (dom.diffHostControls) {
+      dom.diffHostControls.hidden = false;
+    }
+    if (dom.btnDiffIncrement) dom.btnDiffIncrement.disabled = found >= total;
+    if (dom.btnDiffDecrement) dom.btnDiffDecrement.disabled = found <= 0;
+    if (dom.btnDiffReset) dom.btnDiffReset.disabled = found <= 0;
+  }
+
+  function incrementDifference() {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const cq = state.currentQ;
+    const total = Math.min(20, Math.max(1, Math.round(Number(cq.question.differencesCount) || 5)));
+    if ((cq.differencesFound || 0) >= total) return;
+    cq.inModalSnapshots.push(captureInModalSnapshot("diff"));
+    cq.differencesFound = Math.min(total, (cq.differencesFound || 0) + 1);
+    renderDifferencesLiveUI();
+    persistActiveMatch();
+    if (window.SeenJeemAudio) {
+      if (cq.differencesFound >= total && typeof window.SeenJeemAudio.playDiffComplete === "function") {
+        window.SeenJeemAudio.playDiffComplete();
+        showToast(`🎉 رائع! تم اكتشاف جميع الفروقات (${total} / ${total})!`, "success");
+      } else if (typeof window.SeenJeemAudio.playDiffFound === "function") {
+        window.SeenJeemAudio.playDiffFound();
+      }
+    }
+  }
+
+  function decrementDifference() {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const cq = state.currentQ;
+    if ((cq.differencesFound || 0) <= 0) return;
+    cq.inModalSnapshots.push(captureInModalSnapshot("diff"));
+    cq.differencesFound = Math.max(0, (cq.differencesFound || 0) - 1);
+    renderDifferencesLiveUI();
+    persistActiveMatch();
+  }
+
+  function resetDifferences() {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const cq = state.currentQ;
+    if ((cq.differencesFound || 0) === 0) return;
+    cq.inModalSnapshots.push(captureInModalSnapshot("diff"));
+    cq.differencesFound = 0;
+    renderDifferencesLiveUI();
+    persistActiveMatch();
+  }
+
+  function getEffectiveAudioChallengeRoute() {
+    return state.dualScreen.connected && state.audioChallenge.route !== "host" ? "display" : "host";
+  }
+
+  function stopActiveAudioChallenge() {
+    if (window.SeenJeemAudioChallenge) {
+      window.SeenJeemAudioChallenge.stop();
+    }
+    if (liveSync && state.dualScreen.connected && typeof liveSync.broadcastAudioControl === "function") {
+      liveSync.broadcastAudioControl("STOP", {});
+    }
+    state.audioChallenge.status = {
+      playing: false,
+      teaserActive: false,
+      currentTime: 0,
+      duration: 0,
+      volume: state.audioChallenge.status ? state.audioChallenge.status.volume : 0.85,
+      autoplayBlocked: false,
+      error: ""
+    };
+  }
+
+  function setupAudioChallengeForQuestion(q) {
+    if (!q || !dom.audioChallengePanel) return;
+    const audioSrc = typeof q.audioUrl === "string" ? q.audioUrl.trim() : "";
+    const clipStart = Number.isFinite(Number(q.audioStart)) && Number(q.audioStart) >= 0 ? Number(q.audioStart) : 0;
+    const clipEnd =
+      q.audioEnd !== undefined && q.audioEnd !== null && Number.isFinite(Number(q.audioEnd)) && Number(q.audioEnd) > clipStart
+        ? Number(q.audioEnd)
+        : null;
+
+    dom.audioChallengePanel.hidden = false;
+    state.audioChallenge.status = {
+      playing: false,
+      teaserActive: false,
+      currentTime: 0,
+      duration: clipEnd ? clipEnd - clipStart : 0,
+      volume: state.audioChallenge.status ? state.audioChallenge.status.volume : 0.85,
+      autoplayBlocked: false,
+      error: audioSrc ? "" : "لا يوجد رابط أو ملف صوتي مرفق لهذا السؤال."
+    };
+
+    if (audioSrc && getEffectiveAudioChallengeRoute() === "host" && window.SeenJeemAudioChallenge) {
+      window.SeenJeemAudioChallenge.load(audioSrc, {
+        start: clipStart,
+        end: clipEnd,
+        questionId: q.id || ""
+      });
+    }
+    renderAudioChallengeHostUI();
+  }
+
+  function renderAudioChallengeHostUI() {
+    if (!dom.audioChallengePanel || dom.audioChallengePanel.hidden) return;
+    const st = state.audioChallenge.status || {};
+    const fmt =
+      window.SeenJeemAudioChallengeUtils && window.SeenJeemAudioChallengeUtils.formatMmSs
+        ? window.SeenJeemAudioChallengeUtils.formatMmSs
+        : (s) => formatTime(s);
+    const cur = Math.max(0, Number(st.currentTime) || 0);
+    const dur = Math.max(0, Number(st.duration) || 0);
+    const route = getEffectiveAudioChallengeRoute();
+
+    if (dom.btnAudioChRoute) {
+      dom.btnAudioChRoute.hidden = !state.dualScreen.connected;
+      dom.btnAudioChRoute.textContent =
+        route === "display" ? "📺 الصوت: التلفزيون فقط (بلا صدى)" : "💻 الصوت: جهاز المقدّم (معاينة)";
+    }
+    if (dom.audioChVisualizer) {
+      dom.audioChVisualizer.classList.toggle("is-playing", Boolean(st.playing));
+    }
+    if (dom.audioChCurTime) dom.audioChCurTime.textContent = fmt(cur);
+    if (dom.audioChDurTime) dom.audioChDurTime.textContent = dur > 0 ? fmt(dur) : "--:--";
+    if (dom.audioChSeek) {
+      dom.audioChSeek.max = String(dur > 0 ? dur : 100);
+      dom.audioChSeek.value = String(dur > 0 ? Math.min(dur, cur) : 0);
+      dom.audioChSeek.disabled = dur <= 0;
+    }
+    if (dom.btnAudioChPlay) dom.btnAudioChPlay.hidden = Boolean(st.playing);
+    if (dom.btnAudioChPause) dom.btnAudioChPause.hidden = !Boolean(st.playing);
+    if (dom.audioChStatusText) {
+      dom.audioChStatusText.textContent = st.autoplayBlocked
+        ? "🔇 يرجى النقر على شاشة التلفزيون لتفعيل الصوت"
+        : st.teaserActive
+          ? "⚡ تشغيل مقطع سريع (5ث)..."
+          : st.playing
+            ? "🔊 قيد التشغيل"
+            : "⏸️ متوقف / جاهز";
+    }
+    if (dom.audioChError) {
+      dom.audioChError.hidden = !st.error;
+      dom.audioChError.textContent = st.error || "";
+    }
+  }
+
+  async function sendAudioChallengeAction(action, payload = {}) {
+    if (!state.currentQ || !state.currentQ.question) return;
+    const q = state.currentQ.question;
+    const src = typeof q.audioUrl === "string" ? q.audioUrl.trim() : "";
+    if (!src && action !== "STOP") {
+      showToast("لا يوجد ملف صوتي لهذا السؤال", "warning");
+      return;
+    }
+    const clipStart = Number.isFinite(Number(q.audioStart)) && Number(q.audioStart) >= 0 ? Number(q.audioStart) : 0;
+    const clipEnd =
+      q.audioEnd !== undefined && q.audioEnd !== null && Number.isFinite(Number(q.audioEnd)) && Number(q.audioEnd) > clipStart
+        ? Number(q.audioEnd)
+        : null;
+    const route = getEffectiveAudioChallengeRoute();
+
+    if (route === "display" && liveSync && typeof liveSync.broadcastAudioControl === "function") {
+      // منع الصدى: التأكد من إيقاف الصوت على جهاز المقدّم
+      if (window.SeenJeemAudioChallenge) window.SeenJeemAudioChallenge.pause();
+      liveSync.broadcastAudioControl(action, {
+        ...payload,
+        src,
+        clipStart,
+        clipEnd,
+        questionId: q.id || ""
+      });
+      if (action === "PLAY" || action === "REPLAY" || action === "TEASER_5S") {
+        state.audioChallenge.status.playing = true;
+        state.audioChallenge.status.teaserActive = action === "TEASER_5S";
+      } else if (action === "PAUSE" || action === "STOP") {
+        state.audioChallenge.status.playing = false;
+        state.audioChallenge.status.teaserActive = false;
+      }
+      renderAudioChallengeHostUI();
+      broadcastLiveDisplayState();
+      return;
+    }
+
+    // وضع الشاشة الواحدة أو معاينة المقدّم المحلية
+    if (liveSync && state.dualScreen.connected && typeof liveSync.broadcastAudioControl === "function") {
+      liveSync.broadcastAudioControl("PAUSE", {});
+    }
+    const player = window.SeenJeemAudioChallenge;
+    if (!player) return;
+    player.load(src, { start: clipStart, end: clipEnd, questionId: q.id || "" });
+    if (action === "PLAY") await player.play();
+    else if (action === "PAUSE") player.pause();
+    else if (action === "REPLAY") await player.replay();
+    else if (action === "TEASER_5S") await player.playTeaser(Number(payload.seconds) || 5);
+    else if (action === "SEEK") player.seek(Number(payload.seconds) || 0);
+    else if (action === "SET_VOLUME") player.setVolume(Number(payload.volume));
+    else if (action === "STOP") player.stop();
   }
 
   function commitQuestionResolution({
     winnerTeamIndex = null,
     awardedPoints = 0,
+    multiAwards = null,
     deductTeamIndex = null,
     deductPoints = 0,
     actionType = "award",
@@ -5923,7 +6342,9 @@
 
     stopTimerInterval();
     stopMemoryInterval();
+    stopActiveAudioChallenge();
     hideCharadesSecret();
+    resetAllPlayState(false);
     state.timerRunning = false;
     state.memoryPhase = null;
 
@@ -5964,12 +6385,28 @@
       state.matchSettings
     );
 
+    const cleanMultiAwards = Array.isArray(multiAwards)
+      ? multiAwards.filter(
+          (a) =>
+            a &&
+            Number.isInteger(a.teamIdx) &&
+            a.teamIdx >= 0 &&
+            a.teamIdx < state.teams.length &&
+            Number(a.points) > 0
+        )
+      : [];
+
     const hasValidWinner =
+      cleanMultiAwards.length === 0 &&
       Number.isInteger(winnerTeamIndex) &&
       winnerTeamIndex >= 0 &&
       winnerTeamIndex < state.teams.length;
 
-    if (hasValidWinner && awardedPoints > 0) {
+    if (cleanMultiAwards.length > 0) {
+      cleanMultiAwards.forEach((a) => {
+        state.teams[a.teamIdx].score += Number(a.points);
+      });
+    } else if (hasValidWinner && awardedPoints > 0) {
       state.teams[winnerTeamIndex].score += awardedPoints;
     }
 
@@ -5985,8 +6422,15 @@
 
     // تسجيل الحدث في سجل إحصائيات المباراة (MatchEvent[])
     const askingTeam = state.teams[cq.activeTeamAtOpen] || state.teams[0];
-    const awardedTeam = hasValidWinner ? state.teams[winnerTeamIndex] : null;
+    const primaryMultiWinner = cleanMultiAwards.length === 1 ? cleanMultiAwards[0] : null;
+    const effectiveWinnerIdx = hasValidWinner
+      ? winnerTeamIndex
+      : primaryMultiWinner
+        ? primaryMultiWinner.teamIdx
+        : null;
+    const awardedTeam = effectiveWinnerIdx !== null ? state.teams[effectiveWinnerIdx] : null;
     const isStealWin = actionType === "steal-win" || (hasValidWinner && winnerTeamIndex !== cq.activeTeamAtOpen && cq.stealConsumed);
+    const totalMultiAwarded = cleanMultiAwards.reduce((sum, a) => sum + Number(a.points || 0), 0);
     const eventRecord = matchStore.sanitizeMatchEvent({
       questionId: cq.question.id,
       categoryId: cq.category.id,
@@ -5995,7 +6439,7 @@
       answerText: cq.question.answer,
       explanation: cq.question.explanation || undefined,
       basePoints: Number(cq.question.points) || 200,
-      effectivePoints: hasValidWinner ? awardedPoints : 0,
+      effectivePoints: cleanMultiAwards.length > 0 ? totalMultiAwarded : hasValidWinner ? awardedPoints : 0,
       askingTeamId: askingTeam ? askingTeam.id : `team-${cq.activeTeamAtOpen}`,
       awardedTeamId: awardedTeam ? awardedTeam.id : null,
       wasSteal: Boolean(isStealWin),
@@ -6012,7 +6456,7 @@
 
     // تسجيل السؤال النهائي في الخلية كـ «ملعوب» (الأسئلة المستبدلة عبر Swap لم تُسجَّل مطلقاً)
     cq.slot.played = true;
-    cq.slot.winnerTeam = hasValidWinner ? winnerTeamIndex : null;
+    cq.slot.winnerTeam = effectiveWinnerIdx;
     historyStore.markQuestionPlayed(cq.question.id, Date.now());
     state.answeredThisRound++;
 
@@ -6514,7 +6958,9 @@
 
     stopTimerInterval();
     stopMemoryInterval();
+    stopActiveAudioChallenge();
     hideCharadesSecret();
+    resetAllPlayState(false);
     closeLightbox();
     state.timerRunning = false;
     state.memoryPhase = null;
@@ -6904,6 +7350,26 @@
       images: Array.isArray(q.images) ? q.images.slice() : null,
       showPlus: Boolean(q.showPlus),
       differencesCount: q.differencesCount || null,
+      differencesFound: Math.max(0, Math.floor(Number(cq.differencesFound) || 0)),
+      answerImageMode: cq.answerImageMode || "answer",
+      audioChallenge:
+        cq.visualType === "audio" && typeof q.audioUrl === "string" && q.audioUrl.trim()
+          ? {
+              hasAudio: true,
+              audioSrc: q.audioUrl.trim(),
+              clipStart: Number.isFinite(Number(q.audioStart)) && Number(q.audioStart) >= 0 ? Number(q.audioStart) : 0,
+              clipEnd:
+                q.audioEnd !== undefined && q.audioEnd !== null && Number.isFinite(Number(q.audioEnd)) && Number(q.audioEnd) > (Number(q.audioStart) || 0)
+                  ? Number(q.audioEnd)
+                  : null,
+              playing: Boolean(state.audioChallenge.status && state.audioChallenge.status.playing),
+              teaserActive: Boolean(state.audioChallenge.status && state.audioChallenge.status.teaserActive),
+              currentTime: Number(state.audioChallenge.status && state.audioChallenge.status.currentTime) || 0,
+              duration: Number(state.audioChallenge.status && state.audioChallenge.status.duration) || 0,
+              volume: Number(state.audioChallenge.status && state.audioChallenge.status.volume) || 0.85,
+              route: getEffectiveAudioChallengeRoute()
+            }
+          : null,
       blurLevel: cq.blurLevel,
       halfBlur: cq.halfBlur,
       blurReduced: Boolean(cq.blurReduced),
@@ -6998,6 +7464,11 @@
       typeof window.SeenJeemBaraSalfa.isOpen === "function" &&
       window.SeenJeemBaraSalfa.isOpen()
     );
+    const isTournamentOpen = Boolean(
+      window.SeenJeemTournament &&
+      typeof window.SeenJeemTournament.isOpen === "function" &&
+      window.SeenJeemTournament.isOpen()
+    );
     const isBlitzOpen =
       dom.blitzModal &&
       dom.blitzModal.classList.contains("open") &&
@@ -7021,6 +7492,8 @@
     let customWinnerView = null;
     if (isBaraOpen) {
       screen = "bara-salfa";
+    } else if (isTournamentOpen) {
+      screen = "tournament";
     } else if (isBlitzOpen) {
       if (state.blitz.phase === "finished") {
         screen = "winner";
@@ -7126,6 +7599,13 @@
         typeof window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload === "function"
           ? window.SeenJeemBaraSalfa.buildSanitizedDisplayPayload()
           : null,
+      tournamentView:
+        screen === "tournament" &&
+        window.SeenJeemTournament &&
+        typeof window.SeenJeemTournament.buildSanitizedDisplayPayload === "function"
+          ? window.SeenJeemTournament.buildSanitizedDisplayPayload()
+          : null,
+      allPlay: screen === "question" ? buildPublicAllPlayPayload() : null,
       intermission: {
         active: Boolean(state.intermission && state.intermission.active),
         message: (state.intermission && state.intermission.message) || "استراحة قصيرة — نعود بعد قليل",
@@ -7606,6 +8086,17 @@
     }
 
     dom.btnResumeRound.hidden = !(endedManually && remaining > 0);
+
+    // تسجيل نتيجة مباراة البطولة تلقائياً وإظهار زر العودة لجدول البطولة
+    if (state.activeTournamentMatch && window.SeenJeemTournament && typeof window.SeenJeemTournament.recordMatchResult === "function") {
+      const scoreA = state.teams[0] ? Number(state.teams[0].score) || 0 : 0;
+      const scoreB = state.teams[1] ? Number(state.teams[1].score) || 0 : 0;
+      window.SeenJeemTournament.recordMatchResult(state.activeTournamentMatch.matchId, { scoreA, scoreB });
+      if (dom.btnWinnerReturnTournament) dom.btnWinnerReturnTournament.hidden = false;
+    } else if (dom.btnWinnerReturnTournament) {
+      dom.btnWinnerReturnTournament.hidden = true;
+    }
+
     renderWinnerAnalyticsDashboard();
     recordClassicMatchToArchive();
 
@@ -9214,7 +9705,8 @@
   function startIntermission(rawMessage, durationMinutes = 0) {
     stopIntermissionTimerOnly();
 
-    // إيقاف مؤقت أي عدّاد جارٍ (عام، من غير كلام، سرقة، أو الجولة النهائية) دون إغلاق السؤال
+    // إيقاف مؤقت أي عدّاد جارٍ (عام، من غير كلام، سرقة، أو الجولة النهائية) وأي مقطع صوتي دون إغلاق السؤال
+    stopActiveAudioChallenge();
     if (state.timerRunning) {
       pauseTimer();
     }
@@ -9324,22 +9816,32 @@
     openModal(dom.resultCardModal);
 
     try {
-      const payload = customPayload || {
-        teams: state.teams,
-        analytics: computeMatchAnalytics(),
-        matchEvents: state.matchEvents,
-        profileName: historyStore.getActiveProfile().name,
-        theme: state.theme,
-        timestamp: Date.now()
-      };
-      const canvas = await resultCardGen.generateCanvas({
-        teams: payload.teams,
-        analytics: payload.analytics,
-        matchEvents: payload.matchEvents || [],
-        profileName: payload.profileName || historyStore.getActiveProfile().name,
-        theme: payload.theme || state.theme,
-        timestamp: payload.timestamp || Date.now()
-      });
+      let canvas = null;
+      if (customPayload && customPayload.cardType === "bara-salfa" && typeof resultCardGen.generateBaraSalfaResultCard === "function") {
+        state.currentResultCardPrefix = "bara-salfa-result";
+        canvas = await resultCardGen.generateBaraSalfaResultCard(customPayload.sessionData, state.theme);
+      } else if (customPayload && customPayload.cardType === "tournament" && typeof resultCardGen.generateTournamentResultCard === "function") {
+        state.currentResultCardPrefix = "seen-jeem-tournament";
+        canvas = await resultCardGen.generateTournamentResultCard(customPayload.tournamentData, state.theme);
+      } else {
+        state.currentResultCardPrefix = "seen-jeem-result";
+        const payload = customPayload || {
+          teams: state.teams,
+          analytics: computeMatchAnalytics(),
+          matchEvents: state.matchEvents,
+          profileName: historyStore.getActiveProfile().name,
+          theme: state.theme,
+          timestamp: Date.now()
+        };
+        canvas = await resultCardGen.generateCanvas({
+          teams: payload.teams,
+          analytics: payload.analytics,
+          matchEvents: payload.matchEvents || [],
+          profileName: payload.profileName || historyStore.getActiveProfile().name,
+          theme: payload.theme || state.theme,
+          timestamp: payload.timestamp || Date.now()
+        });
+      }
       const blob = await resultCardGen.canvasToBlob(canvas);
       if (!blob) {
         if (dom.resultCardLoading) dom.resultCardLoading.textContent = "تعذّر توليد الصورة في هذا المتصفح";
@@ -9790,6 +10292,18 @@
     if (s.currentTurnNumber >= s.totalTurns) {
       s.phase = "finished";
       recordBlitzToArchive();
+      if (
+        state.activeTournamentMatch &&
+        window.SeenJeemTournament &&
+        typeof window.SeenJeemTournament.recordMatchResult === "function"
+      ) {
+        const sA = s.teams[0] ? Number(s.teams[0].score) || 0 : 0;
+        const sB = s.teams[1] ? Number(s.teams[1].score) || 0 : 0;
+        window.SeenJeemTournament.recordMatchResult(state.activeTournamentMatch.matchId, { scoreA: sA, scoreB: sB });
+        if (dom.btnBlitzReturnTournament) dom.btnBlitzReturnTournament.hidden = false;
+      } else if (dom.btnBlitzReturnTournament) {
+        dom.btnBlitzReturnTournament.hidden = true;
+      }
       renderBlitzView();
       broadcastLiveDisplayState();
       if (window.SeenJeemAudio) window.SeenJeemAudio.playVictory();
@@ -10469,6 +10983,101 @@
   function renderHallOfFameModal() {
     if (!archiveStore) return;
     const profile = historyStore.getActiveProfile();
+    const isBaraView = state.hofActiveView === "bara-salfa";
+
+    if (dom.hofViewTabs) {
+      dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
+        const active = tab.dataset.hofView === (isBaraView ? "bara-salfa" : "seen-jeem");
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+    }
+    if (dom.hofSeenJeemSections) dom.hofSeenJeemSections.hidden = isBaraView;
+    if (dom.hofBaraSalfaSection) dom.hofBaraSalfaSection.hidden = !isBaraView;
+
+    if (isBaraView) {
+      const baraHof =
+        typeof archiveStore.computeBaraSalfaHallOfFame === "function"
+          ? archiveStore.computeBaraSalfaHallOfFame(profile.id)
+          : { totalRounds: 0, leaderboard: [], records: {} };
+
+      if (dom.hofProfileSubtitle) {
+        dom.hofProfileSubtitle.textContent = `المجموعة النشطة: ${profile.name} • إحصائيات جولات «برا السالفة» المحفوظة`;
+      }
+      if (dom.hofBaraTotalRoundsPill) {
+        dom.hofBaraTotalRoundsPill.textContent = `${baraHof.totalRounds} جولة`;
+      }
+      if (dom.btnHofClearArchive) {
+        dom.btnHofClearArchive.textContent = "🗑️ تصفير إحصائيات برا السالفة للمجموعة";
+        dom.btnHofClearArchive.disabled = baraHof.totalRounds === 0;
+      }
+
+      if (dom.hofBaraRecordsGrid) {
+        const br = baraHof.records || {};
+        dom.hofBaraRecordsGrid.innerHTML = `
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🔍</div>
+            <div class="hof-rec-val">${br.topDetective ? `${br.topDetective.rate}%` : "—"}</div>
+            <div class="hof-rec-lbl">أفضل محقق</div>
+            <div class="hof-rec-sub">${br.topDetective ? `${escapeHtml(br.topDetective.name)} (${br.topDetective.correctVotes} تصويت صائب)` : "لا توجد جولات بعد"}</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🎭</div>
+            <div class="hof-rec-val">${br.topInfiltrator ? `${br.topInfiltrator.rate}%` : "—"}</div>
+            <div class="hof-rec-lbl">أخطر متسلّل</div>
+            <div class="hof-rec-sub">${br.topInfiltrator ? `${escapeHtml(br.topInfiltrator.name)} (${br.topInfiltrator.correctGuesses} تخمين ناجح)` : "بانتظار المتسللين"}</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">👑</div>
+            <div class="hof-rec-val">${br.topScorer ? `${br.topScorer.score} نقطة` : "—"}</div>
+            <div class="hof-rec-lbl">أعلى مجموع نقاط</div>
+            <div class="hof-rec-sub">${br.topScorer ? `${escapeHtml(br.topScorer.name)} (${br.topScorer.rounds} جولة)` : "أكمل أول جولة"}</div>
+          </div>
+        `;
+      }
+
+      if (dom.hofBaraLeaderboardWrap) {
+        if (!baraHof.leaderboard || baraHof.leaderboard.length === 0) {
+          dom.hofBaraLeaderboardWrap.innerHTML = `<div class="empty-inline-note">أكمل أول جولة في «برا السالفة» ليظهر جدول المتصدرين وإحصائيات المحققين والمتسللين لمجموعة «${escapeHtml(profile.name)}».</div>`;
+        } else {
+          dom.hofBaraLeaderboardWrap.innerHTML = `
+            <div class="hof-table-scroll">
+              <table class="hof-leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>اللاعب</th>
+                    <th>الجولات</th>
+                    <th>النقاط</th>
+                    <th>دقة التصويت</th>
+                    <th>تخمين الكلمة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${baraHof.leaderboard
+                    .slice(0, 20)
+                    .map(
+                      (row, idx) => `
+                    <tr class="${idx === 0 ? "is-rank-1" : ""}">
+                      <td><strong>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}</strong></td>
+                      <td><strong>${escapeHtml(row.displayName)}</strong></td>
+                      <td>${row.rounds}</td>
+                      <td><strong>${row.totalScore}</strong></td>
+                      <td>${row.insiderRounds > 0 ? `${row.detectionRate}% (${row.correctVotes}/${row.insiderRounds})` : "—"}</td>
+                      <td>${row.outsiderRounds > 0 ? `${row.guessRate}% (${row.correctGuesses}/${row.outsiderRounds})` : "—"}</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+      return;
+    }
+
     const hof = archiveStore.computeHallOfFame(profile.id);
     const filtered = archiveStore.getForProfile(profile.id, state.hofModeFilter);
 
@@ -10479,6 +11088,7 @@
       dom.hofTotalMatchesPill.textContent = `${hof.totalMatches} مباراة`;
     }
     if (dom.btnHofClearArchive) {
+      dom.btnHofClearArchive.textContent = "🗑️ تصفير أرشيف المجموعة النشطة";
       dom.btnHofClearArchive.disabled = hof.totalMatches === 0;
     }
 
@@ -10977,12 +11587,332 @@
     }
   }
 
+  function canUseAllPlayForCurrentQuestion() {
+    return Boolean(
+      state.currentQ &&
+        !state.currentQ.isCharades &&
+        !state.currentQ.isDailyDouble &&
+        !state.currentQ.revealed
+    );
+  }
+
+  function resetAllPlayState(clearRemote = false) {
+    const prevQId = state.wireless.allPlay && state.wireless.allPlay.questionId;
+    state.wireless.allPlay = {
+      active: false,
+      phase: "idle",
+      questionId: "",
+      answers: {},
+      judgments: {}
+    };
+    if (clearRemote && realtimeSync && prevQId && typeof realtimeSync.clearAllPlayAnswers === "function") {
+      realtimeSync.clearAllPlayAnswers(prevQId);
+    }
+    renderAllPlayHostPanel();
+  }
+
+  function buildPublicAllPlayPayload() {
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active) return null;
+    const submittedTeamIndices = [];
+    Object.keys(ap.answers || {}).forEach((k) => {
+      const idx = Number(k);
+      const entry = ap.answers[k];
+      if (Number.isInteger(idx) && entry && String(entry.text || "").trim()) {
+        submittedTeamIndices.push(idx);
+      }
+    });
+    const payload = {
+      active: true,
+      phase: ap.phase === "revealed" ? "revealed" : "open",
+      questionId: ap.questionId || "",
+      submittedTeamIndices
+    };
+    if (ap.phase === "revealed") {
+      payload.revealedAnswers = state.teams.map((t, idx) => {
+        const ans = ap.answers[idx];
+        const j = ap.judgments[idx];
+        return {
+          teamIdx: idx,
+          teamName: t.name,
+          text: ans && ans.text ? String(ans.text) : "",
+          correct: j === true ? true : j === false ? false : null
+        };
+      });
+    }
+    return payload;
+  }
+
+  function openAllPlayForCurrentQuestion() {
+    if (!state.currentQ) return;
+    if (state.currentQ.isCharades) {
+      showToast("وضع «الكل يجاوب» غير متاح لأسئلة التمثيل «من غير كلام»", "warning");
+      return;
+    }
+    if (state.currentQ.isDailyDouble) {
+      showToast("وضع «الكل يجاوب» غير متاح للمربعات الذهبية المخفية", "warning");
+      return;
+    }
+    const qId = String(state.currentQ.question.id || `q_${Date.now()}`);
+    state.wireless.allPlay = {
+      active: true,
+      phase: "open",
+      questionId: qId,
+      answers: {},
+      judgments: {}
+    };
+    if (realtimeSync && state.wireless.active && typeof realtimeSync.clearAllPlayAnswers === "function") {
+      realtimeSync.clearAllPlayAnswers(qId);
+    }
+    if (!state.timerRunning) {
+      if (state.timerMode === "unlimited" || state.timerRemaining <= 0) {
+        state.timerMax = 45;
+        state.timerRemaining = 45;
+        state.timerMode = "main";
+      }
+      startTimerInterval();
+    }
+    renderAllPlayHostPanel();
+    broadcastLiveDisplayState();
+    showToast("📝 تم فتح وضع «الكل يجاوب» — الفرق تكتب إجاباتها الآن!", "success");
+  }
+
+  function handleIncomingAllPlayAnswers(allMap) {
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active || !ap.questionId || !allMap || typeof allMap !== "object") return;
+    const cleanKey = String(ap.questionId).replace(/[.#$\[\]\/]/g, "_");
+    const qBucket = allMap[cleanKey] || allMap[ap.questionId];
+    if (!qBucket || typeof qBucket !== "object") return;
+
+    let changed = false;
+    Object.values(qBucket).forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const idx = Number(entry.teamIdx);
+      const txt = typeof entry.text === "string" ? entry.text.trim().slice(0, 140) : "";
+      if (!Number.isInteger(idx) || idx < 0 || idx >= state.teams.length || !txt) return;
+      const prev = ap.answers[idx];
+      if (!prev || prev.text !== txt || prev.submittedAt !== entry.submittedAt) {
+        ap.answers[idx] = {
+          teamIdx: idx,
+          text: txt,
+          submittedAt: entry.submittedAt || Date.now(),
+          manual: false
+        };
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      renderAllPlayHostPanel();
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function revealAllPlayAnswers() {
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active) return;
+    stopTimerInterval();
+    state.timerRunning = false;
+    ap.phase = "revealed";
+    state.teams.forEach((_t, idx) => {
+      if (ap.judgments[idx] === undefined) ap.judgments[idx] = null;
+    });
+    if (state.currentQ && !state.currentQ.revealed) {
+      revealAnswer(false);
+    }
+    renderAllPlayHostPanel();
+    broadcastLiveDisplayState();
+  }
+
+  function setAllPlayJudgment(teamIdx, isCorrect) {
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active || ap.phase !== "revealed") return;
+    const idx = Number(teamIdx);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= state.teams.length) return;
+    ap.judgments[idx] = Boolean(isCorrect);
+    renderAllPlayHostPanel();
+    broadcastLiveDisplayState();
+  }
+
+  function setManualAllPlayAnswer(teamIdx, text) {
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active) return;
+    const idx = Number(teamIdx);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= state.teams.length) return;
+    const clean = String(text || "").trim().slice(0, 140);
+    if (clean) {
+      ap.answers[idx] = { teamIdx: idx, text: clean, submittedAt: Date.now(), manual: true };
+    } else {
+      delete ap.answers[idx];
+    }
+    broadcastLiveDisplayState();
+  }
+
+  function commitAllPlayAwards() {
+    const ap = state.wireless.allPlay;
+    const cq = state.currentQ;
+    if (!ap || !ap.active || !cq) return;
+
+    const ownerIdx = cq.activeTeamAtOpen;
+    const ownerPts = computeEffectiveQuestionPoints(cq); // يشمل 2x لصاحب الدور فقط
+    const otherPts = computeDiscountedBasePoints(cq); // بدون 2x لبقية الفرق
+    const awards = [];
+    const awardedNames = [];
+
+    state.teams.forEach((team, idx) => {
+      if (ap.judgments[idx] === true) {
+        const pts = idx === ownerIdx ? ownerPts : otherPts;
+        awards.push({ teamIdx: idx, points: pts });
+        awardedNames.push(`${team.name} (+${pts})`);
+      }
+    });
+
+    const label =
+      awardedNames.length > 0
+        ? `الكل يجاوب: ${awardedNames.join("، ")}`
+        : "الكل يجاوب: بدون نقاط";
+
+    if (realtimeSync && state.wireless.active && ap.questionId && typeof realtimeSync.clearAllPlayAnswers === "function") {
+      realtimeSync.clearAllPlayAnswers(ap.questionId);
+    }
+
+    commitQuestionResolution({
+      multiAwards: awards,
+      actionType: "all-play",
+      undoLabel: label,
+      showBriefAnswerPreview: false
+    });
+
+    if (window.SeenJeemAudio) {
+      if (awards.length > 0) window.SeenJeemAudio.playCorrect();
+      else window.SeenJeemAudio.playWrong();
+    }
+    showToast(
+      awards.length > 0 ? `✔️ تم اعتماد نقاط الكل يجاوب: ${awardedNames.join(" • ")}` : "تم إغلاق سؤال «الكل يجاوب» دون نقاط",
+      awards.length > 0 ? "success" : "info"
+    );
+  }
+
+  function renderAllPlayHostPanel() {
+    if (!dom.allPlayHostPanel) return;
+    const ap = state.wireless.allPlay;
+    if (!ap || !ap.active || !state.currentQ) {
+      dom.allPlayHostPanel.hidden = true;
+      dom.allPlayHostPanel.innerHTML = "";
+      return;
+    }
+
+    dom.allPlayHostPanel.hidden = false;
+    const cq = state.currentQ;
+    const ownerPts = computeEffectiveQuestionPoints(cq);
+    const otherPts = computeDiscountedBasePoints(cq);
+    const subCount = state.teams.filter((_t, i) => ap.answers[i] && ap.answers[i].text).length;
+
+    if (ap.phase === "open") {
+      dom.allPlayHostPanel.innerHTML = `
+        <div class="allplay-panel-head">
+          <strong>📝 وضع «الكل يجاوب» مفتوح (${subCount} / ${state.teams.length} أرسلوا)</strong>
+          <div class="allplay-head-actions">
+            <button type="button" id="btn-allplay-reveal" class="btn btn-amber btn-xs">🔒 إغلاق وكشف الإجابات</button>
+            <button type="button" id="btn-allplay-cancel" class="btn btn-ghost btn-xxs">إلغاء</button>
+          </div>
+        </div>
+        <div class="allplay-teams-list">
+          ${state.teams
+            .map((team, idx) => {
+              const ans = ap.answers[idx];
+              return `
+                <div class="allplay-team-row team-${idx + 1}">
+                  <div class="allplay-team-info">
+                    <strong>${escapeHtml(team.name)}</strong>
+                    <span class="allplay-status-pill ${ans ? "is-sent" : ""}">${ans ? "✅ تم الاستلام" : "⏳ بانتظار الإجابة"}</span>
+                  </div>
+                  <input
+                    type="text"
+                    class="text-input allplay-manual-input"
+                    data-ap-manual-idx="${idx}"
+                    value="${escapeHtml(ans ? ans.text : "")}"
+                    placeholder="إدخال يدوي (للفريق بدون هاتف)..."
+                    maxlength="140"
+                    autocomplete="off"
+                  />
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+    } else {
+      dom.allPlayHostPanel.innerHTML = `
+        <div class="allplay-panel-head">
+          <strong>📋 تقييم إجابات «الكل يجاوب» (اختر الفرق الصحيحة ثم اعتمد النقاط)</strong>
+          <button type="button" id="btn-allplay-commit" class="btn btn-steal-win btn-xs">✔️ اعتماد النقاط</button>
+        </div>
+        <div class="allplay-teams-list">
+          ${state.teams
+            .map((team, idx) => {
+              const ans = ap.answers[idx];
+              const j = ap.judgments[idx];
+              const pts = idx === cq.activeTeamAtOpen ? ownerPts : otherPts;
+              return `
+                <div class="allplay-team-row is-revealed team-${idx + 1}${j === true ? " is-ok" : j === false ? " is-bad" : ""}">
+                  <div class="allplay-team-info">
+                    <strong>${escapeHtml(team.name)} <small>(+${pts}${idx === cq.activeTeamAtOpen && cq.doubleActive ? " ⚡2x" : ""})</small></strong>
+                    <input
+                      type="text"
+                      class="text-input allplay-manual-input"
+                      data-ap-manual-idx="${idx}"
+                      value="${escapeHtml(ans ? ans.text : "")}"
+                      placeholder="— لم تُرسل إجابة (يمكن كتابتها يدوياً) —"
+                      maxlength="140"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="allplay-judge-btns">
+                    <button type="button" class="btn btn-xs ${j === true ? "btn-steal-win" : "btn-secondary"}" data-ap-judge-idx="${idx}" data-ap-judge-val="1">✅ صح</button>
+                    <button type="button" class="btn btn-xs ${j === false ? "btn-danger-outline active" : "btn-ghost"}" data-ap-judge-idx="${idx}" data-ap-judge-val="0">❌ خطأ</button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+    }
+
+    const btnRev = dom.allPlayHostPanel.querySelector("#btn-allplay-reveal");
+    if (btnRev) btnRev.addEventListener("click", revealAllPlayAnswers);
+    const btnCancel = dom.allPlayHostPanel.querySelector("#btn-allplay-cancel");
+    if (btnCancel) {
+      btnCancel.addEventListener("click", () => {
+        resetAllPlayState(true);
+        broadcastLiveDisplayState();
+      });
+    }
+    const btnCommit = dom.allPlayHostPanel.querySelector("#btn-allplay-commit");
+    if (btnCommit) btnCommit.addEventListener("click", commitAllPlayAwards);
+
+    dom.allPlayHostPanel.querySelectorAll("[data-ap-manual-idx]").forEach((inp) => {
+      inp.addEventListener("change", () => {
+        setManualAllPlayAnswer(Number(inp.dataset.apManualIdx), inp.value);
+      });
+    });
+    dom.allPlayHostPanel.querySelectorAll("[data-ap-judge-idx]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setAllPlayJudgment(Number(btn.dataset.apJudgeIdx), btn.dataset.apJudgeVal === "1");
+      });
+    });
+  }
+
   function renderWirelessBuzzerBars() {
     const wl = state.wireless;
     const bz = wl.buzzer;
 
     if (dom.wirelessBuzzerHostBar) {
       dom.wirelessBuzzerHostBar.hidden = !wl.active;
+    }
+    if (dom.btnAllPlayOpen) {
+      dom.btnAllPlayOpen.hidden = !canUseAllPlayForCurrentQuestion();
     }
 
     let summaryText = "🔒 مقفل";
@@ -11017,7 +11947,9 @@
       csoloWord: null,
       csoloExp: null,
       finalAnswer: null,
-      receivedWagers: state.wireless.receivedWagers || {}
+      receivedWagers: state.wireless.receivedWagers || {},
+      allPlayAnswers: state.wireless.allPlay && state.wireless.allPlay.active ? state.wireless.allPlay.answers : {},
+      allPlayJudgments: state.wireless.allPlay && state.wireless.allPlay.active ? state.wireless.allPlay.judgments : {}
     };
 
     if (Array.isArray(state.boardCategories)) {
@@ -11086,6 +12018,7 @@
         onBuzzes: (allBuzzes) => handleIncomingBuzzes(allBuzzes),
         onWagers: (allWagers) => handleIncomingWagers(allWagers),
         onPlayers: (playersMap) => handleIncomingPlayers(playersMap),
+        onAllPlayAnswers: (allMap) => handleIncomingAllPlayAnswers(allMap),
         onConnectionState: (isConn) => {
           state.wireless.connected = isConn;
           renderWirelessRoomModal();
@@ -11359,6 +12292,42 @@
         break;
       case "BUZZER_RESET":
         resetSpeedBuzzer();
+        break;
+      case "ALLPLAY_OPEN":
+        openAllPlayForCurrentQuestion();
+        break;
+      case "ALLPLAY_REVEAL":
+        revealAllPlayAnswers();
+        break;
+      case "ALLPLAY_TOGGLE_JUDGE":
+        setAllPlayJudgment(Number(p.teamIdx), Boolean(p.correct));
+        break;
+      case "ALLPLAY_COMMIT":
+        commitAllPlayAwards();
+        break;
+      case "DIFF_INCREMENT":
+        incrementDifference();
+        break;
+      case "DIFF_DECREMENT":
+        decrementDifference();
+        break;
+      case "DIFF_RESET":
+        resetDifferences();
+        break;
+      case "AUDIO_PLAY":
+        sendAudioChallengeAction("PLAY");
+        break;
+      case "AUDIO_PAUSE":
+        sendAudioChallengeAction("PAUSE");
+        break;
+      case "AUDIO_REPLAY":
+        sendAudioChallengeAction("REPLAY");
+        break;
+      case "AUDIO_TEASER_5S":
+        sendAudioChallengeAction("TEASER_5S", { seconds: 5 });
+        break;
+      case "AUDIO_SEEK":
+        sendAudioChallengeAction("SEEK", { seconds: Number(p.seconds) || 0 });
         break;
       case "TOGGLE_JOIN_LOCK":
         toggleWirelessJoinLock();
@@ -12389,6 +13358,14 @@
         if (e.target === dom.hallOfFameModal) closeHallOfFameModal();
       });
     }
+    if (dom.hofViewTabs) {
+      dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          state.hofActiveView = tab.dataset.hofView === "bara-salfa" ? "bara-salfa" : "seen-jeem";
+          renderHallOfFameModal();
+        });
+      });
+    }
     if (dom.hofModeFilters) {
       dom.hofModeFilters.querySelectorAll(".hof-filter-pill").forEach((pill) => {
         pill.addEventListener("click", () => {
@@ -12400,6 +13377,21 @@
     if (dom.btnHofClearArchive) {
       dom.btnHofClearArchive.addEventListener("click", () => {
         const profile = historyStore.getActiveProfile();
+        if (state.hofActiveView === "bara-salfa") {
+          openConfirmDialog({
+            title: `تصفير إحصائيات «برا السالفة» لمجموعة «${profile.name}»؟`,
+            message: "سيتم حذف جميع جولات وإحصائيات «برا السالفة» المحفوظة لهذه المجموعة فقط.",
+            confirmText: "نعم، صفّر الإحصائيات",
+            onConfirm: () => {
+              if (typeof archiveStore.clearBaraSalfaProfileStats === "function") {
+                archiveStore.clearBaraSalfaProfileStats(profile.id);
+              }
+              renderHallOfFameModal();
+              showToast(`🗑️ تم تصفير إحصائيات «برا السالفة» لمجموعة «${profile.name}»`, "info");
+            }
+          });
+          return;
+        }
         openConfirmDialog({
           title: `تصفير أرشيف مجموعة «${profile.name}»؟`,
           message:
@@ -12411,6 +13403,100 @@
             showToast(`🗑️ تم تصفير أرشيف مجموعة «${profile.name}»`, "info");
           }
         });
+      });
+    }
+
+    if (dom.btnAllPlayOpen) {
+      dom.btnAllPlayOpen.addEventListener("click", openAllPlayForCurrentQuestion);
+    }
+    if (dom.btnWinnerReturnTournament) {
+      dom.btnWinnerReturnTournament.addEventListener("click", () => {
+        closeModal(dom.winnerModal);
+        stopVictoryConfetti();
+        state.activeTournamentMatch = null;
+        returnToSetupScreen();
+        if (window.SeenJeemTournament) window.SeenJeemTournament.open();
+      });
+    }
+    if (dom.btnBlitzReturnTournament) {
+      dom.btnBlitzReturnTournament.addEventListener("click", () => {
+        closeBlitzModal();
+        state.activeTournamentMatch = null;
+        if (window.SeenJeemTournament) window.SeenJeemTournament.open();
+      });
+    }
+
+    // --- ربط أحداث الحزمة الثانية عشرة (الفروقات، صورة الإجابة، التحديات الصوتية، صانع الفئات) ---
+    if (dom.btnDiffIncrement) dom.btnDiffIncrement.addEventListener("click", incrementDifference);
+    if (dom.btnDiffDecrement) dom.btnDiffDecrement.addEventListener("click", decrementDifference);
+    if (dom.btnDiffReset) dom.btnDiffReset.addEventListener("click", resetDifferences);
+
+    if (dom.btnAnsViewAnswer) dom.btnAnsViewAnswer.addEventListener("click", () => setAnswerImageViewMode("answer"));
+    if (dom.btnAnsViewQuestion) dom.btnAnsViewQuestion.addEventListener("click", () => setAnswerImageViewMode("question"));
+    if (dom.btnAnsViewCompare) dom.btnAnsViewCompare.addEventListener("click", () => setAnswerImageViewMode("compare"));
+    if (dom.answerCompareQImg) {
+      dom.answerCompareQImg.addEventListener("click", () => {
+        if (dom.answerCompareQImg.src) openLightbox([{ src: dom.answerCompareQImg.src, caption: "صورة السؤال" }], 0);
+      });
+    }
+    if (dom.answerCompareAImg) {
+      dom.answerCompareAImg.addEventListener("click", () => {
+        if (dom.answerCompareAImg.src) openLightbox([{ src: dom.answerCompareAImg.src, caption: "صورة الإجابة" }], 0);
+      });
+    }
+
+    if (dom.btnAudioChPlay) dom.btnAudioChPlay.addEventListener("click", () => sendAudioChallengeAction("PLAY"));
+    if (dom.btnAudioChPause) dom.btnAudioChPause.addEventListener("click", () => sendAudioChallengeAction("PAUSE"));
+    if (dom.btnAudioChReplay) dom.btnAudioChReplay.addEventListener("click", () => sendAudioChallengeAction("REPLAY"));
+    if (dom.btnAudioChTeaser) dom.btnAudioChTeaser.addEventListener("click", () => sendAudioChallengeAction("TEASER_5S", { seconds: 5 }));
+    if (dom.audioChSeek) {
+      dom.audioChSeek.addEventListener("change", () => {
+        sendAudioChallengeAction("SEEK", { seconds: Number(dom.audioChSeek.value) || 0 });
+      });
+    }
+    if (dom.audioChVolume) {
+      dom.audioChVolume.addEventListener("input", () => {
+        const vol = Math.min(1, Math.max(0, (Number(dom.audioChVolume.value) || 85) / 100));
+        state.audioChallenge.status.volume = vol;
+        sendAudioChallengeAction("SET_VOLUME", { volume: vol });
+      });
+    }
+    if (dom.btnAudioChRoute) {
+      dom.btnAudioChRoute.addEventListener("click", () => {
+        stopActiveAudioChallenge();
+        state.audioChallenge.route = state.audioChallenge.route === "host" ? "display" : "host";
+        renderAudioChallengeHostUI();
+        broadcastLiveDisplayState();
+        showToast(
+          state.audioChallenge.route === "host"
+            ? "💻 تم توجيه صوت التحدي الصوتي لجهاز المقدّم (معاينة محلية)"
+            : "📺 تم توجيه صوت التحدي الصوتي لشاشة التلفزيون فقط (بلا صدى)",
+          "info"
+        );
+      });
+    }
+
+    if (window.SeenJeemAudioChallenge) {
+      window.SeenJeemAudioChallenge.onChange((st) => {
+        if (getEffectiveAudioChallengeRoute() !== "host") return;
+        const prevPlaying = Boolean(state.audioChallenge.status && state.audioChallenge.status.playing);
+        state.audioChallenge.status = { ...state.audioChallenge.status, ...st };
+        renderAudioChallengeHostUI();
+        if (prevPlaying !== Boolean(st.playing)) {
+          broadcastLiveDisplayState();
+        } else if (state.dualScreen.connected) {
+          broadcastLiveDisplayState({ skipWireless: true });
+        }
+      });
+    }
+
+    if (dom.btnOpenCustomPackBuilder && window.SeenJeemCustomPackBuilder) {
+      dom.btnOpenCustomPackBuilder.addEventListener("click", () => window.SeenJeemCustomPackBuilder.open());
+    }
+    if (dom.btnBankOpenPackBuilder && window.SeenJeemCustomPackBuilder) {
+      dom.btnBankOpenPackBuilder.addEventListener("click", () => {
+        closeBankManagerModal();
+        window.SeenJeemCustomPackBuilder.open();
       });
     }
 
@@ -12511,7 +13597,7 @@
     if (dom.btnDownloadResultCard) {
       dom.btnDownloadResultCard.addEventListener("click", () => {
         if (!resultCardGen || !state.currentResultCardBlob) return;
-        const fname = resultCardGen.getDefaultFilename();
+        const fname = resultCardGen.getDefaultFilename(state.currentResultCardPrefix || "seen-jeem-result");
         resultCardGen.downloadBlobAsPNG(state.currentResultCardBlob, fname);
         showToast(`⬇️ تم تنزيل بطاقة النتيجة (${fname})`, "success");
       });
@@ -12589,18 +13675,65 @@
       return;
     }
 
-    // جسر خفيف يسمح لوحدة «برا السالفة» بإرسال مشاهد التلفزيون والاحتفال والإشعارات دون المساس بمنطق سين جيم
+    // جسر خفيف يسمح لوحدتي «برا السالفة» و«نظام البطولة» بإرسال مشاهد التلفزيون وبطاقة النتيجة وإطلاق المباريات دون المساس بمنطق سين جيم
     window.SeenJeemHostBridge = {
       broadcastTV: () => broadcastLiveDisplayState({ skipWireless: true }),
       triggerConfetti: (kind = "victory", theme = "default") => startVictoryConfetti(kind, theme),
       showToast: (msg, type = "info") => showToast(msg, type),
-      openTVDisplayWindow: () => openTVDisplayWindow()
+      openTVDisplayWindow: () => openTVDisplayWindow(),
+      openBaraResultCard: (sessionData) => openResultCardModal({ cardType: "bara-salfa", sessionData }),
+      openTournamentResultCard: (tournamentData) => openResultCardModal({ cardType: "tournament", tournamentData }),
+      refreshCustomPacks: () => refreshCustomPacksFromStore(),
+      launchTournamentMatch: (matchInfo) => {
+        if (!matchInfo || !matchInfo.matchId) return;
+        state.activeTournamentMatch = matchInfo;
+        const format = matchInfo.format || "classic-4";
+        const nameA = (matchInfo.teamA && matchInfo.teamA.name) || matchInfo.teamAName || "الفريق الأول";
+        const nameB = (matchInfo.teamB && matchInfo.teamB.name) || matchInfo.teamBName || "الفريق الثاني";
+        if (format === "blitz") {
+          state.blitzConfig.teamCount = 2;
+          state.blitzConfig.durationSeconds = 60;
+          state.blitzConfig.roundsPerTeam = 1;
+          openBlitzModal();
+          const inputs = dom.blitzTeamNamesInputs ? dom.blitzTeamNamesInputs.querySelectorAll("input") : [];
+          if (inputs[0]) inputs[0].value = nameA;
+          if (inputs[1]) inputs[1].value = nameB;
+          startBlitzSession();
+          return;
+        }
+        const reqCats = format === "classic-6" ? 6 : 4;
+        updateSetupSetting({ teamCount: 2 });
+        renderTeamCountSetupUI();
+        if (dom.team1Input) dom.team1Input.value = nameA;
+        if (dom.team2Input) dom.team2Input.value = nameB;
+        // اختيار تلقائي متوازن لأفضل الفئات ذات الأسئلة الجديدة
+        const sortedCats = [...state.allCategories].sort((a, b) => {
+          const countNew = (cat) =>
+            (cat && Array.isArray(cat.questions) ? cat.questions : []).filter(
+              (q) => q && !historyStore.isPlayed(q.id)
+            ).length;
+          return countNew(b) - countNew(a);
+        });
+        state.selectedCategoryIds = sortedCats.slice(0, reqCats).map((c) => c.id);
+        startNewGame({ requiredCategories: reqCats, keepTournamentMatch: true });
+      }
     };
 
     const btnLaunchBaraSalfa = document.getElementById("btn-launch-bara-salfa");
     if (btnLaunchBaraSalfa && window.SeenJeemBaraSalfa) {
       window.SeenJeemBaraSalfa.init();
       btnLaunchBaraSalfa.addEventListener("click", () => window.SeenJeemBaraSalfa.open());
+    }
+    const btnLaunchTournament = document.getElementById("btn-launch-tournament");
+    if (btnLaunchTournament && window.SeenJeemTournament) {
+      window.SeenJeemTournament.init();
+      btnLaunchTournament.addEventListener("click", () => window.SeenJeemTournament.open());
+    }
+    if (window.SeenJeemCustomPackBuilder) {
+      window.SeenJeemCustomPackBuilder.init();
+    }
+    if (window.SeenJeemCustomPacksStore) {
+      window.SeenJeemCustomPacksStore.init().then(() => refreshCustomPacksFromStore()).catch(() => {});
     }
 
     const data = window.SEEN_JEEM_DATA;
@@ -12664,6 +13797,13 @@
       liveSync.onMessage((msg) => {
         if (msg && msg.type === "SYNC_REQUEST") {
           broadcastLiveDisplayState();
+        } else if (msg && msg.type === "AUDIO_CHALLENGE_STATUS" && msg.payload) {
+          const prevPlaying = Boolean(state.audioChallenge.status && state.audioChallenge.status.playing);
+          state.audioChallenge.status = { ...state.audioChallenge.status, ...msg.payload };
+          renderAudioChallengeHostUI();
+          if (prevPlaying !== Boolean(msg.payload.playing) && state.wireless.active) {
+            broadcastLiveDisplayState();
+          }
         }
       });
     }

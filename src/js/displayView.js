@@ -76,6 +76,8 @@
         "hall-of-fame-modal",
         "wireless-room-modal",
         "bara-salfa-modal",
+        "tournament-modal",
+        "custom-pack-builder-modal",
         "remote-host-root",
         "player-view-root",
         "bara-player-root",
@@ -271,14 +273,51 @@
                 </div>
               </div>
 
-              <!-- عدد الفروقات + الصور المتعددة -->
-              <div id="tv-spot-diff-wrap" class="spot-diff-badge-wrap" hidden>
+              <!-- شاشة التحدي الصوتي المتزامن للجمهور (Anti-Spoiler: بدون اسم الملف أو الرابط!) -->
+              <div id="tv-audio-stage" class="tv-audio-stage" hidden>
+                <div class="tv-audio-card">
+                  <div class="tv-audio-badge">🎵 تحدي صوتي — استمع جيداً!</div>
+                  <div id="tv-audio-visualizer" class="tv-audio-visualizer" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                  <div id="tv-audio-status-label" class="tv-audio-status-label">⏸️ بانتظار تشغيل المقطع من المقدّم...</div>
+                  <div class="tv-audio-progress-wrap">
+                    <span id="tv-audio-cur-time" class="tv-audio-time">0:00</span>
+                    <div class="tv-audio-progress-track">
+                      <div id="tv-audio-progress-bar" class="tv-audio-progress-bar"></div>
+                    </div>
+                    <span id="tv-audio-dur-time" class="tv-audio-time">0:00</span>
+                  </div>
+                  <button type="button" id="tv-audio-autoplay-banner" class="btn btn-amber btn-lg tv-audio-autoplay-banner" hidden>
+                    🔊 انقر هنا لتفعيل الصوت على شاشة التلفزيون
+                  </button>
+                </div>
+              </div>
+
+              <!-- عدد الفروقات + المؤشرات النقطية المتوهجة + الصور المتعددة -->
+              <div id="tv-spot-diff-wrap" class="spot-diff-badge-wrap tv-diff-live-wrap" hidden>
                 <span id="tv-spot-diff-badge" class="spot-diff-count-badge"></span>
+                <div id="tv-diff-dots" class="tv-diff-dots" aria-hidden="true"></div>
               </div>
               <div id="tv-multi-images" class="multi-images-wrap tv-multi-images" hidden></div>
 
+              <!-- مقارنة صورة السؤال وصورة الإجابة جنباً إلى جنب عند الكشف -->
+              <div id="tv-answer-compare-wrap" class="tv-answer-compare-wrap" hidden>
+                <div class="tv-compare-img-col">
+                  <span class="multi-img-label">🖼️ صورة السؤال</span>
+                  <img id="tv-compare-q-img" class="tv-answer-img" alt="صورة السؤال" />
+                </div>
+                <div class="tv-compare-img-col is-answer">
+                  <span class="multi-img-label">✅ صورة الإجابة</span>
+                  <img id="tv-compare-a-img" class="tv-answer-img" alt="صورة الإجابة" />
+                </div>
+              </div>
+
               <!-- التلميح (يظهر فقط بعد كشفه من المقدّم) -->
               <div id="tv-q-hint" class="tv-q-hint" hidden></div>
+
+              <!-- وضع «الكل يجاوب» على التلفزيون (حالة الاستلام فقط قبل الكشف، ثم بطاقات الإجابات بعد الكشف) -->
+              <div id="tv-q-allplay-stage" class="tv-q-allplay-stage" hidden></div>
 
               <!-- بطاقة الإجابة (تظهر فقط بعد كشفها من المقدّم) -->
               <div id="tv-q-answer-card" class="tv-q-answer-card" hidden>
@@ -436,6 +475,11 @@
           <div id="tv-bara-stage" class="tv-bara-stage"></div>
         </section>
 
+        <!-- شاشة نظام البطولة والدوري على التلفزيون (شجرة البطولة أو جدول الدوري + التتويج) -->
+        <section id="tv-screen-tournament" class="tv-screen tv-side-mode-screen tv-tournament-screen" hidden>
+          <div id="tv-tournament-stage" class="tv-tournament-stage"></div>
+        </section>
+
         <!-- طبقة شاشة الاستراحة التلفزيونية الكاملة (Intermission Overlay — بدون أي تسريب للسؤال) -->
         <section id="tv-intermission-overlay" class="tv-intermission-overlay" hidden aria-live="polite">
           <div class="tv-intermission-card">
@@ -544,10 +588,22 @@
         qSingleMedia: $("tv-q-single-media"),
         visualStage: $("tv-visual-stage"),
         qImg: $("tv-q-img"),
+        audioStage: $("tv-audio-stage"),
+        audioVisualizer: $("tv-audio-visualizer"),
+        audioStatusLabel: $("tv-audio-status-label"),
+        audioCurTime: $("tv-audio-cur-time"),
+        audioDurTime: $("tv-audio-dur-time"),
+        audioProgressBar: $("tv-audio-progress-bar"),
+        audioAutoplayBanner: $("tv-audio-autoplay-banner"),
         spotDiffWrap: $("tv-spot-diff-wrap"),
         spotDiffBadge: $("tv-spot-diff-badge"),
+        diffDots: $("tv-diff-dots"),
         multiImages: $("tv-multi-images"),
+        answerCompareWrap: $("tv-answer-compare-wrap"),
+        compareQImg: $("tv-compare-q-img"),
+        compareAImg: $("tv-compare-a-img"),
         qHint: $("tv-q-hint"),
+        qAllPlayStage: $("tv-q-allplay-stage"),
 
         qAnswerCard: $("tv-q-answer-card"),
         qAnswerText: $("tv-q-answer-text"),
@@ -584,6 +640,8 @@
         csoloScreen: $("tv-screen-charades-solo"),
         baraScreen: $("tv-screen-bara-salfa"),
         baraStage: $("tv-bara-stage"),
+        tournamentScreen: $("tv-screen-tournament"),
+        tournamentStage: $("tv-tournament-stage"),
         csoloTeamName: $("tv-csolo-team-name"),
         csoloRoundPill: $("tv-csolo-round-pill"),
         csoloScore: $("tv-csolo-score"),
@@ -649,6 +707,24 @@
       if (this.dom.audioUnlockBtn) {
         this.dom.audioUnlockBtn.addEventListener("click", () => {
           this._unlockAudioIfNeeded(true);
+        });
+      }
+
+      if (this.dom.audioAutoplayBanner) {
+        this.dom.audioAutoplayBanner.addEventListener("click", async () => {
+          this._unlockAudioIfNeeded(false);
+          if (window.SeenJeemAudioChallenge) {
+            await window.SeenJeemAudioChallenge.play();
+          }
+        });
+      }
+
+      if (window.SeenJeemAudioChallenge) {
+        window.SeenJeemAudioChallenge.onChange((st) => {
+          this._syncTVAudioUI(st);
+          if (window.SeenJeemLiveSync) {
+            window.SeenJeemLiveSync.reportDisplayAudioStatus(st);
+          }
         });
       }
 
@@ -732,6 +808,8 @@
             window.SeenJeemConfetti.start(this.dom.confettiCanvas, theme);
           }
         }
+      } else if (msg.type === "AUDIO_CHALLENGE_CMD" && msg.payload) {
+        this._handleAudioChallengeCommand(msg.payload);
       } else if (msg.type === "CLOSE_DISPLAY") {
         this.disconnectedByHost = true;
         if (window.SeenJeemConfetti) window.SeenJeemConfetti.stop();
@@ -756,6 +834,16 @@
       if (this.dom.blitzScreen) this.dom.blitzScreen.hidden = screenName !== "blitz";
       if (this.dom.csoloScreen) this.dom.csoloScreen.hidden = screenName !== "charades-solo";
       if (this.dom.baraScreen) this.dom.baraScreen.hidden = screenName !== "bara-salfa";
+      if (this.dom.tournamentScreen) this.dom.tournamentScreen.hidden = screenName !== "tournament";
+    }
+
+    _triggerConfetti(kind = "victory", theme = "default") {
+      if (!window.SeenJeemConfetti || !this.dom.confettiCanvas) return;
+      if (kind === "steal") {
+        window.SeenJeemConfetti.startLightBurst(this.dom.confettiCanvas, theme);
+      } else {
+        window.SeenJeemConfetti.start(this.dom.confettiCanvas, theme);
+      }
     }
 
     _applyDisplayPrefs(prefs) {
@@ -864,43 +952,128 @@
 
     _resolveIsolatedQuestionMediaIfNeeded(snap) {
       const qv = snap && snap.questionView;
-      if (!qv || !qv.hasMedia || !qv.mediaKey) return;
-      const needsQ = Boolean(qv.mediaFields && qv.mediaFields.questionImage && !qv.questionImage);
-      const needsA = Boolean(qv.answerRevealed && qv.mediaFields && qv.mediaFields.answerImage && !qv.answerImage);
-      const needsM = Boolean(qv.mediaFields && qv.mediaFields.images && (!Array.isArray(qv.images) || qv.images.some((x) => !x)));
-      if (!needsQ && !needsA && !needsM) return;
+      if (!qv || !qv.hasMedia) return;
+      const rt = window.SeenJeemRealtimeSync;
 
-      const cached = this.mediaMemoryCache.get(qv.mediaKey);
-      if (cached) {
-        if (needsQ && cached.questionImage) qv.questionImage = cached.questionImage;
-        if (needsA && cached.answerImage) qv.answerImage = cached.answerImage;
-        if (needsM && Array.isArray(cached.images)) qv.images = cached.images.slice();
-        return;
+      // 1) جلب وسائط السؤال المعزولة (q_<questionId>)
+      if (qv.mediaKey) {
+        const needsQ = Boolean(qv.mediaFields && qv.mediaFields.questionImage && !qv.questionImage);
+        const needsM = Boolean(qv.mediaFields && qv.mediaFields.images && (!Array.isArray(qv.images) || qv.images.some((x) => !x)));
+        if (needsQ || needsM) {
+          const cached = this.mediaMemoryCache.get(qv.mediaKey);
+          if (cached) {
+            if (needsQ && cached.questionImage) qv.questionImage = cached.questionImage;
+            if (needsM && Array.isArray(cached.images)) qv.images = cached.images.slice();
+          } else if (rt && typeof rt.fetchMedia === "function" && !this._pendingMediaKeys.has(qv.mediaKey)) {
+            const key = qv.mediaKey;
+            this._pendingMediaKeys.add(key);
+            rt.fetchMedia(key)
+              .then((payload) => {
+                this._pendingMediaKeys.delete(key);
+                if (!payload) return;
+                this.mediaMemoryCache.set(key, payload);
+                if (this.snapshot && this.snapshot.screen === "question" && this.snapshot.questionView && this.snapshot.questionView.mediaKey === key) {
+                  const curQv = this.snapshot.questionView;
+                  if (!curQv.questionImage && payload.questionImage) curQv.questionImage = payload.questionImage;
+                  if (Array.isArray(payload.images) && (!Array.isArray(curQv.images) || curQv.images.some((x) => !x))) {
+                    curQv.images = payload.images.slice();
+                  }
+                  this.lastQuestionRenderKey = "";
+                  this._renderQuestion(this.snapshot);
+                }
+              })
+              .catch(() => this._pendingMediaKeys.delete(key));
+          }
+        }
       }
 
-      const rt = window.SeenJeemRealtimeSync;
-      if (!rt || typeof rt.fetchMedia !== "function" || this._pendingMediaKeys.has(qv.mediaKey)) return;
-      const key = qv.mediaKey;
-      this._pendingMediaKeys.add(key);
-      rt.fetchMedia(key)
-        .then((payload) => {
-          this._pendingMediaKeys.delete(key);
-          if (!payload) return;
-          this.mediaMemoryCache.set(key, payload);
-          if (this.snapshot && this.snapshot.screen === "question" && this.snapshot.questionView && this.snapshot.questionView.mediaKey === key) {
-            const curQv = this.snapshot.questionView;
-            if (!curQv.questionImage && payload.questionImage) curQv.questionImage = payload.questionImage;
-            if (curQv.answerRevealed && !curQv.answerImage && payload.answerImage) curQv.answerImage = payload.answerImage;
-            if (Array.isArray(payload.images) && (!Array.isArray(curQv.images) || curQv.images.some((x) => !x))) {
-              curQv.images = payload.images.slice();
-            }
-            this.lastQuestionRenderKey = "";
-            this._renderQuestion(this.snapshot);
-          }
-        })
-        .catch(() => {
-          this._pendingMediaKeys.delete(key);
-        });
+      // 2) جلب صورة الإجابة المعزولة (ans_<questionId>) عند الكشف فقط
+      if (qv.answerRevealed && qv.answerMediaKey && !qv.answerImage) {
+        const ansKey = qv.answerMediaKey;
+        const cachedAns = this.mediaMemoryCache.get(ansKey);
+        if (cachedAns && cachedAns.answerImage) {
+          qv.answerImage = cachedAns.answerImage;
+        } else if (rt && typeof rt.fetchMedia === "function" && !this._pendingMediaKeys.has(ansKey)) {
+          this._pendingMediaKeys.add(ansKey);
+          rt.fetchMedia(ansKey)
+            .then((payload) => {
+              this._pendingMediaKeys.delete(ansKey);
+              if (!payload || !payload.answerImage) return;
+              this.mediaMemoryCache.set(ansKey, payload);
+              if (this.snapshot && this.snapshot.screen === "question" && this.snapshot.questionView && this.snapshot.questionView.answerMediaKey === ansKey) {
+                this.snapshot.questionView.answerImage = payload.answerImage;
+                this._renderQuestion(this.snapshot);
+              }
+            })
+            .catch(() => this._pendingMediaKeys.delete(ansKey));
+        }
+      }
+    }
+
+    async _handleAudioChallengeCommand(cmd) {
+      const player = window.SeenJeemAudioChallenge;
+      if (!player || !cmd || typeof cmd.action !== "string") return;
+      const p = cmd.payload || {};
+      if (p.src) {
+        player.load(p.src, { start: p.clipStart || 0, end: p.clipEnd || null, questionId: p.questionId || "" });
+      }
+      switch (cmd.action) {
+        case "PLAY":
+          await player.play();
+          break;
+        case "PAUSE":
+          player.pause();
+          break;
+        case "REPLAY":
+          await player.replay();
+          break;
+        case "TEASER_5S":
+          await player.playTeaser(Number(p.seconds) || 5);
+          break;
+        case "SEEK":
+          player.seek(Number(p.seconds) || 0);
+          break;
+        case "SET_VOLUME":
+          player.setVolume(Number(p.volume));
+          break;
+        case "STOP":
+          player.stop();
+          break;
+        default:
+          break;
+      }
+    }
+
+    _syncTVAudioUI(st) {
+      if (!this.dom.audioStage || this.dom.audioStage.hidden) return;
+      const fmt =
+        window.SeenJeemAudioChallengeUtils && window.SeenJeemAudioChallengeUtils.formatMmSs
+          ? window.SeenJeemAudioChallengeUtils.formatMmSs
+          : (s) => formatTime(s);
+      const cur = Math.max(0, Number(st.currentTime) || 0);
+      const dur = Math.max(0, Number(st.duration) || 0);
+      const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+
+      if (this.dom.audioVisualizer) {
+        this.dom.audioVisualizer.classList.toggle("is-playing", Boolean(st.playing));
+      }
+      if (this.dom.audioCurTime) this.dom.audioCurTime.textContent = fmt(cur);
+      if (this.dom.audioDurTime) this.dom.audioDurTime.textContent = dur > 0 ? fmt(dur) : "--:--";
+      if (this.dom.audioProgressBar) this.dom.audioProgressBar.style.width = `${pct}%`;
+      if (this.dom.audioStatusLabel) {
+        this.dom.audioStatusLabel.textContent = st.autoplayBlocked
+          ? "🔇 المتصفح ينتظر نقرة لتشغيل الصوت"
+          : st.teaserActive
+            ? "⚡ تشغيل مقطع سريع (5 ثوانٍ)..."
+            : st.playing
+              ? "🔊 جاري تشغيل المقطع الصوتي..."
+              : cur > 0 && dur > 0 && cur >= dur - 0.2
+                ? "✓ انتهى المقطع الصوتي"
+                : "⏸️ المقطع جاهز / متوقف مؤقتاً";
+      }
+      if (this.dom.audioAutoplayBanner) {
+        this.dom.audioAutoplayBanner.hidden = !st.autoplayBlocked;
+      }
     }
 
     applySnapshot(snap) {
@@ -921,6 +1094,13 @@
 
       this._renderIntermissionOverlay(snap);
       this._renderWirelessOverlays(snap);
+
+      // إيقاف المقطع الصوتي تلقائياً عند مغادرة السؤال أو تفعيل الاستراحة
+      if (snap.screen !== "question" || (snap.intermission && snap.intermission.active)) {
+        if (window.SeenJeemAudioChallenge && window.SeenJeemAudioChallenge.getState().hasAudio) {
+          window.SeenJeemAudioChallenge.stop();
+        }
+      }
 
       if (snap.screen === "setup") {
         this.lastQuestionRenderKey = "";
@@ -946,6 +1126,9 @@
       } else if (snap.screen === "bara-salfa" && snap.baraSalfaView) {
         this.lastQuestionRenderKey = "";
         this._renderBaraSalfa(snap);
+      } else if (snap.screen === "tournament" && snap.tournamentView) {
+        this.lastQuestionRenderKey = "";
+        this._renderTournament(snap);
       } else {
         this._renderStandby(snap.setupInfo);
       }
@@ -1141,7 +1324,9 @@
         invert: "🎨 ألوان معكوسة",
         silhouette: "👤 تحدي الظل",
         memory: "🧠 اختبار الذاكرة",
+        differences: "🔍 أوجد الفروقات",
         "spot-diff": "👀 أوجد الفروقات",
+        audio: "🎵 تحدي صوتي",
         "multi-image": "🔗 اربط الصور"
       };
       if (qv.isCharades) {
@@ -1195,9 +1380,12 @@
         this.dom.qText.textContent = "";
         this.dom.qText.hidden = true;
         this.dom.qSingleMedia.hidden = true;
+        if (this.dom.audioStage) this.dom.audioStage.hidden = true;
+        if (this.dom.answerCompareWrap) this.dom.answerCompareWrap.hidden = true;
         this.dom.spotDiffWrap.hidden = true;
         this.dom.multiImages.hidden = true;
         this.dom.qHint.hidden = true;
+        if (this.dom.qAllPlayStage) this.dom.qAllPlayStage.hidden = true;
         this.dom.qAnswerCard.hidden = true;
         if (this.dom.ddWagerStage) {
           this.dom.ddWagerStage.hidden = false;
@@ -1281,6 +1469,8 @@
         this.dom.memoryBar.hidden = true;
         this.dom.qText.hidden = true;
         this.dom.qSingleMedia.hidden = true;
+        if (this.dom.audioStage) this.dom.audioStage.hidden = true;
+        if (this.dom.answerCompareWrap) this.dom.answerCompareWrap.hidden = true;
         this.dom.spotDiffWrap.hidden = true;
         this.dom.multiImages.hidden = true;
 
@@ -1332,27 +1522,81 @@
           this.dom.qText.hidden = true;
         }
 
+        // التحدي الصوتي المتزامن (Audio Challenge — Pack 12: بدون عرض اسم الملف أو الرابط!)
+        if (qv.visualType === "audio" && qv.audioChallenge && qv.audioChallenge.hasAudio) {
+          this.dom.qSingleMedia.hidden = true;
+          this.dom.spotDiffWrap.hidden = true;
+          this.dom.multiImages.hidden = true;
+          if (this.dom.audioStage) {
+            this.dom.audioStage.hidden = false;
+            const ac = qv.audioChallenge;
+            if (ac.route !== "host" && ac.audioSrc && window.SeenJeemAudioChallenge) {
+              window.SeenJeemAudioChallenge.load(ac.audioSrc, {
+                start: ac.clipStart || 0,
+                end: ac.clipEnd || null,
+                questionId: qv.questionId || ""
+              });
+              this._syncTVAudioUI(window.SeenJeemAudioChallenge.getState());
+            } else {
+              this._syncTVAudioUI({
+                playing: ac.playing,
+                teaserActive: ac.teaserActive,
+                currentTime: ac.currentTime,
+                duration: ac.duration,
+                autoplayBlocked: false
+              });
+            }
+          }
+        } else {
+          if (this.dom.audioStage) this.dom.audioStage.hidden = true;
+          if (window.SeenJeemAudioChallenge && window.SeenJeemAudioChallenge.getState().hasAudio) {
+            window.SeenJeemAudioChallenge.stop();
+          }
+
+        // شارة وعدّاد «أوجد الفروقات» التفاعلي مع المؤشرات النقطية المتوهجة
+        const isDiffMode = (qv.visualType === "differences" || qv.visualType === "spot-diff") && Number(qv.differencesCount) > 0;
+        if (isDiffMode) {
+          const totalD = Number(qv.differencesCount) || 5;
+          const foundD = Math.min(totalD, Math.max(0, Number(qv.differencesFound) || 0));
+          this.dom.spotDiffBadge.textContent = `🔍 أوجد الفروقات: ${foundD} / ${totalD}`;
+          this.dom.spotDiffWrap.hidden = false;
+          this.dom.spotDiffWrap.classList.toggle("is-complete", foundD >= totalD);
+          if (this.dom.diffDots) {
+            this.dom.diffDots.innerHTML = Array.from(
+              { length: totalD },
+              (_, i) => `<span class="tv-diff-dot${i < foundD ? " is-found" : ""}"></span>`
+            ).join("");
+          }
+        } else {
+          this.dom.spotDiffWrap.hidden = true;
+          if (this.dom.diffDots) this.dom.diffDots.innerHTML = "";
+        }
+
         // الصور المتعددة (spot-diff / multi-image)
         if ((qv.visualType === "spot-diff" || qv.visualType === "multi-image") && Array.isArray(qv.images) && qv.images.length > 0) {
           this.dom.qSingleMedia.hidden = true;
-          if (qv.visualType === "spot-diff" && qv.differencesCount) {
-            this.dom.spotDiffBadge.textContent = `🔍 المطلوب إيجاد ${qv.differencesCount} فروقات`;
-            this.dom.spotDiffWrap.hidden = false;
-          } else {
-            this.dom.spotDiffWrap.hidden = true;
-          }
           if (isNewQuestionStage) {
             this._renderTVMultiImages(qv.visualType, qv.images, qv.showPlus);
           }
           this.dom.multiImages.hidden = false;
         } else {
-          this.dom.spotDiffWrap.hidden = true;
           this.dom.multiImages.hidden = true;
 
-          // الصورة المفردة مع حركات blur و zoom السلسة
+          // الصورة المفردة (تشمل differences بحجم مكبّر وواضح، مع حركات blur و zoom السلسة)
           const cleanImg = normalizeImgUrl(qv.questionImage);
-          if (cleanImg) {
+          const cleanAnsImgForSwap = qv.answerRevealed ? normalizeImgUrl(qv.answerImage) : "";
+          const hideMainImgForCompare = Boolean(
+            qv.answerRevealed && cleanImg && cleanAnsImgForSwap && qv.answerImageMode === "compare"
+          );
+          const showAnswerInMainStage = Boolean(
+            qv.answerRevealed && cleanImg && cleanAnsImgForSwap && qv.answerImageMode === "answer"
+          );
+
+          if (cleanImg && !hideMainImgForCompare) {
             this.dom.qSingleMedia.hidden = false;
+            this.dom.qSingleMedia.classList.toggle("is-differences-hero", qv.visualType === "differences");
+            const desiredSrc = showAnswerInMainStage ? cleanAnsImgForSwap : cleanImg;
+
             if (isNewQuestionStage) {
               this.dom.visualStage.className = "visual-image-stage tv-visual-stage no-visual-transition";
               this.dom.visualStage.style.removeProperty("--blur-amount");
@@ -1375,12 +1619,16 @@
                 this.dom.visualStage.classList.add("visual-mode-silhouette");
               }
 
-              this.dom.qImg.src = cleanImg;
+              this.dom.qImg.src = desiredSrc;
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   this.dom.visualStage.classList.remove("no-visual-transition");
                 });
               });
+            } else if (this.dom.qImg.getAttribute("src") !== desiredSrc) {
+              this.dom.qImg.classList.add("tv-img-swap-fade");
+              this.dom.qImg.src = desiredSrc;
+              setTimeout(() => this.dom.qImg.classList.remove("tv-img-swap-fade"), 320);
             }
 
             if (MASKED_TYPES.has(qv.visualType)) {
@@ -1393,6 +1641,7 @@
             this.dom.qImg.removeAttribute("src");
           }
         }
+        }
       }
 
       // التلميح للجمهور (فقط بعد تفعيل كشف التلميح من المقدّم)
@@ -1404,7 +1653,84 @@
         this.dom.qHint.hidden = true;
       }
 
-      // بطاقة الإجابة للجمهور (فقط بعد كشفها صراحةً من المقدّم!)
+      // وضع «الكل يجاوب» (Anti-Spoiler: حالة الاستلام فقط قبل الكشف، ثم النصوص بعد phase === "revealed")
+      if (this.dom.qAllPlayStage) {
+        const ap = snap.allPlay;
+        if (ap && ap.active && (ap.phase === "open" || ap.phase === "revealed")) {
+          this.dom.qAllPlayStage.hidden = false;
+          if (ap.phase === "open") {
+            const subSet = new Set(Array.isArray(ap.submittedTeamIndices) ? ap.submittedTeamIndices : []);
+            this.dom.qAllPlayStage.innerHTML = `
+              <div class="tv-allplay-box is-open">
+                <div class="tv-allplay-head">
+                  <span>📝 وضع «الكل يجاوب» مفتوح — أرسلوا إجاباتكم من الهواتف!</span>
+                  <strong>${subSet.size} / ${teams.length} أرسلوا</strong>
+                </div>
+                <div class="tv-allplay-chips">
+                  ${teams
+                    .map(
+                      (t, idx) => `
+                    <span class="tv-allplay-chip team-${idx + 1}${subSet.has(idx) ? " is-sent" : ""}">
+                      ${subSet.has(idx) ? "✅" : "⏳"} ${escapeHtml(t.name || `الفريق ${idx + 1}`)}
+                    </span>
+                  `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            `;
+          } else {
+            const revealed = Array.isArray(ap.revealedAnswers) ? ap.revealedAnswers : [];
+            this.dom.qAllPlayStage.innerHTML = `
+              <div class="tv-allplay-box is-revealed">
+                <div class="tv-allplay-head">
+                  <span>📋 إجابات الفرق في جولة «الكل يجاوب»</span>
+                </div>
+                <div class="tv-allplay-grid" data-team-count="${revealed.length}">
+                  ${revealed
+                    .map((item) => {
+                      const cls =
+                        item.correct === true ? " is-correct" : item.correct === false ? " is-wrong" : "";
+                      const badge =
+                        item.correct === true ? "✅ صح" : item.correct === false ? "❌ خطأ" : "⏳ قيد التقييم";
+                      return `
+                        <div class="tv-allplay-answer-card team-${(item.teamIdx || 0) + 1}${cls}">
+                          <div class="tv-allplay-ans-head">
+                            <strong>${escapeHtml(item.teamName || `الفريق ${(item.teamIdx || 0) + 1}`)}</strong>
+                            <span class="tv-allplay-verdict">${badge}</span>
+                          </div>
+                          <div class="tv-allplay-ans-text">${item.text ? escapeHtml(item.text) : "<em>— لم تُرسل إجابة —</em>"}</div>
+                        </div>
+                      `;
+                    })
+                    .join("")}
+                </div>
+              </div>
+            `;
+          }
+        } else {
+          this.dom.qAllPlayStage.hidden = true;
+          this.dom.qAllPlayStage.innerHTML = "";
+        }
+      }
+
+      // بطاقة الإجابة للجمهور (فقط بعد كشفها صراحةً من المقدّم — منع تسريب answerImage 100% قبل الكشف!)
+      const cleanQImg = normalizeImgUrl(qv.questionImage);
+      const cleanAnsImg = qv.answerRevealed ? normalizeImgUrl(qv.answerImage) : "";
+      const isCompareView = Boolean(qv.answerRevealed && cleanQImg && cleanAnsImg && qv.answerImageMode === "compare");
+
+      if (this.dom.answerCompareWrap) {
+        if (isCompareView) {
+          this.dom.compareQImg.src = cleanQImg;
+          this.dom.compareAImg.src = cleanAnsImg;
+          this.dom.answerCompareWrap.hidden = false;
+        } else {
+          this.dom.answerCompareWrap.hidden = true;
+          this.dom.compareQImg.removeAttribute("src");
+          this.dom.compareAImg.removeAttribute("src");
+        }
+      }
+
       if (qv.answerRevealed && qv.answerText) {
         this.dom.qAnswerText.textContent = qv.answerText;
         if (qv.explanationText) {
@@ -1415,8 +1741,9 @@
           this.dom.qAnswerExp.textContent = "";
           this.dom.qAnswerExp.hidden = true;
         }
-        const cleanAnsImg = normalizeImgUrl(qv.answerImage);
-        if (cleanAnsImg) {
+        // عرض answerImage داخل بطاقة الإجابة إذا لم تكن معروضة أصلاً في المقارنة أو مستبدلة في الصورة الرئيسية
+        const alreadyShownInMain = Boolean(cleanQImg && cleanAnsImg && (qv.answerImageMode === "answer" || qv.answerImageMode === "compare"));
+        if (cleanAnsImg && !alreadyShownInMain) {
           this.dom.qAnswerImg.src = cleanAnsImg;
           this.dom.qAnswerImgWrap.hidden = false;
         } else {
@@ -1429,6 +1756,7 @@
         this.dom.qAnswerText.textContent = "";
         this.dom.qAnswerExp.textContent = "";
         this.dom.qAnswerExp.hidden = true;
+        this.dom.qAnswerImg.removeAttribute("src");
         this.dom.qAnswerImgWrap.hidden = true;
       }
     }
@@ -1984,6 +2312,143 @@
       }
 
       this.dom.baraStage.innerHTML = html;
+    }
+
+    _renderTournament(snap) {
+      this._showOnlyScreen("tournament");
+      const tv = snap.tournamentView;
+      if (!tv || !this.dom.tournamentStage) return;
+
+      if (!tv.active) {
+        this.dom.tournamentStage.innerHTML = `
+          <div class="tv-trn-shell">
+            <div class="tv-trn-header">
+              <span class="tv-side-mode-tag">🏆 نظام البطولات والدوري</span>
+              <h1 class="tv-trn-title">${escapeHtml(tv.name || "جاري إعداد البطولة...")}</h1>
+              <p class="tv-bara-sub">جاري اختيار الفرق ونظام البطولة على جهاز المقدّم...</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const matches = Array.isArray(tv.matches) ? tv.matches : [];
+      const nextMatch = matches.find((m) => m.status === "ready") || null;
+      const isFinished = tv.status === "completed" || tv.status === "finished";
+
+      if (isFinished && tv.champion) {
+        if (this._lastTournamentConfettiId !== tv.id) {
+          this._lastTournamentConfettiId = tv.id;
+          this._triggerConfetti("victory", "default");
+        }
+      }
+
+      const championBanner =
+        isFinished && tv.champion
+          ? `
+            <div class="tv-trn-champion-banner">
+              <div class="tv-trn-champ-trophy">🏆</div>
+              <div class="tv-trn-champ-eyebrow">بطل ${escapeHtml(tv.name || "البطولة")}</div>
+              <h1 class="tv-trn-champ-name" style="color:${escapeHtml(tv.champion.color || "#fbbf24")}">${escapeHtml(tv.champion.name)}</h1>
+            </div>
+          `
+          : "";
+
+      const nextBanner =
+        nextMatch && !isFinished
+          ? `
+            <div class="tv-trn-next-banner">
+              <span>⚡ المباراة القادمة (${escapeHtml(nextMatch.slotLabel || nextMatch.roundLabel || "")}):</span>
+              <strong>${escapeHtml((nextMatch.teamA && nextMatch.teamA.name) || "—")}</strong>
+              <span class="tv-trn-vs">VS</span>
+              <strong>${escapeHtml((nextMatch.teamB && nextMatch.teamB.name) || "—")}</strong>
+            </div>
+          `
+          : "";
+
+      let bodyHtml = "";
+      if (tv.type === "knockout") {
+        const roundsMap = new Map();
+        matches.forEach((m) => {
+          const rNum = Number(m.round) || 1;
+          if (!roundsMap.has(rNum)) roundsMap.set(rNum, { name: m.roundLabel || `الدور ${rNum}`, items: [] });
+          roundsMap.get(rNum).items.push(m);
+        });
+        const cols = Array.from(roundsMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(
+            ([, group]) => `
+            <div class="tv-trn-col">
+              <div class="tv-trn-col-title">${escapeHtml(group.name)}</div>
+              <div class="tv-trn-col-matches">
+                ${group.items
+                  .map((m) => {
+                    const isNext = nextMatch && nextMatch.id === m.id;
+                    const cls = m.status === "completed" ? "is-done" : isNext ? "is-next" : "";
+                    const tA = m.teamA;
+                    const tB = m.teamB;
+                    return `
+                      <div class="tv-trn-match-card ${cls}">
+                        <div class="tv-trn-row${m.winnerId && tA && m.winnerId === tA.id ? " is-win" : ""}">
+                          <span class="tv-trn-dot" style="background:${escapeHtml((tA && tA.color) || "#64748b")}"></span>
+                          <span class="tv-trn-tname">${escapeHtml((tA && tA.name) || "يُحدّد لاحقاً")}</span>
+                          <strong class="tv-trn-tscore">${m.scoreA !== null && m.scoreA !== undefined ? m.scoreA : "—"}</strong>
+                        </div>
+                        <div class="tv-trn-row${m.winnerId && tB && m.winnerId === tB.id ? " is-win" : ""}">
+                          <span class="tv-trn-dot" style="background:${escapeHtml((tB && tB.color) || "#64748b")}"></span>
+                          <span class="tv-trn-tname">${escapeHtml((tB && tB.name) || "يُحدّد لاحقاً")}</span>
+                          <strong class="tv-trn-tscore">${m.scoreB !== null && m.scoreB !== undefined ? m.scoreB : "—"}</strong>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </div>
+          `
+          )
+          .join("");
+        bodyHtml = `<div class="tv-trn-bracket">${cols}</div>`;
+      } else {
+        const rows = (tv.standings || [])
+          .map(
+            (s, idx) => `
+          <tr class="${idx === 0 ? "is-leader" : ""}">
+            <td>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}</td>
+            <td><span class="tv-trn-dot" style="background:${escapeHtml(s.color || "#06b6d4")}"></span> ${escapeHtml(s.name)}</td>
+            <td>${s.played}</td>
+            <td>${s.wins}</td>
+            <td>${s.draws}</td>
+            <td>${s.losses}</td>
+            <td>${(s.diff || 0) >= 0 ? `+${s.diff || 0}` : s.diff}</td>
+            <td><strong>${s.leaguePoints}</strong></td>
+          </tr>
+        `
+          )
+          .join("");
+        bodyHtml = `
+          <div class="tv-trn-league-wrap">
+            <table class="tv-trn-table">
+              <thead>
+                <tr><th>#</th><th>الفريق</th><th>لعب</th><th>فوز</th><th>تعادل</th><th>خسارة</th><th>الفارق</th><th>النقاط</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      this.dom.tournamentStage.innerHTML = `
+        <div class="tv-trn-shell">
+          <div class="tv-trn-header">
+            <span class="tv-side-mode-tag">🏆 ${tv.type === "knockout" ? "بطولة خروج المغلوب" : "دوري النقاط"}</span>
+            <h1 class="tv-trn-title">${escapeHtml(tv.name || "بطولة سين جيم")}</h1>
+          </div>
+          ${championBanner}
+          ${nextBanner}
+          ${bodyHtml}
+        </div>
+      `;
     }
   }
 

@@ -527,6 +527,122 @@
         `;
       }
 
+      const ap = pub.allPlay && pub.allPlay.active ? pub.allPlay : null;
+      const privAnswers = (priv && priv.allPlayAnswers) || {};
+      const privJudgments = (priv && priv.allPlayJudgments) || {};
+      let allPlaySection = "";
+
+      // أدوات تحكم نمط «أوجد الفروقات» (Pack 12)
+      let diffSection = "";
+      if ((qv.visualType === "differences" || qv.visualType === "spot-diff") && Number(qv.differencesCount) > 0 && !inDdWager) {
+        const totalDiff = Number(qv.differencesCount) || 5;
+        const foundDiff = Math.min(totalDiff, Math.max(0, Number(qv.differencesFound) || 0));
+        const dots = Array.from({ length: totalDiff }, (_, i) => (i < foundDiff ? "●" : "○")).join(" ");
+        diffSection = `
+          <div class="rh-diff-box">
+            <div class="rh-card-head">
+              <span>🔍 أوجد الفروقات: <strong>${foundDiff} / ${totalDiff}</strong></span>
+              <span class="rh-diff-dots">${dots}</span>
+            </div>
+            <div class="rh-btn-row rh-cols-3">
+              <button type="button" class="btn btn-steal-win rh-touch-btn" data-rh-cmd="DIFF_INCREMENT" ${foundDiff >= totalDiff ? "disabled" : ""}>➕ فرق (+1)</button>
+              <button type="button" class="btn btn-secondary rh-touch-btn" data-rh-cmd="DIFF_DECREMENT" ${foundDiff <= 0 ? "disabled" : ""}>➖ تراجع (-1)</button>
+              <button type="button" class="btn btn-ghost rh-touch-btn" data-rh-cmd="DIFF_RESET" ${foundDiff <= 0 ? "disabled" : ""}>🔄 تصفير</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // أدوات تحكم التحدي الصوتي المتزامن (Pack 12)
+      let audioSection = "";
+      const ac = qv.audioChallenge;
+      if (qv.visualType === "audio" && ac && ac.hasAudio && !inDdWager) {
+        const fmtSec = (s) => {
+          const n = Math.max(0, Math.floor(Number(s) || 0));
+          return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+        };
+        audioSection = `
+          <div class="rh-audio-box">
+            <div class="rh-card-head">
+              <span>🎵 تحدي صوتي ${ac.playing ? "(قيد التشغيل 🔊)" : "(متوقف ⏸️)"}</span>
+              <span class="rh-timer-pill">${fmtSec(ac.currentTime)} / ${fmtSec(ac.duration)}</span>
+            </div>
+            <div class="rh-btn-row rh-cols-2">
+              <button type="button" class="btn ${ac.playing ? "btn-amber" : "btn-steal-win"} rh-touch-btn" data-rh-cmd="${ac.playing ? "AUDIO_PAUSE" : "AUDIO_PLAY"}">
+                ${ac.playing ? "⏸️ إيقاف مؤقت" : "▶️ تشغيل الصوت"}
+              </button>
+              <button type="button" class="btn btn-secondary rh-touch-btn" data-rh-cmd="AUDIO_REPLAY">🔄 إعادة من البداية</button>
+            </div>
+            <div class="rh-btn-row rh-cols-2">
+              <button type="button" class="btn btn-gold-outline rh-touch-btn" data-rh-cmd="AUDIO_TEASER_5S">⚡ مقطع سريع 5ث</button>
+              <button type="button" class="btn btn-ghost rh-touch-btn" data-rh-cmd="AUDIO_SEEK" data-payload='{"seconds":0}'>⏮️ بداية المقطع</button>
+            </div>
+          </div>
+        `;
+      }
+
+      if (!qv.isCharades && !inDdWager) {
+        if (!ap || ap.phase === "idle") {
+          allPlaySection = `
+            <div class="rh-allplay-box">
+              <button type="button" class="btn btn-gold-outline rh-touch-btn" data-rh-cmd="ALLPLAY_OPEN" style="width:100%">
+                📝 فتح إجابة جماعية للفرق (الكل يجاوب)
+              </button>
+            </div>
+          `;
+        } else if (ap.phase === "open") {
+          const rows = teams
+            .map((t, idx) => {
+              const ans = privAnswers[idx];
+              return `
+                <div class="rh-allplay-row">
+                  <strong>${escapeHtml(t.name)}</strong>
+                  <span>${ans && ans.text ? `✅ ${escapeHtml(ans.text)}` : "⏳ بانتظار الإجابة..."}</span>
+                </div>
+              `;
+            })
+            .join("");
+          allPlaySection = `
+            <div class="rh-allplay-box is-open">
+              <div class="rh-secret-label">📝 الكل يجاوب — الإجابات الواردة (سري للمقدّم قبل الكشف)</div>
+              ${rows}
+              <button type="button" class="btn btn-amber rh-touch-btn" data-rh-cmd="ALLPLAY_REVEAL" style="width:100%">
+                🔒 إغلاق وكشف الإجابات على التلفزيون
+              </button>
+            </div>
+          `;
+        } else if (ap.phase === "revealed") {
+          const rows = teams
+            .map((t, idx) => {
+              const ans = privAnswers[idx];
+              const isOk = privJudgments[idx] === true;
+              const isNo = privJudgments[idx] === false;
+              return `
+                <div class="rh-allplay-judge-row">
+                  <div>
+                    <strong>${escapeHtml(t.name)}</strong>
+                    <div class="rh-secret-meta">${ans && ans.text ? escapeHtml(ans.text) : "— بدون إجابة —"}</div>
+                  </div>
+                  <div class="rh-btn-row rh-cols-2">
+                    <button type="button" class="btn ${isOk ? "btn-steal-win" : "btn-secondary"} rh-mini-btn" data-rh-cmd="ALLPLAY_TOGGLE_JUDGE" data-payload='{"teamIdx":${idx},"correct":true}'>✅ صح</button>
+                    <button type="button" class="btn ${isNo ? "btn-danger-outline" : "btn-ghost"} rh-mini-btn" data-rh-cmd="ALLPLAY_TOGGLE_JUDGE" data-payload='{"teamIdx":${idx},"correct":false}'>❌ خطأ</button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+          allPlaySection = `
+            <div class="rh-allplay-box is-revealed">
+              <div class="rh-secret-label">📝 تحكيم إجابات «الكل يجاوب»</div>
+              ${rows}
+              <button type="button" class="btn btn-primary rh-touch-btn" data-rh-cmd="ALLPLAY_COMMIT" style="width:100%">
+                ✔️ اعتماد النقاط للفرق الصحيحة
+              </button>
+            </div>
+          `;
+        }
+      }
+
       return `
         <section class="rh-card">
           <div class="rh-card-head">
@@ -535,6 +651,9 @@
           </div>
           ${!inDdWager ? `<p class="rh-question-text">${escapeHtml(qText)}</p>` : ""}
           ${secretCard}
+          ${diffSection}
+          ${audioSection}
+          ${allPlaySection}
           ${actionsHtml}
           ${
             !inDdWager

@@ -324,8 +324,10 @@
      */
     async createRoom({
       initialPublicState = {},
+      vipEnabled = true,
       onPlayers = null,
       onPlayerActions = null,
+      onVipCommand = null,
       onConnectionState = null
     } = {}) {
       await this.closeRoom();
@@ -341,8 +343,10 @@
         createdAt: sdk.dbMod.serverTimestamp(),
         lastActivityAt: sdk.dbMod.serverTimestamp(),
         joinLocked: false,
+        vipEnabled: Boolean(vipEnabled),
+        vipUid: null,
         hostOnline: true,
-        appVersion: "4.11.0"
+        appVersion: "4.12.0"
       });
 
       this._role = "master";
@@ -367,6 +371,19 @@
       this._unsubs.push(
         sdk.dbMod.onValue(sdk.dbMod.ref(db, `${roomPath}/playerActions`), (snap) => {
           if (typeof onPlayerActions === "function") onPlayerActions(snap.val() || {});
+        })
+      );
+
+      // الاستماع لأوامر اللاعب الأول (VIP) وحذفها فور الاستلام
+      this._unsubs.push(
+        sdk.dbMod.onChildAdded(sdk.dbMod.ref(db, `${roomPath}/vipCommands`), (snap) => {
+          const cmdId = snap.key;
+          const cmdVal = snap.val();
+          sdk.dbMod.remove(sdk.dbMod.ref(db, `${roomPath}/vipCommands/${cmdId}`)).catch(() => {});
+          if (cmdVal && typeof onVipCommand === "function") {
+            this._maybeTouchActivity();
+            onVipCommand(cmdVal, cmdId);
+          }
         })
       );
 
@@ -427,6 +444,19 @@
         await dbMod.update(dbMod.ref(this._db, `baraRooms/${this.roomCode}/meta`), {
           joinLocked: Boolean(locked)
         });
+        this._maybeTouchActivity();
+      } catch (_err) {}
+    }
+
+    async setVipMeta({ vipUid, vipEnabled } = {}) {
+      if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
+      const { dbMod } = this._sdk;
+      const patch = {};
+      if (vipUid !== undefined) patch.vipUid = vipUid || null;
+      if (typeof vipEnabled === "boolean") patch.vipEnabled = vipEnabled;
+      if (Object.keys(patch).length === 0) return;
+      try {
+        await dbMod.update(dbMod.ref(this._db, `baraRooms/${this.roomCode}/meta`), patch);
         this._maybeTouchActivity();
       } catch (_err) {}
     }
@@ -636,6 +666,25 @@
         return { ok: true };
       } catch (err) {
         return { ok: false, error: (err && err.message) || "تعذّر إرسال اختيارك" };
+      }
+    }
+
+    async sendVipCommand(type, payload = {}) {
+      if (this._role !== "player" || !this.roomCode || !this._uid || !this._sdk || !this._db || this._kicked) {
+        return { ok: false, error: "غير متصل بالغرفة" };
+      }
+      const { dbMod } = this._sdk;
+      const cmdRef = dbMod.ref(this._db, `baraRooms/${this.roomCode}/vipCommands`);
+      try {
+        await dbMod.push(cmdRef, {
+          type: String(type || ""),
+          payload: stripUndefined(payload),
+          uid: this._uid,
+          ts: dbMod.serverTimestamp()
+        });
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || "تعذّر إرسال أمر VIP" };
       }
     }
 

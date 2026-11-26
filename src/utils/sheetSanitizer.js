@@ -13,19 +13,30 @@
   const CACHE_SCHEMA_VERSION = 1;
 
   const VALID_POINTS = new Set([200, 400, 600]);
-  const APPROVED_VISUAL_TYPES = new Set(["normal", "blur", "zoom", "multi-image", "memory"]);
+  const APPROVED_VISUAL_TYPES = new Set([
+    "normal",
+    "blur",
+    "zoom",
+    "multi-image",
+    "memory",
+    "differences",
+    "audio"
+  ]);
   const LEGACY_LOCAL_VISUAL_TYPES = new Set(["spot-diff", "invert", "silhouette"]);
+  const AUDIO_EXT_RE = /\.(mp3|wav|ogg|m4a|aac|opus|webm)(\?|#|$)/i;
 
   const VISUAL_FIELD_KEYS = [
     "questionImage",
-    "answerImage",
     "images",
     "blurLevel",
     "differencesCount",
     "zoomLevel",
     "zoomOrigin",
     "memorySeconds",
-    "showPlus"
+    "showPlus",
+    "audioUrl",
+    "audioStart",
+    "audioEnd"
   ];
 
   const DEFAULT_BLUR_LEVEL = 18;
@@ -198,7 +209,26 @@
   }
 
   /**
-   * تنظيف مسار صورة مفردة مع رفض أي بقايا JSON عالقة
+   * تحويل روابط Google Drive الشائعة إلى روابط مباشرة صالحة للصور أو الصوتيات
+   */
+  function normalizeGoogleDriveUrl(url, kind = "image") {
+    if (typeof url !== "string") return url;
+    const t = url.trim();
+    if (!/^https?:\/\/(drive|docs)\.google\.com\//i.test(t)) return t;
+    let fileId = "";
+    const m1 = t.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+    const m2 = t.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m1 && m1[1]) fileId = m1[1];
+    else if (m2 && m2[1]) fileId = m2[1];
+    if (!fileId) return t;
+    if (kind === "audio") {
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    }
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
+  }
+
+  /**
+   * تنظيف مسار صورة مفردة مع تحويل روابط Google Drive ورفض أي بقايا JSON عالقة
    */
   function sanitizeImagePath(rawVal) {
     if (rawVal === undefined || rawVal === null) {
@@ -211,7 +241,30 @@
     if (isStuckJsonArtifact(trimmed) || /[\r\n]/.test(trimmed)) {
       return { value: undefined, wasInvalid: true };
     }
-    return { value: trimmed, wasInvalid: false };
+    return { value: normalizeGoogleDriveUrl(trimmed, "image"), wasInvalid: false };
+  }
+
+  /**
+   * تنظيف رابط أو DataURL مقطع صوتي مع تحويل روابط Google Drive
+   */
+  function sanitizeAudioUrl(rawVal) {
+    if (rawVal === undefined || rawVal === null) {
+      return { value: undefined, wasInvalid: false };
+    }
+    const trimmed = String(rawVal).trim();
+    if (!trimmed) {
+      return { value: undefined, wasInvalid: false };
+    }
+    if (isStuckJsonArtifact(trimmed) || /[\r\n]/.test(trimmed)) {
+      return { value: undefined, wasInvalid: true };
+    }
+    return { value: normalizeGoogleDriveUrl(trimmed, "audio"), wasInvalid: false };
+  }
+
+  function isLikelyAudioPath(str) {
+    if (typeof str !== "string") return false;
+    const t = str.trim();
+    return /^data:audio\//i.test(t) || AUDIO_EXT_RE.test(t);
   }
 
   /**
@@ -351,16 +404,31 @@
       cleanedFields.push("visualType");
     }
 
-    // الحقول النصية الاختيارية المشتركة (hint, explanation)
+    // الحقول المشتركة لجميع أنواع الأسئلة (hint, explanation, answerImage)
     const hintRes = sanitizeOptionalText(getCellRaw(rawRow, "hint"));
     if (hintRes.wasInvalid) cleanedFields.push("hint");
 
     const explanationRes = sanitizeOptionalText(getCellRaw(rawRow, "explanation"));
     if (explanationRes.wasInvalid) cleanedFields.push("explanation");
 
-    // حماية إلزامية لأسئلة normal: تصفير وتجاهل جميع الأعمدة البصرية بالكامل (undefined)
+    // تفعيل answerImage بأمان لجميع أنواع الأسئلة (نصي، بصري، فروقات، صوتي)
+    const aImgRes = sanitizeImagePath(getCellRaw(rawRow, "answerImage"));
+    if (aImgRes.wasInvalid) cleanedFields.push("answerImage");
+
+    // التعرّف التلقائي على نمط «أوجد الفروقات» إذا وُجد differencesCount > 0 مع questionImage
+    const rawDiffPreCheck = getCellRaw(rawRow, "differencesCount");
+    const rawQImgPreCheck = sanitizeImagePath(getCellRaw(rawRow, "questionImage"));
+    if (visualType === "normal" && hasNonEmptyRawValue(rawDiffPreCheck) && rawQImgPreCheck.value) {
+      const preDiffNum = Number(String(rawDiffPreCheck).trim());
+      if (Number.isFinite(preDiffNum) && preDiffNum > 0) {
+        visualType = "differences";
+      }
+    }
+
+    // حماية إلزامية لأسئلة normal: تصفير الأعمدة البصرية غير الصالحة مع الحفاظ على answerImage وquestionImage (إن وُجدت في الفئات الخاصة)
     if (visualType === "normal") {
       VISUAL_FIELD_KEYS.forEach((fieldKey) => {
+        if (fieldKey === "questionImage") return;
         const rawFieldVal = getCellRaw(rawRow, fieldKey);
         if (fieldKey === "showPlus") {
           const spCheck = sanitizeShowPlus(rawFieldVal);
@@ -372,6 +440,8 @@
         }
       });
 
+      if (rawQImgPreCheck.wasInvalid) cleanedFields.push("questionImage");
+
       const cleanNormalQuestion = {
         id,
         categoryId,
@@ -379,8 +449,8 @@
         visualType: "normal",
         question: questionText,
         answer: answerText,
-        questionImage: undefined,
-        answerImage: undefined,
+        questionImage: rawQImgPreCheck.value,
+        answerImage: aImgRes.value,
         images: undefined,
         hint: hintRes.value,
         explanation: explanationRes.value,
@@ -389,7 +459,10 @@
         zoomLevel: undefined,
         zoomOrigin: undefined,
         memorySeconds: undefined,
-        showPlus: undefined
+        showPlus: undefined,
+        audioUrl: undefined,
+        audioStart: undefined,
+        audioEnd: undefined
       };
 
       return {
@@ -400,12 +473,9 @@
       };
     }
 
-    // معالجة آمنة لأسئلة التحديات البصرية
-    const qImgRes = sanitizeImagePath(getCellRaw(rawRow, "questionImage"));
+    // معالجة آمنة لأسئلة التحديات البصرية والصوتية
+    const qImgRes = rawQImgPreCheck;
     if (qImgRes.wasInvalid) cleanedFields.push("questionImage");
-
-    const aImgRes = sanitizeImagePath(getCellRaw(rawRow, "answerImage"));
-    if (aImgRes.wasInvalid) cleanedFields.push("answerImage");
 
     const imgsRes = sanitizeImagesList(getCellRaw(rawRow, "images"));
     if (imgsRes.wasInvalid) cleanedFields.push("images");
@@ -468,20 +538,53 @@
 
     let differencesCount;
     const rawDiff = getCellRaw(rawRow, "differencesCount");
-    if (visualType === "spot-diff") {
+    if (visualType === "spot-diff" || visualType === "differences") {
       if (hasNonEmptyRawValue(rawDiff)) {
         const diffRes = sanitizeBoundedNumber(rawDiff, {
           min: 1,
           max: 20,
-          fallback: 3,
+          fallback: 5,
           integer: true
         });
         if (diffRes.wasInvalid) cleanedFields.push("differencesCount");
         differencesCount = diffRes.value;
+      } else if (visualType === "differences") {
+        differencesCount = 5;
       }
     } else if (hasNonEmptyRawValue(rawDiff)) {
       cleanedFields.push("differencesCount");
       differencesCount = undefined;
+    }
+
+    let audioUrl;
+    let audioStart;
+    let audioEnd;
+    let finalQuestionImage = qImgRes.value;
+    if (visualType === "audio") {
+      const rawAudioUrl = getCellRaw(rawRow, "audioUrl", "questionAudio");
+      const aUrlRes = sanitizeAudioUrl(rawAudioUrl);
+      if (aUrlRes.wasInvalid) cleanedFields.push("audioUrl");
+      if (aUrlRes.value) {
+        audioUrl = aUrlRes.value;
+      } else if (finalQuestionImage && isLikelyAudioPath(finalQuestionImage)) {
+        audioUrl = normalizeGoogleDriveUrl(finalQuestionImage, "audio");
+        finalQuestionImage = undefined;
+      }
+
+      const rawStart = getCellRaw(rawRow, "audioStart");
+      if (hasNonEmptyRawValue(rawStart)) {
+        const stRes = sanitizeBoundedNumber(rawStart, { min: 0, max: 3600, fallback: 0, integer: false });
+        if (stRes.wasInvalid) cleanedFields.push("audioStart");
+        audioStart = stRes.value;
+      }
+      const rawEnd = getCellRaw(rawRow, "audioEnd");
+      if (hasNonEmptyRawValue(rawEnd)) {
+        const endRes = sanitizeBoundedNumber(rawEnd, { min: 0, max: 3600, fallback: 0, integer: false });
+        if (endRes.wasInvalid) cleanedFields.push("audioEnd");
+        if (endRes.value > (audioStart || 0)) {
+          audioEnd = endRes.value;
+        }
+      }
     }
 
     let showPlus;
@@ -505,7 +608,7 @@
       visualType,
       question: questionText,
       answer: answerText,
-      questionImage: qImgRes.value,
+      questionImage: finalQuestionImage,
       answerImage: aImgRes.value,
       images: imgsRes.value,
       hint: hintRes.value,
@@ -515,7 +618,10 @@
       zoomLevel,
       zoomOrigin,
       memorySeconds,
-      showPlus
+      showPlus,
+      audioUrl,
+      audioStart,
+      audioEnd
     };
 
     return {

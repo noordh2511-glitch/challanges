@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.11.0";
+const CACHE_VERSION = "seen-jeem-v4.13.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -37,6 +37,8 @@ const APP_SHELL_URLS = [
   "./src/utils/baraSalfaSync.js",
   "./src/utils/backupManager.js",
   "./src/utils/resultCardGenerator.js",
+  "./src/utils/audioChallengePlayer.js",
+  "./src/utils/customPacksStore.js",
   "./src/utils/pwaManager.js",
   "./src/js/audio.js",
   "./src/js/confetti.js",
@@ -45,6 +47,8 @@ const APP_SHELL_URLS = [
   "./src/js/playerView.js",
   "./src/js/baraSalfaMode.js",
   "./src/js/baraSalfaPlayerView.js",
+  "./src/js/tournamentMode.js",
+  "./src/js/customPackBuilder.js",
   "./src/js/app.js",
   "./src/assets/icons/icon.svg",
   "./src/assets/icons/icon-192.png",
@@ -165,14 +169,20 @@ function isFirebaseRealtimeOrAuthRequest(url) {
   );
 }
 
+function isAudioOrRangeRequest(request, url) {
+  if (request.headers && request.headers.has("range")) return true;
+  if (request.destination === "audio" || request.destination === "video") return true;
+  return /\.(mp3|wav|ogg|m4a|aac|opus|webm)$/i.test(url.pathname);
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
 
-  // 0) تمرير مباشر لطلبات Firebase RTDB وAuth دون أي اعتراض أو تخزين مؤقت
-  if (isFirebaseRealtimeOrAuthRequest(url)) {
+  // 0) تمرير مباشر لطلبات Firebase RTDB وAuth وطلبات الصوت / Range (لضمان عمل 206 Partial Content دون تعطل)
+  if (isFirebaseRealtimeOrAuthRequest(url) || isAudioOrRangeRequest(request, url)) {
     return;
   }
 

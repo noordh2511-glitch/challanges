@@ -144,6 +144,13 @@
             <span>اكتشف المخادع (3–12 لاعباً • محلي أو بالهواتف)</span>
           </div>
         </button>
+        <button type="button" id="btn-launch-tournament" class="mode-launch-card mode-tournament">
+          <span class="mode-launch-icon" aria-hidden="true">🏆</span>
+          <div class="mode-launch-text">
+            <strong>نظام البطولة</strong>
+            <span>خروج المغلوب (4/8 فرق) أو دوري نقاط كامل</span>
+          </div>
+        </button>
         <button type="button" id="btn-open-hall-of-fame" class="mode-launch-card mode-hof">
           <span class="mode-launch-icon" aria-hidden="true">🏆</span>
           <div class="mode-launch-text">
@@ -552,6 +559,10 @@
             <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm">
               <span class="btn-icon">☁️</span>
               تحديث الشيت
+            </button>
+            <button type="button" id="btn-open-custom-pack-builder" class="btn btn-amber btn-sm" title="إنشاء فئات خاصة بأسئلة صور وفروقات وتحديات صوتية">
+              <span class="btn-icon">✨</span>
+              صانع الفئات
             </button>
             <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm">
               <span class="btn-icon">📚</span>
@@ -995,8 +1006,12 @@
           <button type="button" id="btn-wb-open" class="btn btn-steal-win btn-xxs">🔔 فتح الجرس</button>
           <button type="button" id="btn-wb-lock" class="btn btn-secondary btn-xxs">🔒 إقفال</button>
           <button type="button" id="btn-wb-reset" class="btn btn-gold-outline btn-xxs">🔄 تصفير</button>
+          <button type="button" id="btn-allplay-open" class="btn btn-amber btn-xxs" title="فتح إجابة جماعية من هواتف جميع الفرق معاً">📝 الكل يجاوب</button>
         </div>
       </div>
+
+      <!-- لوحة وضع «الكل يجاوب» للمقدّم (All-Play Host Panel - Pack 11) -->
+      <div id="allplay-host-panel" class="allplay-host-panel" hidden aria-live="polite"></div>
 
       <!-- المؤقت وأدواته (ثابت أعلى النافذة للأسئلة القياسية ووضع السرقة) -->
       <div id="timer-section" class="timer-section">
@@ -1243,9 +1258,49 @@
             </div>
           </div>
 
-          <!-- شارة عدد الفروقات المطلوب إيجادها (تظهر لنوع spot-diff عند توفر differencesCount) -->
+          <!-- شارة وعدّاد «أوجد الفروقات» التفاعلي للمقدّم (Pack 12) -->
           <div id="spot-diff-badge-wrap" class="spot-diff-badge-wrap" hidden>
-            <span id="spot-diff-count-badge" class="spot-diff-count-badge">🔍 المطلوب إيجاد 3 فروقات</span>
+            <div class="diff-live-header">
+              <span id="spot-diff-count-badge" class="spot-diff-count-badge">🔍 أوجد الفروقات: 0 / 5</span>
+              <div id="diff-live-dots" class="diff-live-dots" aria-hidden="true"></div>
+            </div>
+            <div id="diff-host-controls" class="diff-host-controls" hidden>
+              <button type="button" id="btn-diff-increment" class="btn btn-steal-win btn-xs">➕ فرق مكتشف (+1)</button>
+              <button type="button" id="btn-diff-decrement" class="btn btn-secondary btn-xs">➖ تراجع (-1)</button>
+              <button type="button" id="btn-diff-reset" class="btn btn-ghost btn-xs">🔄 تصفير العدّاد</button>
+            </div>
+          </div>
+
+          <!-- لوحة مشغّل التحدي الصوتي المتزامن للمقدّم (Audio Challenge Panel - Pack 12) -->
+          <div id="audio-challenge-panel" class="audio-challenge-panel" hidden>
+            <div class="audio-ch-head">
+              <div class="audio-ch-title-group">
+                <span class="audio-ch-badge">🎵 تحدي صوتي</span>
+                <span id="audio-ch-status-text" class="audio-ch-status">جاهز للتشغيل</span>
+              </div>
+              <button type="button" id="btn-audio-ch-route" class="btn btn-ghost btn-xxs" hidden title="تبديل مصدر صوت المقطع بين التلفزيون واللابتوب لمنع الصدى">
+                📺 الصوت: التلفزيون فقط
+              </button>
+            </div>
+            <div class="audio-ch-visualizer" id="audio-ch-visualizer" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="audio-ch-progress-row">
+              <span id="audio-ch-cur-time" class="audio-ch-time">0:00</span>
+              <input type="range" id="audio-ch-seek" class="audio-ch-seek" min="0" max="100" step="0.5" value="0" aria-label="تقديم أو إرجاع المقطع الصوتي" />
+              <span id="audio-ch-dur-time" class="audio-ch-time">0:00</span>
+            </div>
+            <div class="audio-ch-controls">
+              <button type="button" id="btn-audio-ch-play" class="btn btn-steal-win btn-sm">▶️ تشغيل</button>
+              <button type="button" id="btn-audio-ch-pause" class="btn btn-amber btn-sm" hidden>⏸️ إيقاف مؤقت</button>
+              <button type="button" id="btn-audio-ch-replay" class="btn btn-secondary btn-sm">🔄 إعادة</button>
+              <button type="button" id="btn-audio-ch-teaser" class="btn btn-gold-outline btn-sm">⚡ مقطع 5ث</button>
+              <div class="audio-ch-vol-wrap">
+                <span aria-hidden="true">🔊</span>
+                <input type="range" id="audio-ch-volume" class="audio-ch-vol-slider" min="0" max="100" step="5" value="85" aria-label="مستوى صوت التحدي الصوتي" />
+              </div>
+            </div>
+            <div id="audio-ch-error" class="audio-ch-error" hidden></div>
           </div>
 
           <!-- حاوية الصور المتعددة (لنوعي spot-diff و multi-image) -->
@@ -1281,6 +1336,22 @@
             <div id="modal-answer-text" class="answer-text"></div>
             <div id="modal-answer-explanation" class="answer-explanation" hidden></div>
             <div id="modal-answer-image-wrap" class="media-wrap" hidden>
+              <!-- شريط التبديل والمقارنة السلس عند وجود صورة سؤال وصورة إجابة معاً (Pack 12) -->
+              <div id="answer-image-toggle-bar" class="answer-image-toggle-bar" hidden>
+                <button type="button" id="btn-ans-view-answer" class="btn btn-amber btn-xxs active">✅ صورة الإجابة</button>
+                <button type="button" id="btn-ans-view-question" class="btn btn-secondary btn-xxs">🖼️ صورة السؤال</button>
+                <button type="button" id="btn-ans-view-compare" class="btn btn-ghost btn-xxs">↔️ مقارنة جنباً إلى جنب</button>
+              </div>
+              <div id="answer-compare-grid" class="answer-compare-grid" hidden>
+                <div class="answer-compare-col">
+                  <span class="multi-img-label">صورة السؤال</span>
+                  <img id="answer-compare-q-img" class="modal-media-img" alt="صورة السؤال للمقارنة" />
+                </div>
+                <div class="answer-compare-col is-answer">
+                  <span class="multi-img-label">✅ صورة الإجابة</span>
+                  <img id="answer-compare-a-img" class="modal-media-img" alt="صورة الإجابة للمقارنة" />
+                </div>
+              </div>
               <div id="answer-image-stage" class="visual-image-stage answer-image-stage is-zoomable">
                 <div id="answer-image-skeleton" class="visual-image-skeleton" hidden aria-live="polite">
                   <span class="visual-loading-spinner" aria-hidden="true"></span>
@@ -1463,6 +1534,9 @@
       </section>
 
       <div class="winner-actions">
+        <button type="button" id="btn-winner-return-tournament" class="btn btn-amber btn-lg winner-tournament-btn" hidden>
+          🏆 العودة لجدول البطولة
+        </button>
         <button type="button" id="btn-start-tiebreaker-from-winner" class="btn btn-amber btn-lg winner-tiebreaker-btn" hidden>
           ⚔️ خوض جولة كسر تعادل
         </button>
@@ -1575,6 +1649,19 @@
           <div id="bank-categories-overview" class="bank-categories-overview">
             <!-- يتم توليد ملخص فئات البنك ديناميكياً -->
           </div>
+        </section>
+
+        <!-- القسم أ0: صانع الفئات الخاصة البصري والصوتي (Pack 12) -->
+        <section class="bank-section cpb-bank-launcher-section" aria-label="صانع الفئات الخاصة">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">✨ صانع الفئات الخاصة (صور، أوجد الفروقات، تحديات صوتية)</h3>
+            <button type="button" id="btn-bank-open-pack-builder" class="btn btn-amber btn-sm">
+              ✨ فتح محرّر الفئات الخاصة
+            </button>
+          </div>
+          <p class="bank-export-note">
+            أنشئ فئاتك بسهولة بواجهة مرئية مع ضغط تلقائي للصور، حقل <code>answerImage</code>، جولات «أوجد الفروقات»، ورفع مقاطع صوتية (≤ 2MB) مع التصدير والاستيراد.
+          </p>
         </section>
 
         <!-- القسم أ: استيراد دفعة أسئلة (JSON) -->
@@ -2095,6 +2182,7 @@
           <h3 id="blitz-finish-title" class="winner-title">نهاية جولة البرق!</h3>
           <div id="blitz-finish-scores" class="winner-scores-grid"></div>
           <div class="side-finish-actions">
+            <button type="button" id="btn-blitz-return-tournament" class="btn btn-amber btn-md" hidden>🏆 العودة لجدول البطولة</button>
             <button type="button" id="btn-blitz-result-card" class="btn btn-gold-outline btn-md">📸 حفظ بطاقة النتيجة</button>
             <button type="button" id="btn-blitz-open-hof" class="btn btn-secondary btn-md">🏆 قاعة المشاهير</button>
             <button type="button" id="btn-blitz-play-again" class="btn btn-primary btn-md">🔄 جولة برق جديدة</button>
@@ -2293,6 +2381,17 @@
       </div>
 
       <div class="bank-modal-scroll-body">
+        <!-- تبويب التبديل بين إحصائيات «سين جيم» وإحصائيات «برا السالفة» -->
+        <div id="hof-view-tabs" class="hof-view-tabs" role="tablist" aria-label="اختر نوع الإحصائيات">
+          <button type="button" class="hof-view-tab active" data-hof-view="seen-jeem" role="tab" aria-selected="true">
+            🏆 إحصائيات سين جيم
+          </button>
+          <button type="button" class="hof-view-tab" data-hof-view="bara-salfa" role="tab" aria-selected="false">
+            🕵️ إحصائيات برا السالفة
+          </button>
+        </div>
+
+        <div id="hof-seen-jeem-sections">
         <!-- 1) الأرقام القياسية -->
         <section class="bank-section">
           <div class="bank-section-header">
@@ -2323,6 +2422,25 @@
           </div>
           <div id="hof-archive-list" class="hof-archive-list"></div>
         </section>
+        </div>
+
+        <!-- قسم إحصائيات «برا السالفة» (Pack 11) -->
+        <div id="hof-bara-salfa-section" hidden>
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">🕵️ أرقام «برا السالفة» القياسية</h3>
+              <span id="hof-bara-total-rounds-pill" class="bank-count-pill">0 جولات</span>
+            </div>
+            <div id="hof-bara-records-grid" class="hof-records-grid"></div>
+          </section>
+
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">📊 جدول متصدري «برا السالفة»</h3>
+            </div>
+            <div id="hof-bara-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
+          </section>
+        </div>
       </div>
 
       <div class="bank-modal-footer">
@@ -2722,6 +2840,9 @@
           </p>
         </div>
         <div class="bara-header-actions">
+          <button type="button" id="btn-bara-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة عند التحكم من هاتف VIP">
+            📺 وضع العرض الكامل (بدون أزرار)
+          </button>
           <button type="button" id="btn-bara-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
             📺 التلفزيون
           </button>
@@ -2729,6 +2850,56 @@
         </div>
       </div>
       <div id="bara-salfa-body" class="bank-modal-scroll-body bara-salfa-body"></div>
+    </div>
+    <button type="button" id="btn-bara-exit-clean-tv" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
+  </div>
+
+  <!-- =========================================================
+       نافذة نظام البطولات والدوري (Tournament & League Mode - Pack 11)
+       ========================================================= -->
+  <div id="tournament-modal" class="modal-overlay tournament-overlay" role="dialog" aria-modal="true" aria-labelledby="tournament-modal-title" aria-hidden="true">
+    <div class="modal-card tournament-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="tournament-modal-title" class="bank-modal-title">
+            <span>🏆</span>
+            نظام البطولات والدوري
+          </h2>
+          <p class="bank-sources-summary">
+            بطولة خروج المغلوب (4 أو 8 فرق) أو دوري نقاط (4–8 فرق) مع حفظ تلقائي ومزامنة لشاشة التلفزيون!
+          </p>
+        </div>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-tournament-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
+            📺 التلفزيون
+          </button>
+          <button type="button" id="btn-close-tournament" class="q-modal-close-btn" aria-label="إغلاق نظام البطولة">✕</button>
+        </div>
+      </div>
+      <div id="tournament-body" class="bank-modal-scroll-body tournament-body"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة صانع الفئات الخاصة البصري والصوتي (Custom Pack Builder - Pack 12)
+       ========================================================= -->
+  <div id="custom-pack-builder-modal" class="modal-overlay cpb-overlay" role="dialog" aria-modal="true" aria-labelledby="cpb-modal-title" aria-hidden="true">
+    <div class="modal-card cpb-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="cpb-modal-title" class="bank-modal-title">
+            <span>✨</span>
+            صانع الفئات الخاصة (بصري / فروقات / صوتي)
+          </h2>
+          <p class="bank-sources-summary">
+            حفظ تلقائي بسعة كبيرة في IndexedDB مع ضغط الصور ودعم صورة الإجابة والمقاطع الصوتية حتى 2MB.
+          </p>
+        </div>
+        <button type="button" id="btn-close-custom-pack-builder" class="q-modal-close-btn" aria-label="إغلاق صانع الفئات الخاصة">✕</button>
+      </div>
+      <div id="custom-pack-builder-body" class="bank-modal-scroll-body cpb-body"></div>
     </div>
   </div>
 
@@ -2754,6 +2925,8 @@
   <script src="src/utils/baraSalfaSync.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
+  <script src="src/utils/audioChallengePlayer.js"></script>
+  <script src="src/utils/customPacksStore.js"></script>
   <script src="src/utils/pwaManager.js"></script>
   <script src="src/js/audio.js"></script>
   <script src="src/js/confetti.js"></script>
@@ -2762,6 +2935,8 @@
   <script src="src/js/playerView.js"></script>
   <script src="src/js/baraSalfaMode.js"></script>
   <script src="src/js/baraSalfaPlayerView.js"></script>
+  <script src="src/js/tournamentMode.js"></script>
+  <script src="src/js/customPackBuilder.js"></script>
   <script src="src/js/app.js"></script>
 </body>
 </html>

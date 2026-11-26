@@ -47,6 +47,9 @@
       this.wagerAmount = 0;
       this.wagerSentRoundKey = "";
       this.answerSentRoundKey = "";
+      this.allPlayDraft = "";
+      this.allPlaySentQId = "";
+      this.allPlaySentText = "";
       this._registeredPresenceKey = "";
       this._localTimerInterval = null;
     }
@@ -458,6 +461,32 @@
       }
     }
 
+    async _submitAllPlayAnswer(rawText) {
+      if (this.kicked) return;
+      const ap = this.publicState && this.publicState.allPlay;
+      if (!ap || !ap.active || ap.phase !== "open" || !ap.questionId || this.selectedTeamIdx === null) return;
+      const clean = String(rawText || "").trim().slice(0, 140);
+      if (!clean) {
+        this.errorMessage = "يرجى كتابة إجابة أولاً.";
+        this._render();
+        return;
+      }
+      const res = await window.SeenJeemRealtimeSync.sendAllPlayAnswer(ap.questionId, this.selectedTeamIdx, clean);
+      if (res && res.ok) {
+        this.allPlaySentQId = ap.questionId;
+        this.allPlaySentText = clean;
+        this.allPlayDraft = clean;
+        this.errorMessage = "";
+        if (navigator.vibrate) {
+          try { navigator.vibrate(45); } catch (_e) {}
+        }
+        this._render();
+      } else {
+        this.errorMessage = (res && res.error) || "تعذّر إرسال الإجابة";
+        this._render();
+      }
+    }
+
     _render() {
       if (!this.root) return;
 
@@ -676,6 +705,68 @@
         const ansInp = document.getElementById("pl-final-answer-input");
         if (sendAnsBtn && ansInp) {
           sendAnsBtn.addEventListener("click", () => this._submitFinalAnswer(ansInp.value));
+        }
+        return;
+      }
+
+      // 2.5) وضع «الكل يجاوب» (All-Play) أثناء السؤال
+      const ap = pub.screen === "question" && pub.allPlay && pub.allPlay.active ? pub.allPlay : null;
+      if (ap && (ap.phase === "open" || ap.phase === "revealed")) {
+        if (this.allPlaySentQId && this.allPlaySentQId !== ap.questionId) {
+          this.allPlayDraft = "";
+          this.allPlaySentQId = "";
+          this.allPlaySentText = "";
+        }
+        const alreadySent = this.allPlaySentQId === ap.questionId;
+        const qv = pub.questionView || {};
+        const apBody =
+          ap.phase === "open"
+            ? `
+              <section class="pl-card pl-wager-card">
+                <div class="final-eyebrow">📝 إجابة جماعية — الكل يجاوب!</div>
+                ${qv.questionText ? `<p class="pl-final-q">${escapeHtml(qv.questionText)}</p>` : ""}
+                <label for="pl-allplay-input" class="pl-label">اكتب إجابة فريقك (يمكنك التعديل قبل إغلاق الباب):</label>
+                <input
+                  type="text"
+                  id="pl-allplay-input"
+                  class="pl-room-input pl-answer-input"
+                  maxlength="140"
+                  value="${escapeHtml(this.allPlayDraft)}"
+                  placeholder="اكتب إجابتك هنا..."
+                  autocomplete="off"
+                />
+                ${this.errorMessage ? `<p class="pl-error-note">⚠️ ${escapeHtml(this.errorMessage)}</p>` : ""}
+                <button type="button" id="pl-btn-send-allplay" class="btn ${alreadySent ? "btn-steal-win" : "btn-primary"} pl-touch-btn pl-full-btn">
+                  ${alreadySent ? "✅ تم الإرسال — اضغط لتعديل إجابتك" : "📤 إرسال الإجابة"}
+                </button>
+              </section>
+            `
+            : `
+              <section class="pl-card pl-wager-card">
+                <div class="final-eyebrow">🔒 تم إغلاق الإجابات وكشفها</div>
+                <h2 class="pl-wager-title">تابع التحكيم على شاشة التلفزيون!</h2>
+                ${
+                  alreadySent
+                    ? `<p class="pl-sub-note">إجابة فريقك المرسلة: <strong>${escapeHtml(this.allPlaySentText)}</strong></p>`
+                    : `<p class="pl-sub-note">لم يُرسل فريقك إجابة في هذا السؤال.</p>`
+                }
+              </section>
+            `;
+
+        this.root.innerHTML = this._wrapPlayerChrome(team, teamNum, apBody);
+        this._bindChromeEvents();
+        const inp = document.getElementById("pl-allplay-input");
+        const sendBtn = document.getElementById("pl-btn-send-allplay");
+        if (inp) {
+          inp.addEventListener("input", () => {
+            this.allPlayDraft = inp.value;
+          });
+          inp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") this._submitAllPlayAnswer(inp.value);
+          });
+        }
+        if (sendBtn && inp) {
+          sendBtn.addEventListener("click", () => this._submitAllPlayAnswer(inp.value));
         }
         return;
       }

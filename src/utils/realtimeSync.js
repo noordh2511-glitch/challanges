@@ -96,6 +96,14 @@
     return typeof val === "string" && /^data:image\//i.test(val.trim());
   }
 
+  function isDataUrlAudio(val) {
+    return typeof val === "string" && /^data:audio\//i.test(val.trim());
+  }
+
+  function isAnyHeavyDataUrl(val) {
+    return isDataUrlImage(val) || isDataUrlAudio(val);
+  }
+
   function sanitizeFirebaseKey(raw) {
     const cleaned = String(raw || "")
       .trim()
@@ -168,7 +176,7 @@
    */
   function stripAnyDataUrlsDeep(obj) {
     if (typeof obj === "string") {
-      return isDataUrlImage(obj) ? null : obj;
+      return isAnyHeavyDataUrl(obj) ? null : obj;
     }
     if (obj === null || typeof obj !== "object") return obj;
     if (Array.isArray(obj)) {
@@ -186,21 +194,30 @@
 
   /**
    * فصل صور DataURL الثقيلة من questionView إلى حزمة media مستقلة
-   * مع الالتزام الكامل ببروتوكول منع التسريب (answerImage لا يُعزل ولا يُرفع إلا بعد answerRevealed)
+   * - صور السؤال -> media/q_<questionId>
+   * - صورة الإجابة (بعد الكشف فقط!) -> media/ans_<questionId>
+   * - الصوت DataURL يُزال كلياً من publicState ولا يُرفع إلى Firebase أو هواتف الفرق
    */
   function isolateQuestionMedia(publicState) {
     if (!publicState || typeof publicState !== "object" || publicState.screen !== "question" || !publicState.questionView) {
-      return { mediaKey: "", mediaPayload: null, mediaSig: "" };
+      return { mediaKey: "", mediaPayload: null, mediaSig: "", answerMediaKey: "", answerMediaPayload: null, answerMediaSig: "" };
     }
     const qv = publicState.questionView;
+    // عدم تمرير أي رابط أو DataURL صوتي ثقيل داخل Firebase publicState
+    if (qv.audioChallenge && typeof qv.audioChallenge === "object") {
+      qv.audioChallenge.audioSrc = null;
+    }
+
     const hasQImgData = isDataUrlImage(qv.questionImage);
     const hasAnsImgData = Boolean(qv.answerRevealed) && isDataUrlImage(qv.answerImage);
     const hasMultiData = Array.isArray(qv.images) && qv.images.some((item) => isDataUrlImage(item));
 
     if (!hasQImgData && !hasAnsImgData && !hasMultiData) {
+      if (isDataUrlImage(qv.answerImage)) qv.answerImage = null;
       qv.hasMedia = false;
       qv.mediaKey = null;
-      return { mediaKey: "", mediaPayload: null, mediaSig: "" };
+      qv.answerMediaKey = null;
+      return { mediaKey: "", mediaPayload: null, mediaSig: "", answerMediaKey: "", answerMediaPayload: null, answerMediaSig: "" };
     }
 
     const rawId =
@@ -208,31 +225,43 @@
       `${qv.categoryId || "cat"}_${qv.basePoints || 200}_${quickHashString(
         (qv.questionText || "") + "|" + (qv.visualType || "normal")
       )}`;
-    const mediaKey = `q_${sanitizeFirebaseKey(rawId)}`;
-    const mediaPayload = { mediaKey };
-    const sigParts = [mediaKey];
+    const cleanId = sanitizeFirebaseKey(rawId);
 
-    if (hasQImgData) {
-      mediaPayload.questionImage = qv.questionImage;
-      qv.questionImage = null;
-      sigParts.push("q:" + qv.questionId + ":" + mediaPayload.questionImage.length);
+    let mediaKey = "";
+    let mediaPayload = null;
+    let mediaSig = "";
+    if (hasQImgData || hasMultiData) {
+      mediaKey = `q_${cleanId}`;
+      mediaPayload = { mediaKey };
+      const sigParts = [mediaKey];
+      if (hasQImgData) {
+        mediaPayload.questionImage = qv.questionImage;
+        qv.questionImage = null;
+        sigParts.push("q:" + mediaPayload.questionImage.length);
+      }
+      if (hasMultiData) {
+        mediaPayload.images = qv.images.slice();
+        qv.images = qv.images.map((item) => (isDataUrlImage(item) ? null : item));
+        sigParts.push("m:" + mediaPayload.images.length + ":" + mediaPayload.images.reduce((s, x) => s + (x ? x.length : 0), 0));
+      }
+      mediaSig = sigParts.join("|");
     }
+
+    let answerMediaKey = "";
+    let answerMediaPayload = null;
+    let answerMediaSig = "";
     if (hasAnsImgData) {
-      mediaPayload.answerImage = qv.answerImage;
+      answerMediaKey = `ans_${cleanId}`;
+      answerMediaPayload = { mediaKey: answerMediaKey, answerImage: qv.answerImage };
+      answerMediaSig = `${answerMediaKey}:${qv.answerImage.length}`;
       qv.answerImage = null;
-      sigParts.push("a:" + mediaPayload.answerImage.length);
     } else if (isDataUrlImage(qv.answerImage)) {
-      // حماية إضافية لمنع التسريب قبل الكشف
       qv.answerImage = null;
-    }
-    if (hasMultiData) {
-      mediaPayload.images = qv.images.slice();
-      qv.images = qv.images.map((item) => (isDataUrlImage(item) ? null : item));
-      sigParts.push("m:" + mediaPayload.images.length + ":" + mediaPayload.images.reduce((s, x) => s + (x ? x.length : 0), 0));
     }
 
-    qv.hasMedia = true;
-    qv.mediaKey = mediaKey;
+    qv.hasMedia = Boolean(mediaKey || answerMediaKey);
+    qv.mediaKey = mediaKey || null;
+    qv.answerMediaKey = answerMediaKey || null;
     qv.mediaFields = {
       questionImage: hasQImgData,
       answerImage: hasAnsImgData,
@@ -242,7 +271,10 @@
     return {
       mediaKey,
       mediaPayload,
-      mediaSig: sigParts.join("|")
+      mediaSig,
+      answerMediaKey,
+      answerMediaPayload,
+      answerMediaSig
     };
   }
 
@@ -426,6 +458,8 @@
       // عزل الصور وكاش القراءة
       this._activeMediaKey = "";
       this._uploadedMediaSig = "";
+      this._activeAnswerMediaKey = "";
+      this._uploadedAnswerMediaSig = "";
       this._mediaCache = new Map();
 
       // Shallow Diffing & Session Bandwidth Diagnostics
@@ -471,6 +505,8 @@
     _resetSessionTrackers() {
       this._activeMediaKey = "";
       this._uploadedMediaSig = "";
+      this._activeAnswerMediaKey = "";
+      this._uploadedAnswerMediaSig = "";
       this._lastPublicSig = "";
       this._lastHostPrivateSig = "";
       this._stats = { writes: 0, skippedWrites: 0, bytesSent: 0, mediaUploads: 0 };
@@ -686,6 +722,7 @@
       onCommand = null,
       onBuzzes = null,
       onWagers = null,
+      onAllPlayAnswers = null,
       onPlayers = null,
       onConnectionState = null,
       onStatsUpdate = null
@@ -767,6 +804,13 @@
       });
       this._unsubs.push(unsubPlayers);
 
+      // الاستماع لإجابات «الكل يجاوب» الواردة سراً إلى الجهاز الرئيسي فقط
+      const allPlayRef = sdk.dbMod.ref(db, `${roomPath}/allPlayAnswers`);
+      const unsubAllPlay = sdk.dbMod.onValue(allPlayRef, (snap) => {
+        if (typeof onAllPlayAnswers === "function") onAllPlayAnswers(snap.val() || {});
+      });
+      this._unsubs.push(unsubAllPlay);
+
       return this.getRoomInfo();
     }
 
@@ -804,6 +848,30 @@
             this._activeMediaKey = "";
             this._uploadedMediaSig = "";
             tasks.push(dbMod.remove(dbMod.ref(this._db, `${roomPath}/media/${staleKey}`)).catch(() => {}));
+          }
+
+          // إدارة عقدة media/ans_<questionId> المعزولة لصورة الإجابة عند الكشف فقط
+          if (mediaInfo.answerMediaKey && mediaInfo.answerMediaPayload) {
+            if (this._activeAnswerMediaKey && this._activeAnswerMediaKey !== mediaInfo.answerMediaKey) {
+              const staleAnsKey = this._activeAnswerMediaKey;
+              tasks.push(dbMod.remove(dbMod.ref(this._db, `${roomPath}/media/${staleAnsKey}`)).catch(() => {}));
+            }
+            if (mediaInfo.answerMediaSig !== this._uploadedAnswerMediaSig) {
+              this._activeAnswerMediaKey = mediaInfo.answerMediaKey;
+              this._uploadedAnswerMediaSig = mediaInfo.answerMediaSig;
+              const ansJson = JSON.stringify(mediaInfo.answerMediaPayload);
+              tasks.push(
+                dbMod
+                  .set(dbMod.ref(this._db, `${roomPath}/media/${mediaInfo.answerMediaKey}`), mediaInfo.answerMediaPayload)
+                  .then(() => this._recordWrite(ansJson, { isMedia: true }))
+              );
+              didWrite = true;
+            }
+          } else if (this._activeAnswerMediaKey) {
+            const staleAnsKey = this._activeAnswerMediaKey;
+            this._activeAnswerMediaKey = "";
+            this._uploadedAnswerMediaSig = "";
+            tasks.push(dbMod.remove(dbMod.ref(this._db, `${roomPath}/media/${staleAnsKey}`)).catch(() => {}));
           }
 
           // Shallow Diffing لـ publicState لمنع الكتابات المكررة
@@ -926,6 +994,18 @@
       const path = roundId
         ? `rooms/${this.roomCode}/wagers/${roundId}`
         : `rooms/${this.roomCode}/wagers`;
+      try {
+        await dbMod.remove(dbMod.ref(this._db, path));
+      } catch (_err) {}
+    }
+
+    async clearAllPlayAnswers(questionId) {
+      if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
+      const { dbMod } = this._sdk;
+      const qKey = questionId ? sanitizeFirebaseKey(questionId) : "";
+      const path = qKey
+        ? `rooms/${this.roomCode}/allPlayAnswers/${qKey}`
+        : `rooms/${this.roomCode}/allPlayAnswers`;
       try {
         await dbMod.remove(dbMod.ref(this._db, path));
       } catch (_err) {}
@@ -1241,6 +1321,32 @@
         return { ok: true };
       } catch (err) {
         return { ok: false, error: (err && err.message) || "تعذّر إرسال الرهان السري" };
+      }
+    }
+
+    async sendAllPlayAnswer(questionId, teamIdx, text) {
+      if (this._role !== "player" || !this.roomCode || !questionId || !this._sdk || !this._db || this._kicked) {
+        return { ok: false, error: "غير متصل بالغرفة" };
+      }
+      const cleanText = typeof text === "string" ? text.trim().slice(0, 140) : "";
+      if (!cleanText) {
+        return { ok: false, error: "يرجى كتابة إجابة أولاً." };
+      }
+      const { dbMod } = this._sdk;
+      const qKey = sanitizeFirebaseKey(questionId);
+      const teamId = `team-${Number(teamIdx) || 0}`;
+      const aRef = dbMod.ref(this._db, `rooms/${this.roomCode}/allPlayAnswers/${qKey}/${teamId}`);
+      try {
+        await dbMod.set(aRef, {
+          teamIdx: Number(teamIdx) || 0,
+          text: cleanText,
+          submittedAt: dbMod.serverTimestamp(),
+          deviceId: this.deviceId,
+          uid: this._uid || ""
+        });
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || "تعذّر إرسال الإجابة" };
       }
     }
 
