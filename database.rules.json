@@ -13,6 +13,10 @@
           ".read": "auth != null",
           ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
         },
+        "media": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+        },
         "hostPrivate": {
           "$token": {
             ".read": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('rooms').child($roomCode).child('meta/hostToken').exists() && root.child('rooms').child($roomCode).child('meta/hostToken').val() === $token))",
@@ -28,13 +32,26 @@
             }
           }
         },
+        "allowedDevices": {
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$deviceId": {
+            ".read": "auth != null"
+          }
+        },
+        "kicked": {
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$deviceId": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
         "buzzes": {
           ".read": "auth != null",
           ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
           "$buzzRoundId": {
             "$teamKey": {
-              ".write": "auth != null && (!data.exists() || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
-              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'teamName', 'ts']) && newData.child('teamIdx').isNumber() && newData.child('teamName').isString() && newData.child('teamName').val().length <= 40)"
+              ".write": "auth != null && (!data.exists() || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid) && (!newData.exists() || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (newData.child('deviceId').isString() && !root.child('rooms').child($roomCode).child('kicked').child(newData.child('deviceId').val()).exists()))",
+              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'teamName', 'deviceId', 'ts']) && newData.child('teamIdx').isNumber() && newData.child('teamName').isString() && newData.child('teamName').val().length <= 40 && newData.child('deviceId').isString())"
             }
           }
         },
@@ -43,16 +60,17 @@
           ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
           "$roundId": {
             "$teamId": {
-              ".write": "auth != null && root.child('rooms').child($roomCode).child('meta').exists()",
-              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'amount', 'locked', 'updatedAt']) && newData.child('teamIdx').isNumber() && newData.child('amount').isNumber() && newData.child('amount').val() >= 0 && (!newData.child('answerText').exists() || (newData.child('answerText').isString() && newData.child('answerText').val().length <= 160)))"
+              ".write": "auth != null && root.child('rooms').child($roomCode).child('meta').exists() && (!newData.exists() || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (newData.child('deviceId').isString() && !root.child('rooms').child($roomCode).child('kicked').child(newData.child('deviceId').val()).exists()))",
+              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'amount', 'locked', 'deviceId', 'updatedAt']) && newData.child('teamIdx').isNumber() && newData.child('amount').isNumber() && newData.child('amount').val() >= 0 && newData.child('deviceId').isString() && (!newData.child('answerText').exists() || (newData.child('answerText').isString() && newData.child('answerText').val().length <= 160)))"
             }
           }
         },
         "players": {
           ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
           "$deviceId": {
-            ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'teamName', 'uid']) && newData.child('teamIdx').isNumber() && newData.child('teamName').isString() && newData.child('uid').val() === auth.uid)"
+            ".write": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && data.child('uid').val() === auth.uid) || (!root.child('rooms').child($roomCode).child('kicked').child($deviceId).exists() && newData.child('uid').val() === auth.uid && (!data.exists() || data.child('uid').val() === auth.uid) && (data.exists() || root.child('rooms').child($roomCode).child('meta/joinLocked').val() !== true || root.child('rooms').child($roomCode).child('allowedDevices').child($deviceId).exists())))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['deviceId', 'uid', 'teamId', 'teamIdx', 'label']) && newData.child('deviceId').isString() && newData.child('deviceId').val() === $deviceId && newData.child('uid').val() === auth.uid && newData.child('teamId').isString() && newData.child('teamIdx').isNumber() && newData.child('label').isString() && newData.child('label').val().length <= 32)"
           }
         }
       }

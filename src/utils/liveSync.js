@@ -178,9 +178,20 @@
               remainingSeconds: Math.max(
                 0,
                 Math.floor(Number(rawSnapshot.intermission.remainingSeconds) || 0)
-              )
+              ),
+              timer:
+                rawSnapshot.intermission.timer && typeof rawSnapshot.intermission.timer === "object"
+                  ? {
+                      status: rawSnapshot.intermission.timer.status || "idle",
+                      durationMs: Math.max(0, Number(rawSnapshot.intermission.timer.durationMs) || 0),
+                      endAtMs: Number.isFinite(rawSnapshot.intermission.timer.endAtMs)
+                        ? Number(rawSnapshot.intermission.timer.endAtMs)
+                        : null,
+                      remainingMs: Math.max(0, Number(rawSnapshot.intermission.timer.remainingMs) || 0)
+                    }
+                  : null
             }
-          : { active: false, message: "استراحة قصيرة — نعود بعد قليل", totalSeconds: 0, remainingSeconds: 0 },
+          : { active: false, message: "استراحة قصيرة — نعود بعد قليل", totalSeconds: 0, remainingSeconds: 0, timer: null },
       displayPrefs:
         rawSnapshot.displayPrefs && typeof rawSnapshot.displayPrefs === "object"
           ? {
@@ -210,6 +221,8 @@
               roomCode: typeof rawSnapshot.wireless.roomCode === "string" ? rawSnapshot.wireless.roomCode : "",
               playerUrl: typeof rawSnapshot.wireless.playerUrl === "string" ? rawSnapshot.wireless.playerUrl : "",
               showQrOnTv: Boolean(rawSnapshot.wireless.showQrOnTv),
+              joinLocked: Boolean(rawSnapshot.wireless.joinLocked),
+              maxDevicesPerTeam: Number(rawSnapshot.wireless.maxDevicesPerTeam) === 1 ? 1 : 0,
               buzzer:
                 rawSnapshot.wireless.buzzer && typeof rawSnapshot.wireless.buzzer === "object"
                   ? {
@@ -242,6 +255,7 @@
         (qv.memoryPhase === "ready" || qv.memoryPhase === "loading" || qv.memoryPhase === "viewing");
 
       clean.questionView = {
+        questionId: typeof qv.questionId === "string" ? qv.questionId : "",
         categoryId: qv.categoryId || "",
         categoryName: qv.categoryName || "",
         categoryIcon: qv.categoryIcon || "🎯",
@@ -289,16 +303,34 @@
         zoomOrigin: qv.zoomOrigin || "center",
         zoomReduced: Boolean(qv.zoomReduced),
 
-        // حالة المؤقت الحي (متطابقة لحظياً مع المقدّم)
+        // حالة المؤقت الحي (متطابقة لحظياً مع المقدّم + واصف الطابع الزمني لـ Firebase)
         timerRemaining: Math.max(0, Number(qv.timerRemaining) || 0),
         timerMax: Math.max(1, Number(qv.timerMax) || 60),
         timerMode: qv.timerMode || "main",
         timerRunning: Boolean(qv.timerRunning),
+        timer:
+          qv.timer && typeof qv.timer === "object"
+            ? {
+                status: qv.timer.status || "idle",
+                durationMs: Math.max(0, Number(qv.timer.durationMs) || 0),
+                endAtMs: Number.isFinite(qv.timer.endAtMs) ? Number(qv.timer.endAtMs) : null,
+                remainingMs: Math.max(0, Number(qv.timer.remainingMs) || 0)
+              }
+            : null,
         charadesDuration: Number(qv.charadesDuration) || 60,
         charadesTimerStarted: Boolean(qv.charadesTimerStarted),
         memoryPhase: qv.memoryPhase || null,
         memoryRemaining: Math.max(0, Number(qv.memoryRemaining) || 0),
         memoryTotal: Math.max(1, Number(qv.memoryTotal) || 10),
+        memoryTimer:
+          qv.memoryTimer && typeof qv.memoryTimer === "object"
+            ? {
+                status: qv.memoryTimer.status || "idle",
+                durationMs: Math.max(0, Number(qv.memoryTimer.durationMs) || 0),
+                endAtMs: Number.isFinite(qv.memoryTimer.endAtMs) ? Number(qv.memoryTimer.endAtMs) : null,
+                remainingMs: Math.max(0, Number(qv.memoryTimer.remainingMs) || 0)
+              }
+            : null,
 
         // لا يُمرَّر hint إلا بعد كشفه صراحةً من المقدّم
         hintText: allowHint && typeof qv.hintText === "string" ? qv.hintText : null,
@@ -326,6 +358,15 @@
         timerRemaining: Number(fv.timerRemaining) || 0,
         timerMax: Number(fv.timerMax) || 60,
         timerRunning: Boolean(fv.timerRunning),
+        timer:
+          fv.timer && typeof fv.timer === "object"
+            ? {
+                status: fv.timer.status || "idle",
+                durationMs: Math.max(0, Number(fv.timer.durationMs) || 0),
+                endAtMs: Number.isFinite(fv.timer.endAtMs) ? Number(fv.timer.endAtMs) : null,
+                remainingMs: Math.max(0, Number(fv.timer.remainingMs) || 0)
+              }
+            : null,
         stillTiedAfterReveal: allowReveal ? Boolean(fv.stillTiedAfterReveal) : false,
         participants: Array.isArray(fv.participants)
           ? fv.participants.map((p) => ({
@@ -365,6 +406,15 @@
         timerRemaining: Number(bv.timerRemaining) || 0,
         timerMax: Number(bv.timerMax) || 60,
         timerRunning: Boolean(bv.timerRunning),
+        timer:
+          bv.timer && typeof bv.timer === "object"
+            ? {
+                status: bv.timer.status || "idle",
+                durationMs: Math.max(0, Number(bv.timer.durationMs) || 0),
+                endAtMs: Number.isFinite(bv.timer.endAtMs) ? Number(bv.timer.endAtMs) : null,
+                remainingMs: Math.max(0, Number(bv.timer.remainingMs) || 0)
+              }
+            : null,
         currentStreak: Number(bv.currentStreak) || 0,
         lastFeedback: bv.lastFeedback || null,
         questionText: bv.phase === "playing" && typeof bv.questionText === "string" ? bv.questionText : null,
@@ -389,6 +439,15 @@
         timerRemaining: Number(cv.timerRemaining) || 0,
         timerMax: Number(cv.timerMax) || 90,
         timerRunning: Boolean(cv.timerRunning),
+        timer:
+          cv.timer && typeof cv.timer === "object"
+            ? {
+                status: cv.timer.status || "idle",
+                durationMs: Math.max(0, Number(cv.timer.durationMs) || 0),
+                endAtMs: Number.isFinite(cv.timer.endAtMs) ? Number(cv.timer.endAtMs) : null,
+                remainingMs: Math.max(0, Number(cv.timer.remainingMs) || 0)
+              }
+            : null,
         lastFeedback: cv.lastFeedback || null,
         header: cv.phase === "playing" && cv.header ? cv.header : null,
         categoryName: cv.phase === "playing" && typeof cv.categoryName === "string" ? cv.categoryName : null,
@@ -656,6 +715,10 @@
     }
 
     enforceAntiSpoiler(rawSnapshot) {
+      return enforceAntiSpoilerOnSnapshot(rawSnapshot);
+    }
+
+    sanitizeSnapshot(rawSnapshot) {
       return enforceAntiSpoilerOnSnapshot(rawSnapshot);
     }
 

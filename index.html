@@ -2358,12 +2358,20 @@
                 📡 إنشاء غرفة لاسلكية
               </button>
               <button type="button" id="btn-close-wireless-room" class="btn btn-danger-outline btn-sm" hidden>
-                🔴 إغلاق الغرفة اللاسلكية
+                🔴 إغلاق وحذف الغرفة الآن
               </button>
               <button type="button" id="btn-toggle-wireless-settings" class="btn btn-secondary btn-sm" aria-expanded="false">
                 ⚙️ إعدادات الاتصال اللاسلكي
               </button>
             </div>
+          </div>
+
+          <div id="wireless-diagnostics-bar" class="wireless-diagnostics-bar" hidden>
+            <span>📊 استهلاك الجلسة: <strong id="wireless-diag-kb">0 KB</strong></span>
+            <span aria-hidden="true">•</span>
+            <span>عمليات الكتابة: <strong id="wireless-diag-writes">0</strong></span>
+            <span aria-hidden="true">•</span>
+            <span>مُوفَّرة (Diff): <strong id="wireless-diag-skipped">0</strong></span>
           </div>
 
           <div id="wireless-room-feedback" class="wireless-feedback-box" hidden aria-live="polite"></div>
@@ -2469,6 +2477,23 @@
             <button type="button" id="btn-modal-wb-lock" class="btn btn-secondary btn-sm">🔒 إقفال الجرس</button>
             <button type="button" id="btn-modal-wb-reset" class="btn btn-gold-outline btn-sm">🔄 تصفير الجرس</button>
           </div>
+        </section>
+
+        <!-- 4) إدارة الأجهزة المتصلة وقفل الغرفة (Phase 4 Pack 10) -->
+        <section id="wireless-devices-panel" class="bank-section wireless-devices-panel" hidden>
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">📱 إدارة الأجهزة المتصلة وقفل الغرفة</h3>
+            <span id="wireless-devices-count-pill" class="bank-count-pill">0 جهاز متصل</span>
+          </div>
+          <div class="wireless-room-guard-controls">
+            <button type="button" id="btn-wireless-toggle-lock" class="btn btn-secondary btn-sm">
+              🔓 الانضمام مفتوح — قفل الغرفة
+            </button>
+            <button type="button" id="btn-wireless-toggle-cap" class="btn btn-gold-outline btn-sm">
+              👥 حد الأجهزة لكل فريق: غير محدود
+            </button>
+          </div>
+          <div id="wireless-devices-list" class="wireless-devices-list"></div>
         </section>
       </div>
     </div>

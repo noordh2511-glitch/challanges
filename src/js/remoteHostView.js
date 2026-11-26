@@ -33,8 +33,10 @@
       this.activeTab = "control"; // "control" | "tools"
       this.publicState = null;
       this.hostPrivate = null;
+      this.playersMap = {};
       this.errorMessage = "";
       this.wagerDraft = "";
+      this._localTimerInterval = null;
     }
 
     init() {
@@ -88,10 +90,17 @@
             this.publicState = pub;
             this._renderTopScores();
             this._renderBody();
+            this._syncLocalTimerLoop();
           },
           onHostPrivate: (priv) => {
             this.hostPrivate = priv;
             this._renderBody();
+          },
+          onPlayers: (playersMap) => {
+            this.playersMap = playersMap && typeof playersMap === "object" ? playersMap : {};
+            if (this.activeTab === "tools") {
+              this._renderBody();
+            }
           },
           onConnectionState: (isConn) => {
             this.connected = isConn;
@@ -122,6 +131,65 @@
       if (!res.ok) {
         this._toast(res.error || "تعذّر إرسال الأمر");
       }
+    }
+
+    _stopLocalTimerLoop() {
+      if (this._localTimerInterval) {
+        clearInterval(this._localTimerInterval);
+        this._localTimerInterval = null;
+      }
+    }
+
+    _getActiveTimerInfo(pub) {
+      if (!pub || typeof pub !== "object") return null;
+      if (pub.screen === "question" && pub.questionView) {
+        const qv = pub.questionView;
+        if (qv.timerMode === "unlimited") return { unlimited: true, timer: qv.timer, fallback: 0 };
+        return { unlimited: false, timer: qv.timer, fallback: qv.timerRemaining };
+      }
+      if (pub.screen === "blitz" && pub.blitzView) {
+        return { unlimited: false, timer: pub.blitzView.timer, fallback: pub.blitzView.timerRemaining };
+      }
+      if (pub.screen === "charades-solo" && pub.charadesSoloView) {
+        return { unlimited: false, timer: pub.charadesSoloView.timer, fallback: pub.charadesSoloView.timerRemaining };
+      }
+      if (pub.screen === "final" && pub.finalRoundView) {
+        return { unlimited: false, timer: pub.finalRoundView.timer, fallback: pub.finalRoundView.timerRemaining };
+      }
+      return null;
+    }
+
+    _formatLiveTimerFromDescriptor(timerObj, fallbackRemaining, isUnlimited = false) {
+      if (isUnlimited || (timerObj && timerObj.status === "unlimited")) return "∞";
+      const utils = window.SeenJeemRealtimeUtils;
+      const rt = window.SeenJeemRealtimeSync;
+      const offsetMs = rt && typeof rt.getServerTimeOffsetMs === "function" ? rt.getServerTimeOffsetMs() : 0;
+      const secs =
+        utils && typeof utils.computeTimerRemainingSeconds === "function"
+          ? utils.computeTimerRemainingSeconds(timerObj, fallbackRemaining, offsetMs)
+          : Math.max(0, Math.floor(Number(fallbackRemaining) || 0));
+      return secs === null ? "∞" : formatTime(secs);
+    }
+
+    _syncLocalTimerLoop() {
+      const info = this._getActiveTimerInfo(this.publicState);
+      const isRunning = Boolean(info && !info.unlimited && info.timer && info.timer.status === "running" && Number.isFinite(info.timer.endAtMs));
+      if (!isRunning) {
+        this._stopLocalTimerLoop();
+        return;
+      }
+      if (this._localTimerInterval) return;
+      this._localTimerInterval = setInterval(() => {
+        const cur = this._getActiveTimerInfo(this.publicState);
+        if (!cur || cur.unlimited || !cur.timer || cur.timer.status !== "running") {
+          this._stopLocalTimerLoop();
+          return;
+        }
+        const el = document.getElementById("rh-live-timer");
+        if (el) {
+          el.textContent = this._formatLiveTimerFromDescriptor(cur.timer, cur.fallback, false);
+        }
+      }, 250);
     }
 
     _toast(msg) {
@@ -463,7 +531,7 @@
         <section class="rh-card">
           <div class="rh-card-head">
             <span>${escapeHtml(qv.categoryIcon || "🎯")} ${escapeHtml(qv.categoryName)} (${qv.basePoints})</span>
-            <span class="rh-timer-pill">${qv.timerMode === "unlimited" ? "∞" : formatTime(qv.timerRemaining)}</span>
+            <span id="rh-live-timer" class="rh-timer-pill">${this._formatLiveTimerFromDescriptor(qv.timer, qv.timerRemaining, qv.timerMode === "unlimited")}</span>
           </div>
           ${!inDdWager ? `<p class="rh-question-text">${escapeHtml(qText)}</p>` : ""}
           ${secretCard}
@@ -486,7 +554,7 @@
         <section class="rh-card">
           <div class="rh-card-head">
             <span>⚡ جولة البرق — ${escapeHtml(bv.activeTeamName)}</span>
-            <span class="rh-timer-pill">${formatTime(bv.timerRemaining)}</span>
+            <span id="rh-live-timer" class="rh-timer-pill">${this._formatLiveTimerFromDescriptor(bv.timer, bv.timerRemaining, false)}</span>
           </div>
           ${
             bv.phase === "playing"
@@ -515,7 +583,7 @@
         <section class="rh-card">
           <div class="rh-card-head">
             <span>🎭 من غير كلام — ${escapeHtml(cv.activeTeamName)}</span>
-            <span class="rh-timer-pill">${formatTime(cv.timerRemaining)}</span>
+            <span id="rh-live-timer" class="rh-timer-pill">${this._formatLiveTimerFromDescriptor(cv.timer, cv.timerRemaining, false)}</span>
           </div>
           ${
             cv.phase === "playing"
@@ -569,7 +637,7 @@
         <section class="rh-card">
           <div class="rh-card-head">
             <span>⚔️ جولة الرهان النهائي (${escapeHtml(fv.phase)})</span>
-            <span class="rh-timer-pill">${formatTime(fv.timerRemaining)}</span>
+            <span id="rh-live-timer" class="rh-timer-pill">${this._formatLiveTimerFromDescriptor(fv.timer, fv.timerRemaining, false)}</span>
           </div>
           ${priv.finalAnswer ? `<div class="rh-secret-box"><div class="rh-secret-label">🔒 إجابة سؤال الحسم</div><div class="rh-secret-answer">✅ ${escapeHtml(priv.finalAnswer)}</div></div>` : ""}
           <div class="rh-final-list">${cards}</div>
@@ -587,8 +655,87 @@
     _renderToolsTab() {
       const teams = (this.publicState && Array.isArray(this.publicState.teams) && this.publicState.teams) || [];
       const intermissionOn = Boolean(this.publicState && this.publicState.intermission && this.publicState.intermission.active);
+      const wl = (this.publicState && this.publicState.wireless) || {};
+      const joinLocked = Boolean(wl.joinLocked);
+      const maxPerTeam = Number(wl.maxDevicesPerTeam) === 1 ? 1 : 0;
+
+      const deviceEntries = Object.entries(this.playersMap || {})
+        .map(([devId, info]) => ({
+          deviceId: (info && info.deviceId) || devId,
+          teamIdx: Number.isInteger(Number(info && info.teamIdx)) ? Number(info.teamIdx) : 0,
+          label: (info && info.label) || "جهاز متصل"
+        }))
+        .filter((d) => Boolean(d.deviceId));
+
+      const displayTeams =
+        teams.length >= 2
+          ? teams
+          : [
+              { name: "الفريق الأول" },
+              { name: "الفريق الثاني" }
+            ];
+
+      const devicesHtml = displayTeams
+        .map((t, idx) => {
+          const teamDevices = deviceEntries.filter((d) => d.teamIdx === idx);
+          const hasDup = teamDevices.length > 1;
+          const rows =
+            teamDevices.length === 0
+              ? `<div class="rh-device-empty">لا توجد أجهزة متصلة</div>`
+              : teamDevices
+                  .map(
+                    (d) => `
+                  <div class="rh-device-row">
+                    <span class="rh-device-name">📱 ${escapeHtml(d.label)}</span>
+                    <button
+                      type="button"
+                      class="btn btn-danger-outline rh-mini-btn"
+                      data-rh-cmd="KICK_PLAYER"
+                      data-payload='${escapeHtml(JSON.stringify({ deviceId: d.deviceId }))}'
+                    >
+                      🚫 طرد
+                    </button>
+                  </div>
+                `
+                  )
+                  .join("");
+          return `
+            <div class="rh-device-group team-${idx + 1}${hasDup ? " has-dup" : ""}">
+              <div class="rh-device-group-head">
+                <div class="rh-ref-team-name">
+                  <span class="team-badge-dot team-${idx + 1}-dot"></span>
+                  <strong>${escapeHtml(t.name)}</strong>
+                  <span class="rh-device-count">${teamDevices.length} 📱</span>
+                </div>
+                ${hasDup ? `<span class="rh-dup-badge">⚠️ أكثر من جهاز</span>` : ""}
+              </div>
+              ${rows}
+            </div>
+          `;
+        })
+        .join("");
 
       return `
+        <section class="rh-card">
+          <div class="rh-card-head">
+            <span>🔒 قفل الغرفة وإدارة الأجهزة (${deviceEntries.length} 📱)</span>
+          </div>
+          <div class="rh-btn-row rh-cols-2">
+            <button type="button" class="btn ${joinLocked ? "btn-amber" : "btn-secondary"} rh-touch-btn" data-rh-cmd="TOGGLE_JOIN_LOCK">
+              ${joinLocked ? "🔒 مقفلة (افتح)" : "🔓 قفل الانضمام"}
+            </button>
+            <button
+              type="button"
+              class="btn ${maxPerTeam === 1 ? "btn-primary" : "btn-gold-outline"} rh-touch-btn"
+              data-rh-cmd="SET_MAX_DEVICES_PER_TEAM"
+              data-payload='{"maxDevicesPerTeam":${maxPerTeam === 1 ? 0 : 1}}'
+            >
+              ${maxPerTeam === 1 ? "👤 جهاز واحد/فريق" : "👥 غير محدود"}
+            </button>
+          </div>
+          <div class="rh-devices-list">${devicesHtml}</div>
+        </section>
+
         <section class="rh-card">
           <div class="rh-card-head"><span>🎛️ لوحة المؤثرات الصوتية (على التلفزيون)</span></div>
           <div class="rh-btn-row rh-cols-2">

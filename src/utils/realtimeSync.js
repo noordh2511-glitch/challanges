@@ -1,9 +1,11 @@
 /**
- * محرك المزامنة اللاسلكية عبر Firebase Realtime Database (Master-Owned State & Command Queue)
+ * محرك المزامنة اللاسلكية عبر Firebase Realtime Database (Phase 4 — Pack 9 & Pack 10)
  * - يستورد Firebase Modular SDK (v10) ديناميكياً عند تفعيل الغرفة فقط (صفر طلبات شبكة في الوضع المحلي!)
- * - يدعم تسجيل الدخول المجهول (signInAnonymously) تلقائياً
- * - فصل صارم بين publicState (للاعبين والتلفزيون) و hostPrivate/{hostToken} (سري للمقدّم فقط)
- * - يدعم طابور أوامر المقدّم hostCommands/{hostToken}، جرس السرعة بـ serverTimestamp()، والرهانات السرية
+ * - عزل الصور الثقيلة (Media Isolation): منع DataURL داخل publicState/hostPrivate ورفعها مرة واحدة في media/{mediaKey}
+ * - مزامنة المؤقتات بالطوابع الزمنية (.info/serverTimeOffset + endAtMs) دون أي كتابة كل ثانية
+ * - تقليص حجم الحزم ومنع الكتابة المكررة (Shallow Diffing) + عدّاد استهلاك الجلسة التشخيصي (KB وعدد الكتابات)
+ * - تنظيف تلقائي للغرف الخاملة (>24 ساعة) عبر سجل محلي آمن (seen-jeem-owned-rooms-v1) وحماية الانقطاع المؤقت
+ * - تتبّع الأجهزة المتصلة (Presence) وقفل الانضمام وحدّ الأجهزة لكل فريق والطرد الفوري (Kick Device)
  */
 (function () {
   "use strict";
@@ -11,6 +13,9 @@
   const FIREBASE_SDK_VER = "10.14.1";
   const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // بدون O, 0, I, 1 لتجنب الالتباس
   const DEVICE_ID_KEY = "seen_jeem_wireless_device_id_v1";
+  const OWNED_ROOMS_STORAGE_KEY = "seen-jeem-owned-rooms-v1";
+  const STALE_ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 24 ساعة
+  const ACTIVITY_TOUCH_INTERVAL_MS = 5 * 60 * 1000; // حد أقصى مرة كل 5 دقائق
 
   function getUrlParams() {
     try {
@@ -87,6 +92,61 @@
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
 
+  function isDataUrlImage(val) {
+    return typeof val === "string" && /^data:image\//i.test(val.trim());
+  }
+
+  function sanitizeFirebaseKey(raw) {
+    const cleaned = String(raw || "")
+      .trim()
+      .replace(/[.#$\[\]\/\s]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 64);
+    return cleaned || `k_${Date.now().toString(36)}`;
+  }
+
+  function quickHashString(str) {
+    let h = 2166136261;
+    const s = String(str || "");
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(36);
+  }
+
+  function estimateUtf8Bytes(str) {
+    if (typeof str !== "string" || !str) return 0;
+    try {
+      if (typeof TextEncoder !== "undefined") {
+        return new TextEncoder().encode(str).length;
+      }
+      return new Blob([str]).size;
+    } catch (_err) {
+      return str.length * 2;
+    }
+  }
+
+  /**
+   * حساب الثواني المتبقية محلياً بدقة بالاعتماد على endAtMs + .info/serverTimeOffset دون أي كتابة كل ثانية
+   */
+  function computeTimerRemainingSeconds(timerObj, fallbackRemaining = 0, serverTimeOffsetMs = 0) {
+    if (timerObj && typeof timerObj === "object") {
+      if (timerObj.status === "unlimited") return null;
+      if (timerObj.status === "running" && Number.isFinite(timerObj.endAtMs)) {
+        const nowServer = Date.now() + (Number(serverTimeOffsetMs) || 0);
+        return Math.max(0, Math.ceil((Number(timerObj.endAtMs) - nowServer) / 1000));
+      }
+      if (timerObj.status === "finished" || timerObj.status === "ended") {
+        return 0;
+      }
+      if (Number.isFinite(timerObj.remainingMs)) {
+        return Math.max(0, Math.ceil(Number(timerObj.remainingMs) / 1000));
+      }
+    }
+    return Math.max(0, Math.floor(Number(fallbackRemaining) || 0));
+  }
+
   /**
    * إزالة قيم undefined لأن Firebase RTDB يرفض undefined
    */
@@ -103,6 +163,248 @@
     return out;
   }
 
+  /**
+   * طبقة أمان أخيرة تمنع تسرّب أي DataURL ثقيل داخل publicState أو hostPrivate
+   */
+  function stripAnyDataUrlsDeep(obj) {
+    if (typeof obj === "string") {
+      return isDataUrlImage(obj) ? null : obj;
+    }
+    if (obj === null || typeof obj !== "object") return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => stripAnyDataUrlsDeep(item));
+    }
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+      const val = obj[k];
+      if (val !== undefined) {
+        out[k] = stripAnyDataUrlsDeep(val);
+      }
+    });
+    return out;
+  }
+
+  /**
+   * فصل صور DataURL الثقيلة من questionView إلى حزمة media مستقلة
+   * مع الالتزام الكامل ببروتوكول منع التسريب (answerImage لا يُعزل ولا يُرفع إلا بعد answerRevealed)
+   */
+  function isolateQuestionMedia(publicState) {
+    if (!publicState || typeof publicState !== "object" || publicState.screen !== "question" || !publicState.questionView) {
+      return { mediaKey: "", mediaPayload: null, mediaSig: "" };
+    }
+    const qv = publicState.questionView;
+    const hasQImgData = isDataUrlImage(qv.questionImage);
+    const hasAnsImgData = Boolean(qv.answerRevealed) && isDataUrlImage(qv.answerImage);
+    const hasMultiData = Array.isArray(qv.images) && qv.images.some((item) => isDataUrlImage(item));
+
+    if (!hasQImgData && !hasAnsImgData && !hasMultiData) {
+      qv.hasMedia = false;
+      qv.mediaKey = null;
+      return { mediaKey: "", mediaPayload: null, mediaSig: "" };
+    }
+
+    const rawId =
+      (typeof qv.questionId === "string" && qv.questionId.trim()) ||
+      `${qv.categoryId || "cat"}_${qv.basePoints || 200}_${quickHashString(
+        (qv.questionText || "") + "|" + (qv.visualType || "normal")
+      )}`;
+    const mediaKey = `q_${sanitizeFirebaseKey(rawId)}`;
+    const mediaPayload = { mediaKey };
+    const sigParts = [mediaKey];
+
+    if (hasQImgData) {
+      mediaPayload.questionImage = qv.questionImage;
+      qv.questionImage = null;
+      sigParts.push("q:" + qv.questionId + ":" + mediaPayload.questionImage.length);
+    }
+    if (hasAnsImgData) {
+      mediaPayload.answerImage = qv.answerImage;
+      qv.answerImage = null;
+      sigParts.push("a:" + mediaPayload.answerImage.length);
+    } else if (isDataUrlImage(qv.answerImage)) {
+      // حماية إضافية لمنع التسريب قبل الكشف
+      qv.answerImage = null;
+    }
+    if (hasMultiData) {
+      mediaPayload.images = qv.images.slice();
+      qv.images = qv.images.map((item) => (isDataUrlImage(item) ? null : item));
+      sigParts.push("m:" + mediaPayload.images.length + ":" + mediaPayload.images.reduce((s, x) => s + (x ? x.length : 0), 0));
+    }
+
+    qv.hasMedia = true;
+    qv.mediaKey = mediaKey;
+    qv.mediaFields = {
+      questionImage: hasQImgData,
+      answerImage: hasAnsImgData,
+      images: hasMultiData
+    };
+
+    return {
+      mediaKey,
+      mediaPayload,
+      mediaSig: sigParts.join("|")
+    };
+  }
+
+  /**
+   * تقليص حزمة publicState المرسلة إلى Firebase RTDB وحذف الحقول غير اللازمة أو المتغيرة كل ثانية
+   */
+  function buildCompactFirebasePublicState(rawPublicState) {
+    if (!rawPublicState || typeof rawPublicState !== "object") return null;
+
+    // نسخ خفيف حتى لا نعدّل كائن BroadcastChannel المحلي
+    const pub = stripUndefined(rawPublicState);
+
+    // حذف الحقول غير اللازمة للريموت وهواتف الفرق أو التي تسبب فروقات كاذبة
+    delete pub.sentAt;
+    delete pub.audioSettings;
+    delete pub.displayPrefs;
+    delete pub.undoStack;
+    delete pub.matchEvents;
+
+    // تقليص winnerView بحذف سجل التحليلات الضخم غير المستخدم في الهواتف
+    if (pub.winnerView && typeof pub.winnerView === "object") {
+      pub.winnerView = {
+        winnerIdx: pub.winnerView.winnerIdx !== undefined ? pub.winnerView.winnerIdx : null,
+        leaderIndices: Array.isArray(pub.winnerView.leaderIndices) ? pub.winnerView.leaderIndices : [],
+        eyebrow: pub.winnerView.eyebrow || "",
+        title: pub.winnerView.title || "",
+        teams: Array.isArray(pub.winnerView.teams)
+          ? pub.winnerView.teams.map((t) => ({ id: t.id, name: t.name, score: Number(t.score) || 0 }))
+          : []
+      };
+    }
+
+    // تقليص matchSettings إلى الضروري فقط
+    if (pub.matchSettings && typeof pub.matchSettings === "object") {
+      pub.matchSettings = {
+        teamCount: Number(pub.matchSettings.teamCount) || 2,
+        stealEnabled: Boolean(pub.matchSettings.stealEnabled),
+        hintEnabled: Boolean(pub.matchSettings.hintEnabled),
+        mainTimerSeconds: Number(pub.matchSettings.mainTimerSeconds) || 0,
+        stealTimerSeconds: Number(pub.matchSettings.stealTimerSeconds) || 15
+      };
+    }
+
+    // استقرار حقول المؤقت أثناء العدّ (يُعتمد على timer.endAtMs فقط دون كتابة كل ثانية)
+    const stabilizeTimerHolder = (holder, remField = "timerRemaining", timerField = "timer") => {
+      if (!holder || typeof holder !== "object") return;
+      const t = holder[timerField];
+      if (t && typeof t === "object") {
+        if (t.status === "running") {
+          holder[remField] = Math.max(0, Math.ceil((Number(t.remainingMs) || 0) / 1000));
+        } else if (t.status === "finished" || t.status === "ended" || t.status === "unlimited") {
+          holder[remField] = 0;
+        } else if (Number.isFinite(t.remainingMs)) {
+          holder[remField] = Math.max(0, Math.ceil(Number(t.remainingMs) / 1000));
+        }
+      }
+    };
+
+    if (pub.questionView) {
+      stabilizeTimerHolder(pub.questionView, "timerRemaining", "timer");
+      stabilizeTimerHolder(pub.questionView, "memoryRemaining", "memoryTimer");
+    }
+    if (pub.finalRoundView) {
+      stabilizeTimerHolder(pub.finalRoundView, "timerRemaining", "timer");
+    }
+    if (pub.blitzView) {
+      stabilizeTimerHolder(pub.blitzView, "timerRemaining", "timer");
+      // حذف ملخص الأسئلة الطويل إذا لم نكن في turn-summary
+      if (pub.blitzView.phase !== "turn-summary") {
+        pub.blitzView.turnSummary = [];
+      }
+    }
+    if (pub.charadesSoloView) {
+      stabilizeTimerHolder(pub.charadesSoloView, "timerRemaining", "timer");
+      if (pub.charadesSoloView.phase !== "turn-summary") {
+        pub.charadesSoloView.turnSummary = [];
+      }
+    }
+    if (pub.intermission) {
+      stabilizeTimerHolder(pub.intermission, "remainingSeconds", "timer");
+    }
+
+    // عزل صور DataURL الثقيلة من questionView
+    const mediaInfo = isolateQuestionMedia(pub);
+
+    // منع قاطع لأي DataURL متبقٍ داخل publicState
+    const safePub = stripAnyDataUrlsDeep(pub);
+    return {
+      publicState: safePub,
+      mediaInfo
+    };
+  }
+
+  function buildCompactHostPrivate(rawHostPrivate) {
+    if (!rawHostPrivate || typeof rawHostPrivate !== "object") return null;
+    const priv = stripUndefined(rawHostPrivate);
+    delete priv.updatedAt; // منع الفروقات الكاذبة في Shallow Diffing
+    return stripAnyDataUrlsDeep(priv);
+  }
+
+  /* =========================================================
+     سجل الغرف المملوكة محلياً (seen-jeem-owned-rooms-v1) للتنظيف الآمن
+     ========================================================= */
+  function loadOwnedRooms() {
+    try {
+      const raw = localStorage.getItem(OWNED_ROOMS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item) => item && typeof item.roomCode === "string" && item.roomCode.length >= 4);
+    } catch (_err) {
+      return [];
+    }
+  }
+
+  function saveOwnedRooms(list) {
+    try {
+      localStorage.setItem(OWNED_ROOMS_STORAGE_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+    } catch (_err) {}
+  }
+
+  function recordOwnedRoom(roomCode, ownerUid) {
+    if (!roomCode) return;
+    const now = Date.now();
+    const list = loadOwnedRooms().filter((r) => r.roomCode !== roomCode);
+    list.push({
+      roomCode,
+      createdAt: now,
+      lastActivityAt: now,
+      ownerUid: ownerUid || ""
+    });
+    saveOwnedRooms(list.slice(-30));
+  }
+
+  function touchOwnedRoomLocal(roomCode) {
+    if (!roomCode) return;
+    const list = loadOwnedRooms();
+    let changed = false;
+    list.forEach((r) => {
+      if (r.roomCode === roomCode) {
+        r.lastActivityAt = Date.now();
+        changed = true;
+      }
+    });
+    if (changed) saveOwnedRooms(list);
+  }
+
+  function removeOwnedRoomLocal(roomCode) {
+    if (!roomCode) return;
+    const list = loadOwnedRooms().filter((r) => r.roomCode !== roomCode);
+    saveOwnedRooms(list);
+  }
+
+  function getStaleOwnedRooms(excludeRoomCode = "") {
+    const now = Date.now();
+    return loadOwnedRooms().filter((r) => {
+      if (excludeRoomCode && r.roomCode === excludeRoomCode) return false;
+      const refTime = Number(r.lastActivityAt) || Number(r.createdAt) || 0;
+      return refTime > 0 && now - refTime > STALE_ROOM_TTL_MS;
+    });
+  }
+
   class RealtimeSyncEngine {
     constructor() {
       this._sdk = null;
@@ -117,6 +419,26 @@
       this.hostToken = "";
       this.connected = false;
       this.deviceId = getOrCreateDeviceId();
+
+      // طابع زمن الخادم (.info/serverTimeOffset)
+      this._serverTimeOffsetMs = 0;
+
+      // عزل الصور وكاش القراءة
+      this._activeMediaKey = "";
+      this._uploadedMediaSig = "";
+      this._mediaCache = new Map();
+
+      // Shallow Diffing & Session Bandwidth Diagnostics
+      this._lastPublicSig = "";
+      this._lastHostPrivateSig = "";
+      this._stats = { writes: 0, skippedWrites: 0, bytesSent: 0, mediaUploads: 0 };
+      this._onStatsUpdate = null;
+
+      // التنظيف والنشاط والأجهزة المعتمدة
+      this._lastActivityTouchMs = 0;
+      this._approvedDevices = new Set();
+      this._lastPlayerPresence = null;
+      this._kicked = false;
     }
 
     isConfigured() {
@@ -127,6 +449,50 @@
       return Boolean(this._role && this.roomCode);
     }
 
+    getServerTimeOffsetMs() {
+      return Number(this._serverTimeOffsetMs) || 0;
+    }
+
+    getServerNowMs() {
+      return Date.now() + this.getServerTimeOffsetMs();
+    }
+
+    getSessionStats() {
+      const bytes = Number(this._stats.bytesSent) || 0;
+      return {
+        writes: this._stats.writes,
+        skippedWrites: this._stats.skippedWrites,
+        bytesSent: bytes,
+        kbSent: Number((bytes / 1024).toFixed(2)),
+        mediaUploads: this._stats.mediaUploads
+      };
+    }
+
+    _resetSessionTrackers() {
+      this._activeMediaKey = "";
+      this._uploadedMediaSig = "";
+      this._lastPublicSig = "";
+      this._lastHostPrivateSig = "";
+      this._stats = { writes: 0, skippedWrites: 0, bytesSent: 0, mediaUploads: 0 };
+      this._lastActivityTouchMs = 0;
+      this._approvedDevices = new Set();
+      this._lastPlayerPresence = null;
+      this._kicked = false;
+      this._mediaCache.clear();
+    }
+
+    _recordWrite(payloadOrJson, { isMedia = false } = {}) {
+      const json = typeof payloadOrJson === "string" ? payloadOrJson : JSON.stringify(payloadOrJson || {});
+      this._stats.writes += 1;
+      this._stats.bytesSent += estimateUtf8Bytes(json);
+      if (isMedia) this._stats.mediaUploads += 1;
+      if (typeof this._onStatsUpdate === "function") {
+        try {
+          this._onStatsUpdate(this.getSessionStats());
+        } catch (_err) {}
+      }
+    }
+
     getRoomInfo() {
       return {
         active: this.isActive(),
@@ -134,6 +500,7 @@
         roomCode: this.roomCode,
         hostToken: this.hostToken,
         connected: this.connected,
+        deviceId: this.deviceId,
         remoteUrl: this.roomCode && this.hostToken ? buildRoleUrl("remote", this.roomCode, this.hostToken) : "",
         playerUrl: this.roomCode ? buildRoleUrl("player", this.roomCode) : ""
       };
@@ -199,19 +566,104 @@
       this._unsubs = [];
     }
 
+    _watchServerTimeOffset(sdk, db) {
+      const offsetRef = sdk.dbMod.ref(db, ".info/serverTimeOffset");
+      const unsub = sdk.dbMod.onValue(offsetRef, (snap) => {
+        const val = snap.val();
+        if (typeof val === "number" && Number.isFinite(val)) {
+          this._serverTimeOffsetMs = val;
+        }
+      });
+      this._unsubs.push(unsub);
+    }
+
     _watchConnected(sdk, db, onConnectionState) {
       const connRef = sdk.dbMod.ref(db, ".info/connected");
       const unsub = sdk.dbMod.onValue(connRef, (snap) => {
         const isConn = Boolean(snap.val());
         this.connected = isConn;
+
+        // إعادة تسليح onDisconnect وضبط hostOnline = true عند عودة الاتصال للجهاز الرئيسي
+        if (isConn && this._role === "master" && this.roomCode) {
+          this._armMasterPresence(sdk, db, this.roomCode).catch(() => {});
+        }
+        // إعادة تسجيل حضور اللاعب تلقائياً عند تذبذب الإنترنت (بشرط ألا يكون مطروداً)
+        if (isConn && this._role === "player" && this.roomCode && this._lastPlayerPresence && !this._kicked) {
+          const lp = this._lastPlayerPresence;
+          this.registerPlayerPresence(lp.teamIdx, lp.teamName, lp.label).catch(() => {});
+        }
+
         if (typeof onConnectionState === "function") onConnectionState(isConn);
       });
       this._unsubs.push(unsub);
     }
 
+    async _armMasterPresence(sdk, db, roomCode) {
+      const metaRef = sdk.dbMod.ref(db, `rooms/${roomCode}/meta`);
+      try {
+        // حماية الانقطاع العابر: لا نحذف الغرفة عند انقطاع الإنترنت؛ نضبط hostOnline = false فقط
+        await sdk.dbMod.onDisconnect(metaRef).update({
+          hostOnline: false,
+          disconnectedAt: sdk.dbMod.serverTimestamp()
+        });
+        await sdk.dbMod.update(metaRef, {
+          hostOnline: true,
+          disconnectedAt: null
+        });
+      } catch (_err) {}
+    }
+
+    _maybeTouchLastActivity() {
+      if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
+      const now = Date.now();
+      if (now - this._lastActivityTouchMs < ACTIVITY_TOUCH_INTERVAL_MS) return;
+      this._lastActivityTouchMs = now;
+      touchOwnedRoomLocal(this.roomCode);
+      const { dbMod } = this._sdk;
+      dbMod
+        .update(dbMod.ref(this._db, `rooms/${this.roomCode}/meta`), {
+          lastActivityAt: dbMod.serverTimestamp()
+        })
+        .catch(() => {});
+    }
+
+    /**
+     * التنظيف الآمن للغرف الخاملة (>24 ساعة) المملوكة لهذا الجهاز فقط دون قراءة جذر /rooms
+     */
+    async cleanupStaleOwnedRooms({ silent = true } = {}) {
+      const stale = getStaleOwnedRooms(this.roomCode);
+      if (stale.length === 0) return { cleaned: 0, attempted: 0 };
+      if (!this.isConfigured() || !navigator.onLine) {
+        return { cleaned: 0, attempted: 0 };
+      }
+
+      let cleaned = 0;
+      try {
+        const { sdk, db } = await this._ensureInitialized();
+        for (const entry of stale) {
+          try {
+            await sdk.dbMod.remove(sdk.dbMod.ref(db, `rooms/${entry.roomCode}`));
+            removeOwnedRoomLocal(entry.roomCode);
+            cleaned += 1;
+          } catch (err) {
+            const msg = String((err && (err.code || err.message)) || "").toLowerCase();
+            // إذا رُفضت الصلاحية (غرفة محذوفة أو تغير uid) نزيلها من القائمة المحلية حتى لا نعيد المحاولة للأبد
+            if (msg.includes("permission") || msg.includes("denied")) {
+              removeOwnedRoomLocal(entry.roomCode);
+            } else if (!silent) {
+              throw err;
+            }
+          }
+        }
+      } catch (err) {
+        if (!silent) throw err;
+      }
+      return { cleaned, attempted: stale.length };
+    }
+
     async testConnection(configOverride = null) {
       try {
-        const { sdk, db, uid } = await this._ensureInitialized(configOverride);
+        const { uid } = await this._ensureInitialized(configOverride);
         return {
           ok: true,
           uid,
@@ -235,36 +687,50 @@
       onBuzzes = null,
       onWagers = null,
       onPlayers = null,
-      onConnectionState = null
+      onConnectionState = null,
+      onStatsUpdate = null
     } = {}) {
       await this.closeRoom();
       const { sdk, db, uid } = await this._ensureInitialized();
+
+      // تنظيف أي غرف قديمة مملوكة لهذا الجهاز مرّ عليها أكثر من 24 ساعة بصمت
+      this.cleanupStaleOwnedRooms({ silent: true }).catch(() => {});
+
+      this._resetSessionTrackers();
+      this._onStatsUpdate = typeof onStatsUpdate === "function" ? onStatsUpdate : null;
 
       const roomCode = generateRoomCode();
       const hostToken = generateHostToken();
       const roomPath = `rooms/${roomCode}`;
 
       // 1) كتابة البيانات الوصفية أولاً لتمكين قواعد الأمان فوراً
-      await sdk.dbMod.set(sdk.dbMod.ref(db, `${roomPath}/meta`), {
+      const metaPayload = {
         ownerUid: uid,
         hostToken,
         createdAt: sdk.dbMod.serverTimestamp(),
-        appVersion: "4.9.0"
-      });
-
-      // 2) كتابة الحالة الأولية المنقّاة والبيانات السرية للمقدّم
-      await Promise.all([
-        sdk.dbMod.set(sdk.dbMod.ref(db, `${roomPath}/publicState`), stripUndefined(initialPublicState)),
-        sdk.dbMod.set(
-          sdk.dbMod.ref(db, `${roomPath}/hostPrivate/${hostToken}`),
-          stripUndefined(initialHostPrivate)
-        )
-      ]);
+        lastActivityAt: sdk.dbMod.serverTimestamp(),
+        hostOnline: true,
+        joinLocked: false,
+        maxDevicesPerTeam: 0,
+        appVersion: "4.10.0"
+      };
+      await sdk.dbMod.set(sdk.dbMod.ref(db, `${roomPath}/meta`), metaPayload);
+      this._recordWrite(metaPayload);
+      this._lastActivityTouchMs = Date.now();
+      recordOwnedRoom(roomCode, uid);
 
       this._role = "master";
       this.roomCode = roomCode;
       this.hostToken = hostToken;
 
+      // 2) تفعيل حماية الانقطاع المؤقت عبر onDisconnect (بدون حذف الغرفة!)
+      await this._armMasterPresence(sdk, db, roomCode);
+
+      // 3) كتابة الحالة الأولية المنقّاة والمقلّصة
+      await this.publishStates(initialPublicState, initialHostPrivate);
+
+      // 4) مراقبة الاتصال وطابع زمن الخادم
+      this._watchServerTimeOffset(sdk, db);
       this._watchConnected(sdk, db, onConnectionState);
 
       // الاستماع لطابور أوامر ريموت المقدّم
@@ -272,9 +738,9 @@
       const unsubCmd = sdk.dbMod.onChildAdded(cmdRef, (snap) => {
         const cmdId = snap.key;
         const cmdVal = snap.val();
-        // حذف الأمر فوراً بعد استلامه لمنع تكرار التنفيذ
         sdk.dbMod.remove(sdk.dbMod.ref(db, `${roomPath}/hostCommands/${hostToken}/${cmdId}`)).catch(() => {});
         if (cmdVal && typeof onCommand === "function") {
+          this._maybeTouchLastActivity();
           onCommand(cmdVal, cmdId);
         }
       });
@@ -304,26 +770,142 @@
       return this.getRoomInfo();
     }
 
-    async publishStates(publicState, hostPrivate) {
+    async publishStates(rawPublicState, rawHostPrivate) {
       if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
       const { dbMod } = this._sdk;
       const roomPath = `rooms/${this.roomCode}`;
       const tasks = [];
-      if (publicState) {
-        tasks.push(dbMod.set(dbMod.ref(this._db, `${roomPath}/publicState`), stripUndefined(publicState)));
+      let didWrite = false;
+
+      if (rawPublicState) {
+        const compact = buildCompactFirebasePublicState(rawPublicState);
+        if (compact) {
+          const { publicState, mediaInfo } = compact;
+
+          // إدارة عقدة media/ المعزولة (رفع مرة واحدة عند فتح السؤال، وحذف السابقة عند الإغلاق/التغيير)
+          if (mediaInfo.mediaKey && mediaInfo.mediaPayload) {
+            if (this._activeMediaKey && this._activeMediaKey !== mediaInfo.mediaKey) {
+              const staleKey = this._activeMediaKey;
+              tasks.push(dbMod.remove(dbMod.ref(this._db, `${roomPath}/media/${staleKey}`)).catch(() => {}));
+            }
+            if (mediaInfo.mediaSig !== this._uploadedMediaSig) {
+              this._activeMediaKey = mediaInfo.mediaKey;
+              this._uploadedMediaSig = mediaInfo.mediaSig;
+              const mediaJson = JSON.stringify(mediaInfo.mediaPayload);
+              tasks.push(
+                dbMod
+                  .set(dbMod.ref(this._db, `${roomPath}/media/${mediaInfo.mediaKey}`), mediaInfo.mediaPayload)
+                  .then(() => this._recordWrite(mediaJson, { isMedia: true }))
+              );
+              didWrite = true;
+            }
+          } else if (this._activeMediaKey) {
+            const staleKey = this._activeMediaKey;
+            this._activeMediaKey = "";
+            this._uploadedMediaSig = "";
+            tasks.push(dbMod.remove(dbMod.ref(this._db, `${roomPath}/media/${staleKey}`)).catch(() => {}));
+          }
+
+          // Shallow Diffing لـ publicState لمنع الكتابات المكررة
+          const pubJson = JSON.stringify(publicState);
+          if (pubJson !== this._lastPublicSig) {
+            this._lastPublicSig = pubJson;
+            tasks.push(
+              dbMod
+                .set(dbMod.ref(this._db, `${roomPath}/publicState`), publicState)
+                .then(() => this._recordWrite(pubJson))
+            );
+            didWrite = true;
+          } else {
+            this._stats.skippedWrites += 1;
+          }
+        }
       }
-      if (hostPrivate && this.hostToken) {
-        tasks.push(
-          dbMod.set(
-            dbMod.ref(this._db, `${roomPath}/hostPrivate/${this.hostToken}`),
-            stripUndefined(hostPrivate)
-          )
-        );
+
+      if (rawHostPrivate && this.hostToken) {
+        const cleanPriv = buildCompactHostPrivate(rawHostPrivate);
+        if (cleanPriv) {
+          const privJson = JSON.stringify(cleanPriv);
+          if (privJson !== this._lastHostPrivateSig) {
+            this._lastHostPrivateSig = privJson;
+            tasks.push(
+              dbMod
+                .set(dbMod.ref(this._db, `${roomPath}/hostPrivate/${this.hostToken}`), cleanPriv)
+                .then(() => this._recordWrite(privJson))
+            );
+            didWrite = true;
+          } else {
+            this._stats.skippedWrites += 1;
+          }
+        }
       }
+
+      if (tasks.length === 0) return;
+
       try {
         await Promise.all(tasks);
+        if (didWrite) this._maybeTouchLastActivity();
       } catch (_err) {
         // استمر بسلاسة دون كسر اللعب المحلي
+      }
+    }
+
+    async updateRoomControl({ joinLocked, maxDevicesPerTeam } = {}) {
+      if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
+      const { dbMod } = this._sdk;
+      const patch = {};
+      if (typeof joinLocked === "boolean") patch.joinLocked = joinLocked;
+      if (maxDevicesPerTeam !== undefined) {
+        patch.maxDevicesPerTeam = Number(maxDevicesPerTeam) === 1 ? 1 : 0;
+      }
+      if (Object.keys(patch).length === 0) return;
+      try {
+        await dbMod.update(dbMod.ref(this._db, `rooms/${this.roomCode}/meta`), patch);
+        this._recordWrite(patch);
+        this._maybeTouchLastActivity();
+      } catch (_err) {}
+    }
+
+    /**
+     * اعتماد جهاز منضم قبل قفل الغرفة كي يتمكن من تحديث الصفحة (F5) بسلاسة أثناء القفل
+     */
+    async approveDevice(deviceId) {
+      if (this._role !== "master" || !this.roomCode || !deviceId || !this._sdk || !this._db) return;
+      const cleanId = sanitizeFirebaseKey(deviceId);
+      if (this._approvedDevices.has(cleanId)) return;
+      this._approvedDevices.add(cleanId);
+      const { dbMod } = this._sdk;
+      try {
+        await dbMod.set(dbMod.ref(this._db, `rooms/${this.roomCode}/allowedDevices/${cleanId}`), true);
+        this._recordWrite({ [cleanId]: true });
+      } catch (_err) {
+        this._approvedDevices.delete(cleanId);
+      }
+    }
+
+    /**
+     * طرد جهاز متصل: حذف players/{deviceId} وallowedDevices/{deviceId} وكتابة kicked/{deviceId}: true
+     */
+    async kickPlayer(deviceId) {
+      if (this._role !== "master" || !this.roomCode || !deviceId || !this._sdk || !this._db) {
+        return { ok: false };
+      }
+      const cleanId = String(deviceId).trim();
+      if (!cleanId) return { ok: false };
+      this._approvedDevices.delete(cleanId);
+      const { dbMod } = this._sdk;
+      const updates = {
+        [`players/${cleanId}`]: null,
+        [`allowedDevices/${cleanId}`]: null,
+        [`kicked/${cleanId}`]: true
+      };
+      try {
+        await dbMod.update(dbMod.ref(this._db, `rooms/${this.roomCode}`), updates);
+        this._recordWrite(updates);
+        this._maybeTouchLastActivity();
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || "تعذّر طرد الجهاز" };
       }
     }
 
@@ -357,11 +939,44 @@
       this.roomCode = "";
       this.hostToken = "";
       this.connected = false;
+      this._resetSessionTrackers();
 
       if (prevRole === "master" && prevRoom && this._sdk && this._db) {
+        const { dbMod } = this._sdk;
         try {
-          await this._sdk.dbMod.remove(this._sdk.dbMod.ref(this._db, `rooms/${prevRoom}`));
+          await dbMod.onDisconnect(dbMod.ref(this._db, `rooms/${prevRoom}/meta`)).cancel();
         } catch (_err) {}
+        try {
+          await dbMod.remove(dbMod.ref(this._db, `rooms/${prevRoom}`));
+        } catch (_err) {}
+        removeOwnedRoomLocal(prevRoom);
+      }
+    }
+
+    /**
+     * جلب صورة سؤال معزولة مرة واحدة عبر get() مع كاش ذاكرة مؤقت (Map) — لا يُستدعى أبداً من playerView.js
+     */
+    async fetchMedia(mediaKey) {
+      if (!mediaKey || !this.roomCode || !this._sdk || !this._db) return null;
+      if (this._role === "player") return null; // عزل قاطع لهواتف الفرق عن تنزيل الصور
+      if (this._mediaCache.has(mediaKey)) {
+        return this._mediaCache.get(mediaKey);
+      }
+      const { dbMod } = this._sdk;
+      try {
+        const snap = await dbMod.get(dbMod.ref(this._db, `rooms/${this.roomCode}/media/${mediaKey}`));
+        const val = snap && snap.exists() ? snap.val() : null;
+        if (val) {
+          this._mediaCache.set(mediaKey, val);
+          // احتفظ بحد أقصى معقول في كاش الذاكرة
+          if (this._mediaCache.size > 16) {
+            const firstKey = this._mediaCache.keys().next().value;
+            this._mediaCache.delete(firstKey);
+          }
+        }
+        return val;
+      } catch (_err) {
+        return null;
       }
     }
 
@@ -373,6 +988,7 @@
       hostToken,
       onPublicState = null,
       onHostPrivate = null,
+      onPlayers = null,
       onConnectionState = null,
       onError = null
     } = {}) {
@@ -388,10 +1004,12 @@
       this.roomCode = cleanRoom;
       this.hostToken = cleanToken;
 
+      this._watchServerTimeOffset(sdk, db);
       this._watchConnected(sdk, db, onConnectionState);
 
       const pubRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/publicState`);
       const privRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/hostPrivate/${cleanToken}`);
+      const playersRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/players`);
 
       this._unsubs.push(
         sdk.dbMod.onValue(
@@ -417,6 +1035,16 @@
         )
       );
 
+      if (typeof onPlayers === "function") {
+        this._unsubs.push(
+          sdk.dbMod.onValue(
+            playersRef,
+            (snap) => onPlayers(snap.val() || {}),
+            () => {}
+          )
+        );
+      }
+
       return this.getRoomInfo();
     }
 
@@ -440,11 +1068,13 @@
     }
 
     /**
-     * الاتصال كهاتف فريق / لاعب (?mode=player)
+     * الاتصال كهاتف فريق / لاعب (?mode=player) — معزول تماماً عن عقدة media/
      */
     async connectAsPlayer({
       roomCode,
       onPublicState = null,
+      onPlayers = null,
+      onKicked = null,
       onConnectionState = null,
       onError = null
     } = {}) {
@@ -458,14 +1088,35 @@
       this._role = "player";
       this.roomCode = cleanRoom;
       this.hostToken = "";
+      this._kicked = false;
+      this._lastPlayerPresence = null;
 
+      // 1) فحص فوري ومراقبة حية لحالة الطرد kicked/{deviceId}
+      const kickRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/kicked/${this.deviceId}`);
+      this._unsubs.push(
+        sdk.dbMod.onValue(
+          kickRef,
+          (snap) => {
+            if (snap.val() === true) {
+              this._kicked = true;
+              this.disconnect();
+              if (typeof onKicked === "function") onKicked();
+            }
+          },
+          () => {}
+        )
+      );
+
+      this._watchServerTimeOffset(sdk, db);
       this._watchConnected(sdk, db, onConnectionState);
 
+      // 2) الاشتراك بـ publicState فقط (بدون media/ إطلاقاً!)
       const pubRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/publicState`);
       this._unsubs.push(
         sdk.dbMod.onValue(
           pubRef,
           (snap) => {
+            if (this._kicked) return;
             if (typeof onPublicState === "function") onPublicState(snap.val());
           },
           (err) => {
@@ -474,31 +1125,84 @@
         )
       );
 
+      // 3) الاشتراك بقائمة الأجهزة الخفيفة لمعرفة حد الأجهزة لكل فريق
+      if (typeof onPlayers === "function") {
+        const playersRef = sdk.dbMod.ref(db, `rooms/${cleanRoom}/players`);
+        this._unsubs.push(
+          sdk.dbMod.onValue(
+            playersRef,
+            (snap) => {
+              if (this._kicked) return;
+              onPlayers(snap.val() || {});
+            },
+            () => {}
+          )
+        );
+      }
+
       return this.getRoomInfo();
     }
 
-    async registerPlayerPresence(teamIdx, teamName) {
+    async isCurrentDevicePreApproved() {
+      if (this._role !== "player" || !this.roomCode || !this._sdk || !this._db) return false;
+      const { dbMod } = this._sdk;
+      try {
+        const snap = await dbMod.get(
+          dbMod.ref(this._db, `rooms/${this.roomCode}/allowedDevices/${this.deviceId}`)
+        );
+        return Boolean(snap && snap.exists() && snap.val() === true);
+      } catch (_err) {
+        return false;
+      }
+    }
+
+    async registerPlayerPresence(teamIdx, teamName, label = "") {
+      if (this._role !== "player" || !this.roomCode || !this._sdk || !this._db || this._kicked) {
+        return { ok: false, error: "غير متصل بالغرفة" };
+      }
+      const { dbMod } = this._sdk;
+      const idx = Number(teamIdx) || 0;
+      const cleanLabel = (typeof label === "string" ? label.trim() : "").slice(0, 24) || "جهاز 1";
+      const pRef = dbMod.ref(this._db, `rooms/${this.roomCode}/players/${this.deviceId}`);
+      this._lastPlayerPresence = { teamIdx: idx, teamName: String(teamName || ""), label: cleanLabel };
+      try {
+        await dbMod.onDisconnect(pRef).remove();
+        await dbMod.set(pRef, {
+          deviceId: this.deviceId,
+          uid: this._uid || "",
+          teamId: `team-${idx}`,
+          teamIdx: idx,
+          teamName: String(teamName || "").slice(0, 32),
+          label: cleanLabel,
+          joinedAt: dbMod.serverTimestamp(),
+          online: true
+        });
+        return { ok: true };
+      } catch (err) {
+        const msg = String((err && (err.code || err.message)) || "").toLowerCase();
+        if (msg.includes("permission") || msg.includes("denied")) {
+          return { ok: false, locked: true, error: "🔒 الغرفة مقفلة حالياً من قِبل المقدّم" };
+        }
+        return { ok: false, error: (err && err.message) || "تعذّر تسجيل الجهاز في الغرفة" };
+      }
+    }
+
+    async unregisterPlayerPresence() {
+      this._lastPlayerPresence = null;
       if (this._role !== "player" || !this.roomCode || !this._sdk || !this._db) return;
       const { dbMod } = this._sdk;
       const pRef = dbMod.ref(this._db, `rooms/${this.roomCode}/players/${this.deviceId}`);
       try {
-        await dbMod.onDisconnect(pRef).remove();
-        await dbMod.set(pRef, {
-          teamIdx: Number(teamIdx) || 0,
-          teamName: String(teamName || "").slice(0, 32),
-          uid: this._uid || "",
-          joinedAt: dbMod.serverTimestamp()
-        });
+        await dbMod.remove(pRef);
       } catch (_err) {}
     }
 
     async sendPlayerBuzz(buzzRoundId, teamIdx, teamName) {
-      if (this._role !== "player" || !this.roomCode || !buzzRoundId || !this._sdk || !this._db) {
+      if (this._role !== "player" || !this.roomCode || !buzzRoundId || !this._sdk || !this._db || this._kicked) {
         return { ok: false };
       }
       const { dbMod } = this._sdk;
       const teamKey = `team-${Number(teamIdx) || 0}`;
-      // استخدام مفتاح ثابت للفريق لمنع تعدد الضغطات من نفس الفريق في نفس الجولة
       const buzzRef = dbMod.ref(this._db, `rooms/${this.roomCode}/buzzes/${buzzRoundId}/${teamKey}`);
       try {
         await dbMod.set(buzzRef, {
@@ -515,7 +1219,7 @@
     }
 
     async sendSecretWager(roundId, teamIdx, { amount, answerText = "", locked = true } = {}) {
-      if (this._role !== "player" || !this.roomCode || !roundId || !this._sdk || !this._db) {
+      if (this._role !== "player" || !this.roomCode || !roundId || !this._sdk || !this._db || this._kicked) {
         return { ok: false };
       }
       const { dbMod } = this._sdk;
@@ -527,6 +1231,7 @@
           amount: Math.max(0, Math.round(Number(amount) || 0)),
           answerText: typeof answerText === "string" ? answerText.trim().slice(0, 140) : "",
           locked: Boolean(locked),
+          deviceId: this.deviceId,
           uid: this._uid || "",
           updatedAt: dbMod.serverTimestamp()
         });
@@ -542,15 +1247,20 @@
       this.roomCode = "";
       this.hostToken = "";
       this.connected = false;
+      this._lastPlayerPresence = null;
+      this._mediaCache.clear();
     }
   }
 
   window.SeenJeemRealtimeSync = new RealtimeSyncEngine();
   window.SeenJeemRealtimeUtils = {
+    OWNED_ROOMS_STORAGE_KEY,
     getUrlParams,
     getUrlMode,
     buildRoleUrl,
     generateRoomCode,
-    generateHostToken
+    generateHostToken,
+    isDataUrlImage,
+    computeTimerRemainingSeconds
   };
 })();

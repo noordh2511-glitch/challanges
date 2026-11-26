@@ -406,7 +406,15 @@
     csoloHoldActive: false,
     csoloLastFeedback: null,
     hofModeFilter: "all",
-    // حالة الحزمة التاسعة (الغرفة اللاسلكية عبر Firebase وجرس السرعة والرهان السري)
+    // حالة الحزمة التاسعة والعاشرة (الغرفة اللاسلكية عبر Firebase + تحصين الحزمة وإدارة الأجهزة)
+    timerStatus: "idle", // "idle" | "running" | "paused" | "finished" | "unlimited"
+    timerDurationMs: 0,
+    timerEndAtMs: null,
+    timerRemainingMs: 0,
+    memoryTimerStatus: "idle",
+    memoryTimerDurationMs: 0,
+    memoryTimerEndAtMs: null,
+    memoryTimerRemainingMs: 0,
     wireless: {
       active: false,
       connected: false,
@@ -417,6 +425,9 @@
       showQrOnTv: false,
       hostQrHidden: false,
       settingsOpen: false,
+      joinLocked: false,
+      maxDevicesPerTeam: 0, // 0 = غير محدود | 1 = جهاز واحد لكل فريق
+      stats: { writes: 0, skippedWrites: 0, bytesSent: 0, kbSent: 0, mediaUploads: 0 },
       buzzer: {
         state: "locked", // "locked" | "open" | "buzzed"
         roundId: "",
@@ -1032,7 +1043,16 @@
     wirelessBuzzerResultBox: document.getElementById("wireless-buzzer-result-box"),
     btnModalWbOpen: document.getElementById("btn-modal-wb-open"),
     btnModalWbLock: document.getElementById("btn-modal-wb-lock"),
-    btnModalWbReset: document.getElementById("btn-modal-wb-reset")
+    btnModalWbReset: document.getElementById("btn-modal-wb-reset"),
+    wirelessDiagnosticsBar: document.getElementById("wireless-diagnostics-bar"),
+    wirelessDiagKb: document.getElementById("wireless-diag-kb"),
+    wirelessDiagWrites: document.getElementById("wireless-diag-writes"),
+    wirelessDiagSkipped: document.getElementById("wireless-diag-skipped"),
+    wirelessDevicesPanel: document.getElementById("wireless-devices-panel"),
+    wirelessDevicesCountPill: document.getElementById("wireless-devices-count-pill"),
+    btnWirelessToggleLock: document.getElementById("btn-wireless-toggle-lock"),
+    btnWirelessToggleCap: document.getElementById("btn-wireless-toggle-cap"),
+    wirelessDevicesList: document.getElementById("wireless-devices-list")
   };
 
   /* =========================================================
@@ -4780,10 +4800,17 @@
         if (!state.currentQ || state.memoryPhase !== "loading") return;
         state.memoryPhase = "viewing";
         state.memoryRemaining = state.memoryTotal;
+        state.memoryTimerStatus = "running";
+        state.memoryTimerDurationMs = Math.max(0, state.memoryTotal) * 1000;
+        state.memoryTimerRemainingMs = state.memoryTimerDurationMs;
+        state.memoryTimerEndAtMs = getWirelessServerNowMs() + state.memoryTimerDurationMs;
         dom.memoryCountdownPanel.hidden = false;
         updateSingleImageZoomability();
         renderTimerUI();
-        renderMemoryCountdownUI();
+        renderMemoryCountdownUI(false);
+        if (state.dualScreen.connected || state.wireless.active) {
+          broadcastLiveDisplayState();
+        }
         persistActiveMatch();
 
         if (window.SeenJeemAudio) {
@@ -4792,7 +4819,7 @@
 
         state.memoryInterval = setInterval(() => {
           state.memoryRemaining = Math.max(0, state.memoryRemaining - 1);
-          renderMemoryCountdownUI();
+          renderMemoryCountdownUI(true);
 
           if (state.memoryRemaining > 0 && state.memoryRemaining <= 3) {
             if (window.SeenJeemAudio) {
@@ -4807,17 +4834,19 @@
       },
       onError: () => {
         stopMemoryInterval();
+        state.memoryTimerStatus = "idle";
+        state.memoryTimerEndAtMs = null;
         renderTimerUI();
       }
     });
   }
 
-  function renderMemoryCountdownUI() {
+  function renderMemoryCountdownUI(isPerSecondTick = true) {
     dom.memorySecondsDisplay.textContent = String(state.memoryRemaining);
     const pct = state.memoryTotal > 0 ? (state.memoryRemaining / state.memoryTotal) * 100 : 0;
     dom.memoryProgressBar.style.width = `${pct}%`;
     if (state.dualScreen.connected) {
-      broadcastLiveDisplayState();
+      broadcastLiveDisplayState({ skipWireless: Boolean(isPerSecondTick) });
     }
   }
 
@@ -4827,6 +4856,9 @@
       return;
     }
     stopMemoryInterval();
+    state.memoryTimerStatus = "finished";
+    state.memoryTimerEndAtMs = null;
+    state.memoryTimerRemainingMs = 0;
     state.questionImageRequestId++;
     state.memoryPhase = "question";
 
@@ -6105,8 +6137,29 @@
   }
 
   /* =========================================================
-     المؤقت القياسي ومؤقت «من غير كلام» (Countdown Timers)
+     المؤقت القياسي ومؤقت «من غير كلام» (Countdown Timers + Timestamp Sync)
      ========================================================= */
+  function getWirelessServerNowMs() {
+    return realtimeSync && typeof realtimeSync.getServerNowMs === "function"
+      ? realtimeSync.getServerNowMs()
+      : Date.now();
+  }
+
+  function buildTimerDescriptor(status, durationSec, remainingSec, endAtMs = null) {
+    const cleanStatus = status || "idle";
+    const durationMs = Math.max(0, Math.round((Number(durationSec) || 0) * 1000));
+    const remainingMs =
+      cleanStatus === "unlimited" || cleanStatus === "finished" || cleanStatus === "ended"
+        ? 0
+        : Math.max(0, Math.round((Number(remainingSec) || 0) * 1000));
+    return {
+      status: cleanStatus,
+      durationMs,
+      endAtMs: cleanStatus === "running" && Number.isFinite(endAtMs) ? Math.round(endAtMs) : null,
+      remainingMs
+    };
+  }
+
   function getConfiguredMainTimerSeconds() {
     const raw =
       state.matchSettings && state.matchSettings.mainTimerSeconds !== undefined
@@ -6124,8 +6177,12 @@
       state.timerMax = 0;
       state.timerMode = "unlimited";
       state.timerRunning = false;
+      state.timerStatus = "unlimited";
+      state.timerDurationMs = 0;
+      state.timerRemainingMs = 0;
+      state.timerEndAtMs = null;
       renderTimerUI();
-      if (state.dualScreen.connected) {
+      if (state.dualScreen.connected || state.wireless.active) {
         broadcastLiveDisplayState();
       }
       return;
@@ -6153,8 +6210,12 @@
     }
     state.timerMode = cleanSecs > 0 ? mode : "ended";
     state.timerRunning = cleanSecs > 0;
+    state.timerStatus = cleanSecs > 0 ? "running" : "finished";
+    state.timerDurationMs = state.timerMax * 1000;
+    state.timerRemainingMs = cleanSecs * 1000;
+    state.timerEndAtMs = cleanSecs > 0 ? getWirelessServerNowMs() + cleanSecs * 1000 : null;
     renderTimerUI();
-    if (state.dualScreen.connected) {
+    if (state.dualScreen.connected || state.wireless.active) {
       broadcastLiveDisplayState();
     }
 
@@ -6166,8 +6227,11 @@
   function pauseTimer() {
     stopTimerInterval();
     state.timerRunning = false;
+    state.timerStatus = state.timerMode === "unlimited" ? "unlimited" : state.timerRemaining > 0 ? "paused" : "finished";
+    state.timerRemainingMs = Math.max(0, state.timerRemaining) * 1000;
+    state.timerEndAtMs = null;
     renderTimerUI();
-    if (state.dualScreen.connected) {
+    if (state.dualScreen.connected || state.wireless.active) {
       broadcastLiveDisplayState();
     }
   }
@@ -6182,8 +6246,12 @@
           ? "charades"
           : "main";
     }
+    state.timerStatus = "running";
+    state.timerDurationMs = Math.max(state.timerMax, state.timerRemaining) * 1000;
+    state.timerRemainingMs = state.timerRemaining * 1000;
+    state.timerEndAtMs = getWirelessServerNowMs() + state.timerRemaining * 1000;
     renderTimerUI();
-    if (state.dualScreen.connected) {
+    if (state.dualScreen.connected || state.wireless.active) {
       broadcastLiveDisplayState();
     }
     state.timerInterval = setInterval(onTimerTick, 1000);
@@ -6213,7 +6281,14 @@
     state.timerRemaining = validSecs;
     state.timerMax = validSecs;
     state.timerMode = "charades";
+    state.timerStatus = "idle";
+    state.timerDurationMs = validSecs * 1000;
+    state.timerRemainingMs = validSecs * 1000;
+    state.timerEndAtMs = null;
     renderTimerUI();
+    if (state.dualScreen.connected || state.wireless.active) {
+      broadcastLiveDisplayState();
+    }
     persistActiveMatch();
   }
 
@@ -6242,7 +6317,14 @@
     state.timerRemaining = dur;
     state.timerMax = dur;
     state.timerMode = "charades";
+    state.timerStatus = "idle";
+    state.timerDurationMs = dur * 1000;
+    state.timerRemainingMs = dur * 1000;
+    state.timerEndAtMs = null;
     renderTimerUI();
+    if (state.dualScreen.connected || state.wireless.active) {
+      broadcastLiveDisplayState();
+    }
     persistActiveMatch();
   }
 
@@ -6266,18 +6348,28 @@
       }
     }
 
+    let justFinished = false;
     if (state.timerRemaining === 0) {
       stopTimerInterval();
       state.timerRunning = false;
       state.timerMode = "ended";
+      state.timerStatus = "finished";
+      state.timerEndAtMs = null;
+      state.timerRemainingMs = 0;
+      justFinished = true;
       if (window.SeenJeemAudio) {
         window.SeenJeemAudio.playTimeUp();
       }
     }
 
     renderTimerUI();
-    if (state.dualScreen.connected) {
-      broadcastLiveDisplayState();
+    // عدم كتابة كل ثانية إلى Firebase؛ نحدّث التلفزيون المحلي فقط، ونرسل لـ Firebase عند انتهاء المؤقت فقط
+    if (justFinished) {
+      if (state.dualScreen.connected || state.wireless.active) {
+        broadcastLiveDisplayState();
+      }
+    } else if (state.dualScreen.connected) {
+      broadcastLiveDisplayState({ skipWireless: true });
     }
   }
 
@@ -6770,7 +6862,19 @@
           ? q.questionImage
           : null;
 
+    const qTimerStatus =
+      state.timerMode === "unlimited"
+        ? "unlimited"
+        : state.timerRunning
+          ? "running"
+          : state.timerRemaining === 0 || state.timerMode === "ended"
+            ? "finished"
+            : state.timerStatus === "paused"
+              ? "paused"
+              : "idle";
+
     return {
+      questionId: q.id || "",
       categoryId: cq.category.id,
       categoryName: cq.category.name,
       categoryIcon: cq.category.icon || "🎯",
@@ -6811,11 +6915,26 @@
       timerMax: state.timerMax,
       timerMode: state.timerMode,
       timerRunning: Boolean(state.timerRunning),
+      timer: buildTimerDescriptor(
+        qTimerStatus,
+        state.timerMax,
+        state.timerRemaining,
+        state.timerEndAtMs
+      ),
       charadesDuration: cq.charadesDuration || 60,
       charadesTimerStarted: Boolean(cq.charadesTimerStarted),
       memoryPhase: state.memoryPhase,
       memoryRemaining: state.memoryRemaining,
       memoryTotal: state.memoryTotal,
+      memoryTimer:
+        cq.visualType === "memory"
+          ? buildTimerDescriptor(
+              state.memoryPhase === "viewing" ? "running" : state.memoryTimerStatus,
+              state.memoryTotal,
+              state.memoryRemaining,
+              state.memoryTimerEndAtMs
+            )
+          : null,
       // بروتوكول منع تسريب الإجابات: لا نمرر التلميح أو الإجابة أو الشرح إلا عند كشفها صراحةً
       hintText: allowHint ? q.hint || null : null,
       answerText: allowAnswer ? q.answer || null : null,
@@ -6871,8 +6990,8 @@
     };
   }
 
-  function broadcastLiveDisplayState() {
-    if (!liveSync || !liveSync.isSupported() || liveSync.isDisplayMode()) return;
+  function broadcastLiveDisplayState({ skipWireless = false } = {}) {
+    if (!liveSync || liveSync.isDisplayMode()) return;
 
     const isBlitzOpen =
       dom.blitzModal &&
@@ -6946,23 +7065,68 @@
           : null,
       finalRoundView:
         screen === "final" && finalRoundEngine && state.finalRound
-          ? finalRoundEngine.buildSanitizedDisplayPayload(state.finalRound, state.teams)
+          ? (() => {
+              const payload = finalRoundEngine.buildSanitizedDisplayPayload(state.finalRound, state.teams);
+              if (payload) {
+                const fr = state.finalRound;
+                const st = fr.timerRunning
+                  ? "running"
+                  : fr.timerRemaining === 0
+                    ? "finished"
+                    : fr.timerStatus || "idle";
+                payload.timer = buildTimerDescriptor(st, fr.timerMax || 60, fr.timerRemaining, fr.timerEndAtMs);
+              }
+              return payload;
+            })()
           : null,
       winnerView:
         screen === "winner" ? customWinnerView || buildDisplayWinnerPayload() : null,
       blitzView:
         screen === "blitz" && blitzEngine && state.blitz
-          ? blitzEngine.buildSanitizedDisplayPayload(state.blitz)
+          ? (() => {
+              const payload = blitzEngine.buildSanitizedDisplayPayload(state.blitz);
+              if (payload) {
+                const bz = state.blitz;
+                const st = bz.timerRunning
+                  ? "running"
+                  : bz.timerRemaining === 0
+                    ? "finished"
+                    : bz.timerStatus || "idle";
+                payload.timer = buildTimerDescriptor(st, bz.durationSeconds || 60, bz.timerRemaining, bz.timerEndAtMs);
+              }
+              return payload;
+            })()
           : null,
       charadesSoloView:
         screen === "charades-solo" && charadesEngine && state.charadesSolo
-          ? charadesEngine.buildSanitizedDisplayPayload(state.charadesSolo)
+          ? (() => {
+              const payload = charadesEngine.buildSanitizedDisplayPayload(state.charadesSolo);
+              if (payload) {
+                const cs = state.charadesSolo;
+                const st = cs.timerRunning
+                  ? "running"
+                  : cs.timerRemaining === 0
+                    ? "finished"
+                    : cs.timerStatus || "idle";
+                payload.timer = buildTimerDescriptor(st, cs.durationSeconds || 90, cs.timerRemaining, cs.timerEndAtMs);
+              }
+              return payload;
+            })()
           : null,
       intermission: {
         active: Boolean(state.intermission && state.intermission.active),
         message: (state.intermission && state.intermission.message) || "استراحة قصيرة — نعود بعد قليل",
         totalSeconds: Number(state.intermission && state.intermission.totalSeconds) || 0,
-        remainingSeconds: Number(state.intermission && state.intermission.remainingSeconds) || 0
+        remainingSeconds: Number(state.intermission && state.intermission.remainingSeconds) || 0,
+        timer:
+          state.intermission && state.intermission.active && Number(state.intermission.totalSeconds) > 0
+            ? buildTimerDescriptor(
+                state.intermission.remainingSeconds === 0 ? "finished" : state.intermission.timerStatus || "running",
+                state.intermission.totalSeconds,
+                state.intermission.remainingSeconds,
+                state.intermission.timerEndAtMs
+              )
+            : null
       },
       displayPrefs: {
         theme: state.theme || "dark-glass",
@@ -6975,13 +7139,25 @@
             roomCode: state.wireless.roomCode,
             playerUrl: state.wireless.playerUrl,
             showQrOnTv: Boolean(state.wireless.showQrOnTv),
+            joinLocked: Boolean(state.wireless.joinLocked),
+            maxDevicesPerTeam: Number(state.wireless.maxDevicesPerTeam) === 1 ? 1 : 0,
             buzzer: { ...state.wireless.buzzer }
           }
-        : { active: false, roomCode: "", playerUrl: "", showQrOnTv: false, buzzer: null }
+        : {
+            active: false,
+            roomCode: "",
+            playerUrl: "",
+            showQrOnTv: false,
+            joinLocked: false,
+            maxDevicesPerTeam: 0,
+            buzzer: null
+          }
     };
 
-    liveSync.broadcastState(snapshot);
-    if (state.wireless.active) {
+    if (liveSync.isSupported()) {
+      liveSync.broadcastState(snapshot);
+    }
+    if (state.wireless.active && !skipWireless) {
       publishWirelessSnapshot(snapshot);
     }
   }
@@ -8373,6 +8549,8 @@
     }
     if (state.finalRound) {
       state.finalRound.timerRunning = false;
+      state.finalRound.timerEndAtMs = null;
+      state.finalRound.timerStatus = state.finalRound.timerRemaining === 0 ? "finished" : "paused";
     }
   }
 
@@ -8484,16 +8662,23 @@
         window.SeenJeemAudio.playTick(state.finalRound.timerRemaining <= 5);
       }
     }
+    let justFinished = false;
     if (state.finalRound.timerRemaining === 0) {
       stopFinalRoundTimer();
+      state.finalRound.timerStatus = "finished";
+      justFinished = true;
       if (window.SeenJeemAudio) {
         window.SeenJeemAudio.playTimeUp();
       }
     }
 
     renderFinalRoundTimerUI();
-    if (state.dualScreen.connected) {
-      broadcastLiveDisplayState();
+    if (justFinished) {
+      if (state.dualScreen.connected || state.wireless.active) {
+        broadcastLiveDisplayState();
+      }
+    } else if (state.dualScreen.connected) {
+      broadcastLiveDisplayState({ skipWireless: true });
     }
   }
 
@@ -8501,12 +8686,18 @@
     if (!state.finalRound || state.finalRound.phase !== "question") return;
     if (state.finalRound.timerRunning) {
       stopFinalRoundTimer();
+      state.finalRound.timerStatus = "paused";
     } else if (state.finalRound.timerRemaining > 0) {
       stopFinalRoundTimer();
       state.finalRound.timerRunning = true;
+      state.finalRound.timerStatus = "running";
+      state.finalRound.timerEndAtMs = getWirelessServerNowMs() + state.finalRound.timerRemaining * 1000;
       state.finalTimerInterval = setInterval(onFinalRoundTimerTick, 1000);
     }
     renderFinalRoundTimerUI();
+    if (state.dualScreen.connected || state.wireless.active) {
+      broadcastLiveDisplayState();
+    }
     persistActiveMatch();
   }
 
@@ -8514,7 +8705,12 @@
     if (!state.finalRound || state.finalRound.phase !== "question") return;
     stopFinalRoundTimer();
     state.finalRound.timerRemaining = state.finalRound.timerMax || 60;
+    state.finalRound.timerStatus = "idle";
+    state.finalRound.timerEndAtMs = null;
     renderFinalRoundTimerUI();
+    if (state.dualScreen.connected || state.wireless.active) {
+      broadcastLiveDisplayState();
+    }
     persistActiveMatch();
   }
 
@@ -8760,6 +8956,8 @@
     state.finalRound.timerRemaining = state.finalRound.timerMax || 60;
     stopFinalRoundTimer();
     state.finalRound.timerRunning = true;
+    state.finalRound.timerStatus = "running";
+    state.finalRound.timerEndAtMs = getWirelessServerNowMs() + state.finalRound.timerRemaining * 1000;
     state.finalTimerInterval = setInterval(onFinalRoundTimerTick, 1000);
 
     renderFinalRoundModal();
@@ -9024,7 +9222,9 @@
       message: msg,
       durationMinutes: mins,
       totalSeconds: totalSecs,
-      remainingSeconds: totalSecs
+      remainingSeconds: totalSecs,
+      timerStatus: totalSecs > 0 ? "running" : "idle",
+      timerEndAtMs: totalSecs > 0 ? getWirelessServerNowMs() + totalSecs * 1000 : null
     };
 
     if (totalSecs > 0) {
@@ -9035,11 +9235,15 @@
         }
         state.intermission.remainingSeconds = Math.max(0, state.intermission.remainingSeconds - 1);
         syncIntermissionHostUI();
-        broadcastLiveDisplayState();
         if (state.intermission.remainingSeconds === 0) {
           stopIntermissionTimerOnly();
+          state.intermission.timerStatus = "finished";
+          state.intermission.timerEndAtMs = null;
+          broadcastLiveDisplayState();
           if (window.SeenJeemAudio) window.SeenJeemAudio.playAttentionChime();
           showToast("☕ انتهى وقت الاستراحة — اضغط «استئناف اللعب» للعودة", "info");
+        } else {
+          broadcastLiveDisplayState({ skipWireless: true });
         }
       }, 1000);
     }
@@ -9464,6 +9668,8 @@
     s.phase = "playing";
     s.timerRemaining = s.durationSeconds;
     s.timerRunning = true;
+    s.timerStatus = "running";
+    s.timerEndAtMs = getWirelessServerNowMs() + s.timerRemaining * 1000;
     s.currentStreak = 0;
     s.turnLog = [];
     s.currentQuestion = blitzEngine.drawNextQuestion(s);
@@ -9483,10 +9689,11 @@
         window.SeenJeemAudio.playCharadesUrgentTick(state.blitz.timerRemaining);
       }
       renderBlitzTimerUI();
-      broadcastLiveDisplayState();
       if (state.blitz.timerRemaining === 0) {
         if (window.SeenJeemAudio) window.SeenJeemAudio.playTimeUp();
         finishBlitzTurn();
+      } else {
+        broadcastLiveDisplayState({ skipWireless: true });
       }
     }, 1000);
 
@@ -9499,6 +9706,8 @@
     const s = state.blitz;
     if (!s || s.phase !== "playing") return;
     s.timerRunning = !s.timerRunning;
+    s.timerStatus = s.timerRunning ? "running" : "paused";
+    s.timerEndAtMs = s.timerRunning ? getWirelessServerNowMs() + s.timerRemaining * 1000 : null;
     renderBlitzTimerUI();
     broadcastLiveDisplayState();
   }
@@ -9554,6 +9763,8 @@
     const s = state.blitz;
     if (!s) return;
     s.timerRunning = false;
+    s.timerStatus = "finished";
+    s.timerEndAtMs = null;
     s.phase = "turn-summary";
     renderBlitzView();
     broadcastLiveDisplayState();
@@ -9936,6 +10147,8 @@
     s.phase = "playing";
     s.timerRemaining = s.durationSeconds;
     s.timerRunning = true;
+    s.timerStatus = "running";
+    s.timerEndAtMs = getWirelessServerNowMs() + s.timerRemaining * 1000;
     s.skipsUsedThisTurn = 0;
     s.turnLog = [];
     s.currentCard = charadesEngine.drawNextCard(s);
@@ -9959,10 +10172,11 @@
         window.SeenJeemAudio.playCharadesUrgentTick(state.charadesSolo.timerRemaining);
       }
       renderCsoloTimerUI();
-      broadcastLiveDisplayState();
       if (state.charadesSolo.timerRemaining === 0) {
         if (window.SeenJeemAudio) window.SeenJeemAudio.playTimeUp();
         finishCsoloTurn();
+      } else {
+        broadcastLiveDisplayState({ skipWireless: true });
       }
     }, 1000);
 
@@ -9975,6 +10189,8 @@
     const s = state.charadesSolo;
     if (!s || s.phase !== "playing") return;
     s.timerRunning = !s.timerRunning;
+    s.timerStatus = s.timerRunning ? "running" : "paused";
+    s.timerEndAtMs = s.timerRunning ? getWirelessServerNowMs() + s.timerRemaining * 1000 : null;
     renderCsoloTimerUI();
     broadcastLiveDisplayState();
   }
@@ -10059,6 +10275,8 @@
     const s = state.charadesSolo;
     if (!s) return;
     s.timerRunning = false;
+    s.timerStatus = "finished";
+    s.timerEndAtMs = null;
     s.phase = "turn-summary";
     renderCsoloView();
     broadcastLiveDisplayState();
@@ -10471,12 +10689,32 @@
     if (firebaseCfgStore && !firebaseCfgStore.isConfigured() && !state.wireless.active) {
       state.wireless.settingsOpen = true;
     }
+    // تنظيف تلقائي صامت للغرف السابقة الخاملة (>24 ساعة) المملوكة لهذا الجهاز فقط
+    if (realtimeSync && typeof realtimeSync.cleanupStaleOwnedRooms === "function") {
+      realtimeSync.cleanupStaleOwnedRooms({ silent: true }).catch(() => {});
+    }
     renderWirelessRoomModal();
     openModal(dom.wirelessRoomModal);
   }
 
   function closeWirelessRoomModal() {
     closeModal(dom.wirelessRoomModal);
+  }
+
+  function renderWirelessDiagnosticsUI(statsOverride = null) {
+    const stats =
+      statsOverride ||
+      (realtimeSync && typeof realtimeSync.getSessionStats === "function"
+        ? realtimeSync.getSessionStats()
+        : state.wireless.stats);
+    state.wireless.stats = stats || state.wireless.stats;
+    if (dom.wirelessDiagnosticsBar) {
+      dom.wirelessDiagnosticsBar.hidden = !state.wireless.active;
+    }
+    if (!state.wireless.active || !stats) return;
+    if (dom.wirelessDiagKb) dom.wirelessDiagKb.textContent = `${Number(stats.kbSent || 0).toFixed(2)} KB`;
+    if (dom.wirelessDiagWrites) dom.wirelessDiagWrites.textContent = String(stats.writes || 0);
+    if (dom.wirelessDiagSkipped) dom.wirelessDiagSkipped.textContent = String(stats.skippedWrites || 0);
   }
 
   function renderWirelessRoomModal() {
@@ -10515,6 +10753,9 @@
     if (dom.btnCloseWirelessRoom) dom.btnCloseWirelessRoom.hidden = !wl.active;
     if (dom.wirelessQrGrid) dom.wirelessQrGrid.hidden = !wl.active;
     if (dom.wirelessBuzzerPanel) dom.wirelessBuzzerPanel.hidden = !wl.active;
+    if (dom.wirelessDevicesPanel) dom.wirelessDevicesPanel.hidden = !wl.active;
+
+    renderWirelessDiagnosticsUI();
 
     if (wl.active) {
       if (dom.wirelessHostQrBox && dom.wirelessHostQrMasked) {
@@ -10549,9 +10790,16 @@
       }
 
       renderWirelessConnectedTeamsUI();
+      renderWirelessDevicesPanel();
     }
 
     renderWirelessBuzzerBars();
+  }
+
+  function getActiveWirelessTeamsForDisplay() {
+    if (state.teams && state.teams.length >= 2) return state.teams;
+    const names = getSetupTeamNames();
+    return names.map((name, idx) => ({ id: `team-${idx}`, name }));
   }
 
   function renderWirelessConnectedTeamsUI() {
@@ -10563,13 +10811,157 @@
         counts[idx] = (counts[idx] || 0) + 1;
       }
     });
-    const teams = state.teams && state.teams.length ? state.teams : [];
+    const teams = getActiveWirelessTeamsForDisplay();
     dom.wirelessConnectedTeams.innerHTML = teams
-      .map(
-        (t, idx) =>
-          `<span class="wireless-team-count-chip team-${idx + 1}"><span class="team-badge-dot team-${idx + 1}-dot"></span>${escapeHtml(t.name)}: <strong>${counts[idx] || 0} 📱</strong></span>`
-      )
+      .map((t, idx) => {
+        const c = counts[idx] || 0;
+        const dupWarn = c > 1 ? ` <span class="wireless-dup-badge" title="أكثر من جهاز متصل بنفس الفريق">⚠️</span>` : "";
+        return `<span class="wireless-team-count-chip team-${idx + 1}${c > 1 ? " has-dup" : ""}"><span class="team-badge-dot team-${idx + 1}-dot"></span>${escapeHtml(t.name)}: <strong>${c} 📱</strong>${dupWarn}</span>`;
+      })
       .join("");
+  }
+
+  function renderWirelessDevicesPanel() {
+    const wl = state.wireless;
+    if (dom.btnWirelessToggleLock) {
+      dom.btnWirelessToggleLock.className = wl.joinLocked
+        ? "btn btn-amber btn-sm"
+        : "btn btn-secondary btn-sm";
+      dom.btnWirelessToggleLock.textContent = wl.joinLocked
+        ? "🔒 الانضمام مقفل — اضغط للفتح"
+        : "🔓 قفل الانضمام للغرفة";
+    }
+    if (dom.btnWirelessToggleCap) {
+      dom.btnWirelessToggleCap.className =
+        wl.maxDevicesPerTeam === 1 ? "btn btn-primary btn-sm" : "btn btn-gold-outline btn-sm";
+      dom.btnWirelessToggleCap.textContent =
+        wl.maxDevicesPerTeam === 1
+          ? "👤 حد الأجهزة: جهاز واحد لكل فريق"
+          : "👥 حد الأجهزة لكل فريق: غير محدود";
+    }
+
+    const entries = Object.entries(wl.playersMap || {})
+      .map(([devId, info]) => ({
+        deviceId: (info && info.deviceId) || devId,
+        teamIdx: Number.isInteger(Number(info && info.teamIdx)) ? Number(info.teamIdx) : 0,
+        label: (info && info.label) || "جهاز متصل",
+        teamName: (info && info.teamName) || ""
+      }))
+      .filter((d) => Boolean(d.deviceId));
+
+    if (dom.wirelessDevicesCountPill) {
+      dom.wirelessDevicesCountPill.textContent = `${entries.length} جهاز متصل`;
+    }
+    if (!dom.wirelessDevicesList) return;
+
+    const teams = getActiveWirelessTeamsForDisplay();
+    const grouped = teams.map((t, idx) => ({
+      idx,
+      name: t.name,
+      devices: entries.filter((d) => d.teamIdx === idx)
+    }));
+
+    dom.wirelessDevicesList.innerHTML = grouped
+      .map((g) => {
+        const hasDup = g.devices.length > 1;
+        const rowsHtml =
+          g.devices.length === 0
+            ? `<div class="wireless-device-empty">لا توجد أجهزة متصلة بهذا الفريق حالياً</div>`
+            : g.devices
+                .map(
+                  (d) => `
+                <div class="wireless-device-row">
+                  <div class="wireless-device-meta">
+                    <span class="wireless-device-online-dot" aria-hidden="true"></span>
+                    <strong class="wireless-device-label">${escapeHtml(d.label)}</strong>
+                    <span class="wireless-device-id">${escapeHtml(d.deviceId.slice(-6))}</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-danger-outline btn-xxs"
+                    data-kick-device="${escapeHtml(d.deviceId)}"
+                    title="طرد هذا الجهاز من الغرفة"
+                  >
+                    🚫 طرد
+                  </button>
+                </div>
+              `
+                )
+                .join("");
+
+        return `
+          <div class="wireless-device-team-group team-${g.idx + 1}${hasDup ? " has-dup" : ""}">
+            <div class="wireless-device-team-head">
+              <div class="wireless-device-team-title">
+                <span class="team-badge-dot team-${g.idx + 1}-dot"></span>
+                <strong>${escapeHtml(g.name)}</strong>
+                <span class="wireless-device-count-badge">${g.devices.length} 📱</span>
+              </div>
+              ${hasDup ? `<span class="wireless-dup-warning">⚠️ أكثر من جهاز بنفس الفريق</span>` : ""}
+            </div>
+            <div class="wireless-device-team-rows">${rowsHtml}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    dom.wirelessDevicesList.querySelectorAll("[data-kick-device]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const devId = btn.dataset.kickDevice;
+        if (devId) kickWirelessDevice(devId);
+      });
+    });
+  }
+
+  async function toggleWirelessJoinLock() {
+    if (!state.wireless.active || !realtimeSync) return;
+    state.wireless.joinLocked = !state.wireless.joinLocked;
+    await realtimeSync.updateRoomControl({ joinLocked: state.wireless.joinLocked });
+    renderWirelessDevicesPanel();
+    broadcastLiveDisplayState();
+    showToast(
+      state.wireless.joinLocked
+        ? "🔒 تم قفل الانضمام للغرفة (الأجهزة المسجّلة مسبقاً تستمر بالعمل)"
+        : "🔓 تم فتح الانضمام للغرفة للأجهزة الجديدة",
+      "info"
+    );
+  }
+
+  async function toggleWirelessMaxDevicesPerTeam(explicitVal = null) {
+    if (!state.wireless.active || !realtimeSync) return;
+    const nextVal =
+      explicitVal === 0 || explicitVal === 1
+        ? explicitVal
+        : state.wireless.maxDevicesPerTeam === 1
+          ? 0
+          : 1;
+    state.wireless.maxDevicesPerTeam = nextVal;
+    await realtimeSync.updateRoomControl({ maxDevicesPerTeam: nextVal });
+    renderWirelessDevicesPanel();
+    broadcastLiveDisplayState();
+    showToast(
+      nextVal === 1
+        ? "👤 تم تفعيل حد جهاز واحد فقط لكل فريق"
+        : "👥 تم إلغاء حد الأجهزة (غير محدود لكل فريق)",
+      "info"
+    );
+  }
+
+  async function kickWirelessDevice(deviceId) {
+    if (!state.wireless.active || !realtimeSync || !deviceId) return;
+    const info = state.wireless.playersMap && state.wireless.playersMap[deviceId];
+    const label = (info && info.label) || "الجهاز";
+    const res = await realtimeSync.kickPlayer(deviceId);
+    if (res && res.ok) {
+      if (state.wireless.playersMap && state.wireless.playersMap[deviceId]) {
+        delete state.wireless.playersMap[deviceId];
+      }
+      renderWirelessConnectedTeamsUI();
+      renderWirelessDevicesPanel();
+      showToast(`🚫 تم طرد «${label}» من الغرفة فوراً`, "warning");
+    } else {
+      showToast((res && res.error) || "تعذّر طرد الجهاز", "warning");
+    }
   }
 
   function renderWirelessBuzzerBars() {
@@ -10603,7 +10995,6 @@
 
   function buildWirelessHostPrivatePayload() {
     const priv = {
-      updatedAt: Date.now(),
       dailyDoubleKeys: [],
       questionText: null,
       answerText: null,
@@ -10654,10 +11045,10 @@
 
   function publishWirelessSnapshot(rawSnapshot) {
     if (!state.wireless.active || !realtimeSync || !realtimeSync.isActive()) return;
-    // تطبيق نفس تنقية Anti-Spoiler الصارمة المستخدمة لشاشة التلفزيون
+    // تطبيق تنقية Anti-Spoiler الصارمة قبل الإرسال إلى Firebase RTDB
     const cleanPublic =
-      liveSync && typeof liveSync.sanitizeSnapshot === "function"
-        ? liveSync.sanitizeSnapshot(rawSnapshot)
+      liveSync && typeof liveSync.enforceAntiSpoiler === "function"
+        ? liveSync.enforceAntiSpoiler(rawSnapshot)
         : rawSnapshot;
     cleanPublic.buzzer = { ...state.wireless.buzzer };
     const hostPrivate = buildWirelessHostPrivatePayload();
@@ -10685,6 +11076,9 @@
         onConnectionState: (isConn) => {
           state.wireless.connected = isConn;
           renderWirelessRoomModal();
+        },
+        onStatsUpdate: (stats) => {
+          renderWirelessDiagnosticsUI(stats);
         }
       });
 
@@ -10696,6 +11090,9 @@
       state.wireless.playerUrl = info.playerUrl;
       state.wireless.hostQrHidden = false;
       state.wireless.settingsOpen = false;
+      state.wireless.joinLocked = false;
+      state.wireless.maxDevicesPerTeam = 0;
+      state.wireless.stats = realtimeSync.getSessionStats();
       state.wireless.buzzer = {
         state: "locked",
         roundId: "",
@@ -10725,6 +11122,9 @@
     state.wireless.remoteUrl = "";
     state.wireless.playerUrl = "";
     state.wireless.showQrOnTv = false;
+    state.wireless.joinLocked = false;
+    state.wireless.maxDevicesPerTeam = 0;
+    state.wireless.stats = { writes: 0, skippedWrites: 0, bytesSent: 0, kbSent: 0, mediaUploads: 0 };
     state.wireless.playersMap = {};
     state.wireless.receivedWagers = {};
     state.wireless.buzzer = {
@@ -10734,10 +11134,10 @@
       winnerTeamName: "",
       runnerUpDeltaMs: null
     };
-    setWirelessFeedback("info", "تم إغلاق الغرفة اللاسلكية وحذف بياناتها من Firebase بنجاح.");
+    setWirelessFeedback("info", "تم إغلاق الغرفة اللاسلكية وحذف بياناتها من Firebase والسجل المحلي بنجاح.");
     renderWirelessRoomModal();
     broadcastLiveDisplayState();
-    showToast("🔴 تم إغلاق الغرفة اللاسلكية", "info");
+    showToast("🔴 تم إغلاق وحذف الغرفة اللاسلكية", "info");
   }
 
   function openSpeedBuzzer() {
@@ -10849,8 +11249,16 @@
   }
 
   function handleIncomingPlayers(playersMap) {
-    state.wireless.playersMap = playersMap && typeof playersMap === "object" ? playersMap : {};
+    const cleanMap = playersMap && typeof playersMap === "object" ? playersMap : {};
+    state.wireless.playersMap = cleanMap;
+    // اعتماد الأجهزة المنضمة أثناء فتح الغرفة كي تستمر بسلاسة بعد تفعيل القفل وعند تحديث الصفحة
+    if (!state.wireless.joinLocked && realtimeSync && typeof realtimeSync.approveDevice === "function") {
+      Object.keys(cleanMap).forEach((devId) => {
+        if (devId) realtimeSync.approveDevice(devId);
+      });
+    }
     renderWirelessConnectedTeamsUI();
+    renderWirelessDevicesPanel();
   }
 
   function handleRemoteHostCommand(cmd) {
@@ -10938,6 +11346,17 @@
         break;
       case "BUZZER_RESET":
         resetSpeedBuzzer();
+        break;
+      case "TOGGLE_JOIN_LOCK":
+        toggleWirelessJoinLock();
+        break;
+      case "SET_MAX_DEVICES_PER_TEAM":
+        toggleWirelessMaxDevicesPerTeam(p.maxDevicesPerTeam === 1 ? 1 : p.maxDevicesPerTeam === 0 ? 0 : null);
+        break;
+      case "KICK_PLAYER":
+        if (typeof p.deviceId === "string" && p.deviceId.trim()) {
+          kickWirelessDevice(p.deviceId.trim());
+        }
         break;
       case "BLITZ_ACTION":
         if (p.action === "correct" || p.action === "skip" || p.action === "wrong") handleBlitzJudge(p.action);
@@ -12065,6 +12484,12 @@
     [dom.btnWbOpen, dom.btnModalWbOpen].forEach((b) => b && b.addEventListener("click", openSpeedBuzzer));
     [dom.btnWbLock, dom.btnModalWbLock].forEach((b) => b && b.addEventListener("click", lockSpeedBuzzer));
     [dom.btnWbReset, dom.btnModalWbReset].forEach((b) => b && b.addEventListener("click", resetSpeedBuzzer));
+    if (dom.btnWirelessToggleLock) {
+      dom.btnWirelessToggleLock.addEventListener("click", toggleWirelessJoinLock);
+    }
+    if (dom.btnWirelessToggleCap) {
+      dom.btnWirelessToggleCap.addEventListener("click", () => toggleWirelessMaxDevicesPerTeam());
+    }
     if (dom.resultCardModal) {
       dom.resultCardModal.addEventListener("click", (e) => {
         if (e.target === dom.resultCardModal) closeResultCardModal();

@@ -50,6 +50,8 @@
       this.fsHideTimer = null;
       this.audioUnlockVisible = false;
       this.disconnectedByHost = false;
+      this.mediaMemoryCache = new Map();
+      this._pendingMediaKeys = new Set();
       this.dom = {};
     }
 
@@ -850,6 +852,47 @@
       }
     }
 
+    _resolveIsolatedQuestionMediaIfNeeded(snap) {
+      const qv = snap && snap.questionView;
+      if (!qv || !qv.hasMedia || !qv.mediaKey) return;
+      const needsQ = Boolean(qv.mediaFields && qv.mediaFields.questionImage && !qv.questionImage);
+      const needsA = Boolean(qv.answerRevealed && qv.mediaFields && qv.mediaFields.answerImage && !qv.answerImage);
+      const needsM = Boolean(qv.mediaFields && qv.mediaFields.images && (!Array.isArray(qv.images) || qv.images.some((x) => !x)));
+      if (!needsQ && !needsA && !needsM) return;
+
+      const cached = this.mediaMemoryCache.get(qv.mediaKey);
+      if (cached) {
+        if (needsQ && cached.questionImage) qv.questionImage = cached.questionImage;
+        if (needsA && cached.answerImage) qv.answerImage = cached.answerImage;
+        if (needsM && Array.isArray(cached.images)) qv.images = cached.images.slice();
+        return;
+      }
+
+      const rt = window.SeenJeemRealtimeSync;
+      if (!rt || typeof rt.fetchMedia !== "function" || this._pendingMediaKeys.has(qv.mediaKey)) return;
+      const key = qv.mediaKey;
+      this._pendingMediaKeys.add(key);
+      rt.fetchMedia(key)
+        .then((payload) => {
+          this._pendingMediaKeys.delete(key);
+          if (!payload) return;
+          this.mediaMemoryCache.set(key, payload);
+          if (this.snapshot && this.snapshot.screen === "question" && this.snapshot.questionView && this.snapshot.questionView.mediaKey === key) {
+            const curQv = this.snapshot.questionView;
+            if (!curQv.questionImage && payload.questionImage) curQv.questionImage = payload.questionImage;
+            if (curQv.answerRevealed && !curQv.answerImage && payload.answerImage) curQv.answerImage = payload.answerImage;
+            if (Array.isArray(payload.images) && (!Array.isArray(curQv.images) || curQv.images.some((x) => !x))) {
+              curQv.images = payload.images.slice();
+            }
+            this.lastQuestionRenderKey = "";
+            this._renderQuestion(this.snapshot);
+          }
+        })
+        .catch(() => {
+          this._pendingMediaKeys.delete(key);
+        });
+    }
+
     applySnapshot(snap) {
       if (!snap || typeof snap !== "object") return;
       this.snapshot = snap;
@@ -876,6 +919,7 @@
         this.lastQuestionRenderKey = "";
         this._renderBoard(snap);
       } else if (snap.screen === "question" && snap.questionView) {
+        this._resolveIsolatedQuestionMediaIfNeeded(snap);
         this._renderQuestion(snap);
       } else if (snap.screen === "final" && snap.finalRoundView) {
         this.lastQuestionRenderKey = "";
