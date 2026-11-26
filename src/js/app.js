@@ -12,11 +12,20 @@
   const historyStore = window.SeenJeemHistoryStore;
   const sanitizer = window.SeenJeemSheetSanitizer;
   const matchStore = window.SeenJeemMatchStore;
+  const finalRoundEngine = window.SeenJeemFinalRound;
   const imagePreloader = window.SeenJeemImagePreloader;
   const liveSync = window.SeenJeemLiveSync;
   const wakeLock = window.SeenJeemWakeLock;
   const flaggedStore = window.SeenJeemFlaggedStore;
+  const archiveStore = window.SeenJeemArchiveStore;
+  const blitzEngine = window.SeenJeemBlitzMode;
+  const charadesEngine = window.SeenJeemCharadesMode;
+  const realtimeSync = window.SeenJeemRealtimeSync;
+  const realtimeUtils = window.SeenJeemRealtimeUtils;
+  const qrGenerator = window.SeenJeemQR;
+  const firebaseCfgStore = window.SeenJeemFirebaseConfig;
   const backupManager = window.SeenJeemBackup;
+  const resultCardGen = window.SeenJeemResultCard;
   const pwaManager = window.SeenJeemPWA;
 
   const CUSTOM_CATEGORIES_STORAGE_KEY = "seenJeem_customCategories_v1";
@@ -364,12 +373,60 @@
       index: 0
     },
 
-    // حالة أدوات الحزمة الرابعة (مراجعة الأسئلة، النسخ الاحتياطي، لوحة الصوت)
+    // حالة أدوات الحزمة الرابعة والخامسة (مراجعة الأسئلة، النسخ الاحتياطي، الصوت، التحكيم، الجولة النهائية)
     flagDrawerOpen: false,
     selectedFlagReason: "typo",
     pendingBackupData: null,
     backupRestoreMode: "merge",
-    audioMixerOpen: false
+    audioMixerOpen: false,
+    refereeAdjustments: [],
+    refereePopoverTeamIdx: null,
+    finalRound: null,
+    finalTimerInterval: null,
+    // حالة الحزمة السادسة (الثيم، مقياس التلفزيون، شاشة الاستراحة، وبطاقة النتيجة)
+    theme: matchStore ? matchStore.loadTheme() : "dark-glass",
+    tvScale: matchStore ? matchStore.loadTvScale() : 100,
+    intermission: matchStore
+      ? matchStore.getDefaultIntermission()
+      : { active: false, message: "استراحة قصيرة — نعود بعد قليل", durationMinutes: 0, totalSeconds: 0, remainingSeconds: 0 },
+    intermissionInterval: null,
+    intermissionSelectedMinutes: 0,
+    currentResultCardBlob: null,
+    currentResultCardUrl: "",
+    customResultCardPayload: null,
+    // حالة الحزمة السابعة (المعرف الفريد للمباراة، البرق السريع، من غير كلام المستقل، قاعة المشاهير)
+    matchId: "",
+    blitz: null,
+    blitzTimerInterval: null,
+    blitzConfig: { teamCount: 1, durationSeconds: 60, roundsPerTeam: 1, groupId: "all" },
+    blitzLastFeedback: null,
+    charadesSolo: null,
+    csoloTimerInterval: null,
+    csoloConfig: { teamCount: 2, durationSeconds: 90, roundsPerTeam: 3, skipLimit: 2, selectedCategoryIds: [] },
+    csoloHoldActive: false,
+    csoloLastFeedback: null,
+    hofModeFilter: "all",
+    // حالة الحزمة التاسعة (الغرفة اللاسلكية عبر Firebase وجرس السرعة والرهان السري)
+    wireless: {
+      active: false,
+      connected: false,
+      roomCode: "",
+      hostToken: "",
+      remoteUrl: "",
+      playerUrl: "",
+      showQrOnTv: false,
+      hostQrHidden: false,
+      settingsOpen: false,
+      buzzer: {
+        state: "locked", // "locked" | "open" | "buzzed"
+        roundId: "",
+        winnerTeamIdx: null,
+        winnerTeamName: "",
+        runnerUpDeltaMs: null
+      },
+      playersMap: {},
+      receivedWagers: {}
+    }
   };
 
   /* =========================================================
@@ -389,8 +446,19 @@
     btnAudioMixerSetup: document.getElementById("btn-audio-mixer-setup"),
     btnAudioMixerGame: document.getElementById("btn-audio-mixer-game"),
     btnToggleSoundSetup: document.getElementById("btn-toggle-sound-setup"),
+    setupVolumeSlider: document.getElementById("setup-volume-slider"),
+    setupVolumePct: document.getElementById("setup-volume-pct"),
+    gameVolumeSlider: document.getElementById("game-volume-slider"),
+    gameVolumePct: document.getElementById("game-volume-pct"),
+    teamCountSelector: document.getElementById("team-count-selector"),
+    teamsInputsGrid: document.getElementById("teams-inputs-grid"),
+    teamsVsDivider: document.getElementById("teams-vs-divider"),
     team1Input: document.getElementById("team1-input"),
     team2Input: document.getElementById("team2-input"),
+    team3Input: document.getElementById("team3-input"),
+    team4Input: document.getElementById("team4-input"),
+    teamInputCard3: document.getElementById("team-input-card-3"),
+    teamInputCard4: document.getElementById("team-input-card-4"),
     tacticalSetupPanel: document.getElementById("tactical-setup-panel"),
     btnToggleTacticalPanel: document.getElementById("btn-toggle-tactical-panel"),
     tacticalSummaryPills: document.getElementById("tactical-summary-pills"),
@@ -436,15 +504,8 @@
     btnStartGame: document.getElementById("btn-start-game"),
     btnStartGameLabel: document.getElementById("btn-start-game-label"),
 
-    // الشريط العلوي للوحة اللعب وزر التراجع
-    scoreboardTeam1: document.getElementById("scoreboard-team-1"),
-    scoreboardTeam2: document.getElementById("scoreboard-team-2"),
-    boardTeam1Name: document.getElementById("board-team1-name"),
-    boardTeam2Name: document.getElementById("board-team2-name"),
-    boardTeam1Score: document.getElementById("board-team1-score"),
-    boardTeam2Score: document.getElementById("board-team2-score"),
-    team1LifelinesStatus: document.getElementById("team1-lifelines-status"),
-    team2LifelinesStatus: document.getElementById("team2-lifelines-status"),
+    // الشريط العلوي للوحة اللعب وزر التراجع (يدعم 2-4 فرق)
+    scoreboardTeamsGrid: document.getElementById("scoreboard-teams-grid"),
     boardRemainingPill: document.getElementById("board-remaining-pill"),
     btnUndoAction: document.getElementById("btn-undo-action"),
     undoStepsBadge: document.getElementById("undo-steps-badge"),
@@ -617,13 +678,97 @@
     winnerTrophy: document.getElementById("winner-trophy"),
     winnerSubtitle: document.getElementById("winner-subtitle"),
     winnerTitle: document.getElementById("winner-title"),
-    winnerCardTeam1: document.getElementById("winner-card-team1"),
-    winnerCardTeam2: document.getElementById("winner-card-team2"),
-    winnerTeam1Name: document.getElementById("winner-team1-name"),
-    winnerTeam2Name: document.getElementById("winner-team2-name"),
-    winnerTeam1Score: document.getElementById("winner-team1-score"),
-    winnerTeam2Score: document.getElementById("winner-team2-score"),
+    winnerScoresGrid: document.getElementById("winner-scores-grid"),
     winnerStatsNote: document.getElementById("winner-stats-note"),
+    winnerRefereeNote: document.getElementById("winner-referee-note"),
+    btnStartTiebreakerFromWinner: document.getElementById("btn-start-tiebreaker-from-winner"),
+
+    // نافذة جولة الرهان النهائي وكسر التعادل (Phase 4 Pack 5)
+    finalRoundModal: document.getElementById("final-round-modal"),
+    finalRoundEyebrow: document.getElementById("final-round-eyebrow"),
+    finalRoundTitle: document.getElementById("final-round-title"),
+    finalTvStatusPill: document.getElementById("final-tv-status-pill"),
+    btnFinalCancel: document.getElementById("btn-final-cancel"),
+    finalStepWager: document.getElementById("final-step-wager"),
+    finalStepQuestion: document.getElementById("final-step-question"),
+    finalStepReveal: document.getElementById("final-step-reveal"),
+    finalCatIcon: document.getElementById("final-cat-icon"),
+    finalCatName: document.getElementById("final-cat-name"),
+    finalQTierPill: document.getElementById("final-q-tier-pill"),
+    btnFinalReroll: document.getElementById("btn-final-reroll"),
+    finalPhaseWager: document.getElementById("final-phase-wager"),
+    finalWagersGrid: document.getElementById("final-wagers-grid"),
+    finalPhaseQuestion: document.getElementById("final-phase-question"),
+    finalTimerDisplay: document.getElementById("final-timer-display"),
+    finalTimerLabel: document.getElementById("final-timer-label"),
+    finalTimerProgress: document.getElementById("final-timer-progress"),
+    btnFinalTimerToggle: document.getElementById("btn-final-timer-toggle"),
+    finalTimerToggleIcon: document.getElementById("final-timer-toggle-icon"),
+    finalTimerToggleText: document.getElementById("final-timer-toggle-text"),
+    btnFinalTimerReset: document.getElementById("btn-final-timer-reset"),
+    finalQuestionText: document.getElementById("final-question-text"),
+    finalHostAnswerBox: document.getElementById("final-host-answer-box"),
+    finalHostAnswerText: document.getElementById("final-host-answer-text"),
+    finalHostExpRow: document.getElementById("final-host-exp-row"),
+    finalHostExpText: document.getElementById("final-host-exp-text"),
+    finalJudgmentsGrid: document.getElementById("final-judgments-grid"),
+    finalPhaseReveal: document.getElementById("final-phase-reveal"),
+    finalRevealAnswerText: document.getElementById("final-reveal-answer-text"),
+    finalRevealExpText: document.getElementById("final-reveal-exp-text"),
+    finalResultsGrid: document.getElementById("final-results-grid"),
+    btnFinalShowQuestion: document.getElementById("btn-final-show-question"),
+    btnFinalRevealResults: document.getElementById("btn-final-reveal-results"),
+    finalRevealFooterActions: document.getElementById("final-reveal-footer-actions"),
+    btnFinalExtraTiebreaker: document.getElementById("btn-final-extra-tiebreaker"),
+    btnFinalGoWinner: document.getElementById("btn-final-go-winner"),
+
+    // الحزمة السادسة: بطاقة النتيجة، لوحة المؤثرات، شاشة الاستراحة، الثيم ومقياس التلفزيون
+    setupTvScaleSlider: document.getElementById("setup-tv-scale-slider"),
+    setupTvScaleVal: document.getElementById("setup-tv-scale-val"),
+    btnResetTvScaleSetup: document.getElementById("btn-reset-tv-scale-setup"),
+    btnOpenSoundboard: document.getElementById("btn-open-soundboard"),
+    btnOpenIntermission: document.getElementById("btn-open-intermission"),
+    btnOpenDisplayPrefs: document.getElementById("btn-open-display-prefs"),
+    hostIntermissionActiveBar: document.getElementById("host-intermission-active-bar"),
+    hostIntermissionCountdown: document.getElementById("host-intermission-countdown"),
+    btnResumeFromIntermission: document.getElementById("btn-resume-from-intermission"),
+    btnSoundboardInQuestion: document.getElementById("btn-soundboard-in-question"),
+    btnIntermissionInQuestion: document.getElementById("btn-intermission-in-question"),
+    btnOpenResultCard: document.getElementById("btn-open-result-card"),
+    resultCardModal: document.getElementById("result-card-modal"),
+    btnCloseResultCard: document.getElementById("btn-close-result-card"),
+    resultCardLoading: document.getElementById("result-card-loading"),
+    resultCardPreviewImg: document.getElementById("result-card-preview-img"),
+    btnDownloadResultCard: document.getElementById("btn-download-result-card"),
+    btnShareResultCard: document.getElementById("btn-share-result-card"),
+    btnCopyResultCard: document.getElementById("btn-copy-result-card"),
+    soundboardPopover: document.getElementById("soundboard-popover"),
+    btnCloseSoundboard: document.getElementById("btn-close-soundboard"),
+    intermissionPopover: document.getElementById("intermission-popover"),
+    btnCloseIntermissionPopover: document.getElementById("btn-close-intermission-popover"),
+    intermissionMessageInput: document.getElementById("intermission-message-input"),
+    intermissionDurationPills: document.getElementById("intermission-duration-pills"),
+    btnStartIntermission: document.getElementById("btn-start-intermission"),
+    btnStopIntermissionPopover: document.getElementById("btn-stop-intermission-popover"),
+    displayPrefsPopover: document.getElementById("display-prefs-popover"),
+    btnCloseDisplayPrefs: document.getElementById("btn-close-display-prefs"),
+    gameTvScaleSlider: document.getElementById("game-tv-scale-slider"),
+    gameTvScaleVal: document.getElementById("game-tv-scale-val"),
+    btnResetTvScaleGame: document.getElementById("btn-reset-tv-scale-game"),
+
+    // قائمة التحكم التحكيمي السريع (Referee Popover)
+    refereePopover: document.getElementById("referee-popover"),
+    refereeTeamTitle: document.getElementById("referee-team-title"),
+    btnCloseRefereePopover: document.getElementById("btn-close-referee-popover"),
+    refereeCustomDeltaInput: document.getElementById("referee-custom-delta-input"),
+    btnRefereeApplyDelta: document.getElementById("btn-referee-apply-delta"),
+    btnRefDoubleMinus: document.getElementById("btn-ref-double-minus"),
+    refDoubleVal: document.getElementById("ref-double-val"),
+    btnRefDoublePlus: document.getElementById("btn-ref-double-plus"),
+    btnRefSwapMinus: document.getElementById("btn-ref-swap-minus"),
+    refSwapVal: document.getElementById("ref-swap-val"),
+    btnRefSwapPlus: document.getElementById("btn-ref-swap-plus"),
+    btnRefSetTurn: document.getElementById("btn-ref-set-turn"),
     winnerAnalyticsDashboard: document.getElementById("winner-analytics-dashboard"),
     btnTabAnalyticsOverview: document.getElementById("btn-tab-analytics-overview"),
     btnTabAnalyticsLog: document.getElementById("btn-tab-analytics-log"),
@@ -643,8 +788,9 @@
     bankManagerModal: document.getElementById("bank-manager-modal"),
     btnCloseBankManager: document.getElementById("btn-close-bank-manager"),
     bankFlaggedCount: document.getElementById("bank-flagged-count"),
+    btnCopyFlaggedReport: document.getElementById("btn-copy-flagged-report"),
+    btnExportFlaggedJson: document.getElementById("btn-export-flagged-json"),
     btnExportFlaggedCsv: document.getElementById("btn-export-flagged-csv"),
-    btnCopyFlaggedJson: document.getElementById("btn-copy-flagged-json"),
     btnClearAllFlagged: document.getElementById("btn-clear-all-flagged"),
     bankFlaggedList: document.getElementById("bank-flagged-list"),
     btnExportFullBackup: document.getElementById("btn-export-full-backup"),
@@ -707,7 +853,186 @@
     lightboxCaption: document.getElementById("lightbox-caption"),
     btnLightboxClose: document.getElementById("btn-lightbox-close"),
     btnLightboxPrev: document.getElementById("btn-lightbox-prev"),
-    btnLightboxNext: document.getElementById("btn-lightbox-next")
+    btnLightboxNext: document.getElementById("btn-lightbox-next"),
+
+    // عناصر الحزمة السابعة (المربعات الذهبية، إطلاق الأطوار السريعة، البرق، من غير كلام المستقل، قاعة المشاهير)
+    btnLaunchBlitzMode: document.getElementById("btn-launch-blitz-mode"),
+    btnLaunchCharadesMode: document.getElementById("btn-launch-charades-mode"),
+    btnOpenHallOfFame: document.getElementById("btn-open-hall-of-fame"),
+    btnWinnerOpenHallOfFame: document.getElementById("btn-winner-open-hall-of-fame"),
+    questionBodyBox: document.getElementById("question-body-box"),
+    dailyDoubleBanner: document.getElementById("daily-double-banner"),
+    dailyDoubleBannerSub: document.getElementById("daily-double-banner-sub"),
+    dailyDoubleWagerPanel: document.getElementById("daily-double-wager-panel"),
+    ddWagerTeamLabel: document.getElementById("dd-wager-team-label"),
+    ddWagerBoundsLabel: document.getElementById("dd-wager-bounds-label"),
+    ddWagerInput: document.getElementById("dd-wager-input"),
+    btnDdLockWager: document.getElementById("btn-dd-lock-wager"),
+    btnDdPresetBase: document.getElementById("btn-dd-preset-base"),
+    btnDdPresetDouble: document.getElementById("btn-dd-preset-double"),
+    btnDdPresetAllin: document.getElementById("btn-dd-preset-allin"),
+    ddResolveActions: document.getElementById("dd-resolve-actions"),
+    ddResolvePrompt: document.getElementById("dd-resolve-prompt"),
+    btnDdCorrect: document.getElementById("btn-dd-correct"),
+    btnDdCorrectLabel: document.getElementById("btn-dd-correct-label"),
+    btnDdWrong: document.getElementById("btn-dd-wrong"),
+    btnDdWrongLabel: document.getElementById("btn-dd-wrong-label"),
+
+    // طور جولة البرق السريعة (60s Blitz)
+    blitzModal: document.getElementById("blitz-modal"),
+    btnBlitzOpenTv: document.getElementById("btn-blitz-open-tv"),
+    btnCloseBlitz: document.getElementById("btn-close-blitz"),
+    blitzSetupView: document.getElementById("blitz-setup-view"),
+    blitzTeamCountPills: document.getElementById("blitz-team-count-pills"),
+    blitzTeamNamesInputs: document.getElementById("blitz-team-names-inputs"),
+    blitzDurationPills: document.getElementById("blitz-duration-pills"),
+    blitzRoundsPills: document.getElementById("blitz-rounds-pills"),
+    blitzSourceGroup: document.getElementById("blitz-source-group"),
+    btnBlitzStartSession: document.getElementById("btn-blitz-start-session"),
+    blitzReadyView: document.getElementById("blitz-ready-view"),
+    blitzReadyBadge: document.getElementById("blitz-ready-badge"),
+    blitzReadyTeamTitle: document.getElementById("blitz-ready-team-title"),
+    blitzReadyDesc: document.getElementById("blitz-ready-desc"),
+    blitzReadyScoreboard: document.getElementById("blitz-ready-scoreboard"),
+    btnBlitzBeginTurn: document.getElementById("btn-blitz-begin-turn"),
+    blitzPlayView: document.getElementById("blitz-play-view"),
+    blitzPlayTeamName: document.getElementById("blitz-play-team-name"),
+    blitzPlayTeamScore: document.getElementById("blitz-play-team-score"),
+    blitzStreakPill: document.getElementById("blitz-streak-pill"),
+    blitzTimerDisplay: document.getElementById("blitz-timer-display"),
+    btnBlitzPause: document.getElementById("btn-blitz-pause"),
+    blitzTimerProgress: document.getElementById("blitz-timer-progress"),
+    blitzQCatPill: document.getElementById("blitz-q-cat-pill"),
+    blitzQText: document.getElementById("blitz-q-text"),
+    blitzQAnswer: document.getElementById("blitz-q-answer"),
+    btnBlitzCorrect: document.getElementById("btn-blitz-correct"),
+    btnBlitzSkip: document.getElementById("btn-blitz-skip"),
+    btnBlitzWrong: document.getElementById("btn-blitz-wrong"),
+    blitzSummaryView: document.getElementById("blitz-summary-view"),
+    blitzSummaryTitle: document.getElementById("blitz-summary-title"),
+    blitzSummaryStats: document.getElementById("blitz-summary-stats"),
+    blitzSummaryList: document.getElementById("blitz-summary-list"),
+    btnBlitzNextTurn: document.getElementById("btn-blitz-next-turn"),
+    blitzFinishView: document.getElementById("blitz-finish-view"),
+    blitzFinishTitle: document.getElementById("blitz-finish-title"),
+    blitzFinishScores: document.getElementById("blitz-finish-scores"),
+    btnBlitzResultCard: document.getElementById("btn-blitz-result-card"),
+    btnBlitzOpenHof: document.getElementById("btn-blitz-open-hof"),
+    btnBlitzPlayAgain: document.getElementById("btn-blitz-play-again"),
+
+    // طور «من غير كلام» المستقل (Standalone Charades)
+    charadesSoloModal: document.getElementById("charades-solo-modal"),
+    btnCharadesOpenTv: document.getElementById("btn-charades-open-tv"),
+    btnCloseCharadesSolo: document.getElementById("btn-close-charades-solo"),
+    csoloSetupView: document.getElementById("csolo-setup-view"),
+    csoloTeamCountPills: document.getElementById("csolo-team-count-pills"),
+    csoloTeamNamesInputs: document.getElementById("csolo-team-names-inputs"),
+    csoloDurationPills: document.getElementById("csolo-duration-pills"),
+    csoloRoundsPills: document.getElementById("csolo-rounds-pills"),
+    csoloSkipPills: document.getElementById("csolo-skip-pills"),
+    csoloCategoriesChips: document.getElementById("csolo-categories-chips"),
+    btnCsoloStartSession: document.getElementById("btn-csolo-start-session"),
+    csoloReadyView: document.getElementById("csolo-ready-view"),
+    csoloReadyBadge: document.getElementById("csolo-ready-badge"),
+    csoloReadyTeamTitle: document.getElementById("csolo-ready-team-title"),
+    csoloReadyDesc: document.getElementById("csolo-ready-desc"),
+    csoloReadyScoreboard: document.getElementById("csolo-ready-scoreboard"),
+    btnCsoloBeginTurn: document.getElementById("btn-csolo-begin-turn"),
+    csoloPlayView: document.getElementById("csolo-play-view"),
+    csoloPlayTeamName: document.getElementById("csolo-play-team-name"),
+    csoloPlayTeamScore: document.getElementById("csolo-play-team-score"),
+    csoloSkipsPill: document.getElementById("csolo-skips-pill"),
+    csoloTimerDisplay: document.getElementById("csolo-timer-display"),
+    btnCsoloPause: document.getElementById("btn-csolo-pause"),
+    csoloTimerProgress: document.getElementById("csolo-timer-progress"),
+    csoloEyebrow: document.getElementById("csolo-eyebrow"),
+    csoloTopic: document.getElementById("csolo-topic"),
+    csoloWordCount: document.getElementById("csolo-word-count"),
+    csoloHostSecretBox: document.getElementById("csolo-host-secret-box"),
+    csoloHostWord: document.getElementById("csolo-host-word"),
+    csoloHostExpRow: document.getElementById("csolo-host-exp-row"),
+    csoloHostExp: document.getElementById("csolo-host-exp"),
+    csoloHoldStage: document.getElementById("csolo-hold-stage"),
+    csoloDecoyCard: document.getElementById("csolo-decoy-card"),
+    csoloSecretCard: document.getElementById("csolo-secret-card"),
+    csoloSecretWord: document.getElementById("csolo-secret-word"),
+    csoloSecretExp: document.getElementById("csolo-secret-exp"),
+    btnCsoloHoldReveal: document.getElementById("btn-csolo-hold-reveal"),
+    csoloHintBox: document.getElementById("csolo-hint-box"),
+    btnCsoloGuessed: document.getElementById("btn-csolo-guessed"),
+    btnCsoloSkip: document.getElementById("btn-csolo-skip"),
+    btnCsoloHint: document.getElementById("btn-csolo-hint"),
+    csoloSummaryView: document.getElementById("csolo-summary-view"),
+    csoloSummaryTitle: document.getElementById("csolo-summary-title"),
+    csoloSummaryStats: document.getElementById("csolo-summary-stats"),
+    csoloSummaryList: document.getElementById("csolo-summary-list"),
+    btnCsoloNextTurn: document.getElementById("btn-csolo-next-turn"),
+    csoloFinishView: document.getElementById("csolo-finish-view"),
+    csoloFinishTitle: document.getElementById("csolo-finish-title"),
+    csoloFinishScores: document.getElementById("csolo-finish-scores"),
+    btnCsoloResultCard: document.getElementById("btn-csolo-result-card"),
+    btnCsoloOpenHof: document.getElementById("btn-csolo-open-hof"),
+    btnCsoloPlayAgain: document.getElementById("btn-csolo-play-again"),
+
+    // قاعة المشاهير وأرشيف المباريات (Hall of Fame)
+    hallOfFameModal: document.getElementById("hall-of-fame-modal"),
+    hofProfileSubtitle: document.getElementById("hof-profile-subtitle"),
+    btnCloseHof: document.getElementById("btn-close-hof"),
+    hofTotalMatchesPill: document.getElementById("hof-total-matches-pill"),
+    hofRecordsGrid: document.getElementById("hof-records-grid"),
+    hofLeaderboardWrap: document.getElementById("hof-leaderboard-wrap"),
+    hofModeFilters: document.getElementById("hof-mode-filters"),
+    hofArchiveList: document.getElementById("hof-archive-list"),
+    btnHofClearArchive: document.getElementById("btn-hof-clear-archive"),
+    btnHofFooterClose: document.getElementById("btn-hof-footer-close"),
+
+    // الغرفة اللاسلكية (Phase 4 Pack 9)
+    btnOpenWirelessSetup: document.getElementById("btn-open-wireless-setup"),
+    btnOpenWirelessGame: document.getElementById("btn-open-wireless-game"),
+    btnOpenWirelessGameLabel: document.getElementById("btn-open-wireless-game-label"),
+    wirelessBuzzerHostBar: document.getElementById("wireless-buzzer-host-bar"),
+    wbStatusText: document.getElementById("wb-status-text"),
+    btnWbOpen: document.getElementById("btn-wb-open"),
+    btnWbLock: document.getElementById("btn-wb-lock"),
+    btnWbReset: document.getElementById("btn-wb-reset"),
+    wirelessRoomModal: document.getElementById("wireless-room-modal"),
+    btnCloseWirelessModal: document.getElementById("btn-close-wireless-modal"),
+    wirelessConnBadge: document.getElementById("wireless-conn-badge"),
+    wirelessRoomCodePill: document.getElementById("wireless-room-code-pill"),
+    wirelessRoomCodeText: document.getElementById("wireless-room-code-text"),
+    btnCreateWirelessRoom: document.getElementById("btn-create-wireless-room"),
+    btnCloseWirelessRoom: document.getElementById("btn-close-wireless-room"),
+    btnToggleWirelessSettings: document.getElementById("btn-toggle-wireless-settings"),
+    wirelessRoomFeedback: document.getElementById("wireless-room-feedback"),
+    wirelessSettingsPanel: document.getElementById("wireless-settings-panel"),
+    fbPasteSnippet: document.getElementById("fb-paste-snippet"),
+    btnFbParseSnippet: document.getElementById("btn-fb-parse-snippet"),
+    fbApiKey: document.getElementById("fb-api-key"),
+    fbAuthDomain: document.getElementById("fb-auth-domain"),
+    fbDatabaseUrl: document.getElementById("fb-database-url"),
+    fbProjectId: document.getElementById("fb-project-id"),
+    fbAppId: document.getElementById("fb-app-id"),
+    btnFbSaveConfig: document.getElementById("btn-fb-save-config"),
+    btnFbTestConn: document.getElementById("btn-fb-test-conn"),
+    btnFbClearConfig: document.getElementById("btn-fb-clear-config"),
+    wirelessQrGrid: document.getElementById("wireless-qr-grid"),
+    btnToggleHostQrPrivacy: document.getElementById("btn-toggle-host-qr-privacy"),
+    wirelessHostQrBox: document.getElementById("wireless-host-qr-box"),
+    wirelessHostQrMasked: document.getElementById("wireless-host-qr-masked"),
+    btnCopyRemoteUrl: document.getElementById("btn-copy-remote-url"),
+    linkOpenRemoteTab: document.getElementById("link-open-remote-tab"),
+    btnToggleTvQr: document.getElementById("btn-toggle-tv-qr"),
+    wirelessPlayerQrBox: document.getElementById("wireless-player-qr-box"),
+    wirelessPlayerCodeBig: document.getElementById("wireless-player-code-big"),
+    wirelessConnectedTeams: document.getElementById("wireless-connected-teams"),
+    btnCopyPlayerUrl: document.getElementById("btn-copy-player-url"),
+    linkOpenPlayerTab: document.getElementById("link-open-player-tab"),
+    wirelessBuzzerPanel: document.getElementById("wireless-buzzer-panel"),
+    wirelessBuzzerStatePill: document.getElementById("wireless-buzzer-state-pill"),
+    wirelessBuzzerResultBox: document.getElementById("wireless-buzzer-result-box"),
+    btnModalWbOpen: document.getElementById("btn-modal-wb-open"),
+    btnModalWbLock: document.getElementById("btn-modal-wb-lock"),
+    btnModalWbReset: document.getElementById("btn-modal-wb-reset")
   };
 
   /* =========================================================
@@ -1046,9 +1371,19 @@
       const mainTimerSec = Number(cfg.mainTimerSeconds);
       const timerLabel =
         mainTimerSec === 0 ? "⏱️ بدون مؤقت" : `⏱️ المؤقت (${mainTimerSec || MAIN_TIMER_SECONDS}ث)`;
+      const finalLabel =
+        cfg.finalRoundMode === "always"
+          ? "⚔️ حسم: دائماً"
+          : cfg.finalRoundMode === "off"
+            ? "⚔️ حسم: معطّل"
+            : "⚔️ حسم: عند التعادل";
+      const ddCount = Number(cfg.dailyDoubleCount) || 0;
+      const ddLabel = ddCount > 0 ? `🌟 ذهبي (${ddCount})` : "🌟 ذهبي (معطّل)";
 
       dom.tacticalSummaryPills.innerHTML = `
         <span class="tactical-summary-pill is-active">${timerLabel}</span>
+        <span class="tactical-summary-pill ${ddCount > 0 ? "is-active" : "is-off"}">${ddLabel}</span>
+        <span class="tactical-summary-pill ${cfg.finalRoundMode !== "off" ? "is-active" : "is-off"}">${finalLabel}</span>
         <span class="tactical-summary-pill ${cfg.hintEnabled ? "is-active" : "is-off"}">${hintLabel}</span>
         <span class="tactical-summary-pill ${cfg.doubleEnabled && cfg.doubleCount > 0 ? "is-active" : "is-off"}">${doubleLabel}</span>
         <span class="tactical-summary-pill ${cfg.swapEnabled && cfg.swapCount > 0 ? "is-active" : "is-off"}">${swapLabel}</span>
@@ -1074,11 +1409,52 @@
 
     dom.tacticalSetupPanel.querySelectorAll(".tactical-opt-btn").forEach((btn) => {
       const key = btn.dataset.setting;
-      const val = Number(btn.dataset.value);
-      const currentVal = Number(cfg[key]);
-      btn.classList.toggle("active", currentVal === val);
-      btn.setAttribute("aria-pressed", String(currentVal === val));
+      const rawVal = btn.dataset.value;
+      const isStringKey = key === "finalRoundMode";
+      const isMatch = isStringKey
+        ? String(cfg[key]) === String(rawVal)
+        : Number(cfg[key]) === Number(rawVal);
+      btn.classList.toggle("active", isMatch);
+      btn.setAttribute("aria-pressed", String(isMatch));
     });
+  }
+
+  function getConfiguredTeamCount() {
+    const raw = Number(state.setupSettings && state.setupSettings.teamCount);
+    return raw === 3 || raw === 4 ? raw : 2;
+  }
+
+  function getSetupTeamNames() {
+    const count = getConfiguredTeamCount();
+    const defaults = ["الفريق الأول", "الفريق الثاني", "الفريق الثالث", "الفريق الرابع"];
+    const inputs = [dom.team1Input, dom.team2Input, dom.team3Input, dom.team4Input];
+    const names = [];
+    for (let i = 0; i < count; i++) {
+      const val = inputs[i] && typeof inputs[i].value === "string" ? inputs[i].value.trim() : "";
+      names.push(val || defaults[i]);
+    }
+    return names;
+  }
+
+  function renderTeamCountSetupUI() {
+    const count = getConfiguredTeamCount();
+    if (dom.teamsInputsGrid) {
+      dom.teamsInputsGrid.dataset.teamCount = String(count);
+    }
+    if (dom.teamsVsDivider) {
+      dom.teamsVsDivider.hidden = count !== 2;
+    }
+    if (dom.teamInputCard3) dom.teamInputCard3.hidden = count < 3;
+    if (dom.teamInputCard4) dom.teamInputCard4.hidden = count < 4;
+
+    if (dom.teamCountSelector) {
+      dom.teamCountSelector.querySelectorAll(".team-count-pill").forEach((pill) => {
+        const val = Number(pill.dataset.teamCount);
+        const isActive = val === count;
+        pill.classList.toggle("active", isActive);
+        pill.setAttribute("aria-pressed", String(isActive));
+      });
+    }
   }
 
   function updateSetupSetting(patch) {
@@ -1114,6 +1490,7 @@
 
   function renderSetupScreen() {
     renderProfileSwitcher();
+    renderTeamCountSetupUI();
     renderTacticalSetupPanel();
 
     const groupStats = buildCategoryGroupStats();
@@ -1324,43 +1701,82 @@
   }
 
   /**
-   * اختيار «تشكيلة متوازنة» تلقائياً من 6 تصنيفات رئيسية مختلفة بأعلى رصيد أسئلة جديدة
+   * التحقق من امتلاك الفئة الحد الأدنى من الأسئلة المطلوبة لبناء عمود اللوحة (6 أسئلة: 2 لكل مستوى نقاط)
+   */
+  function hasFullBoardQuestions(cat) {
+    if (!cat || !Array.isArray(cat.questions) || cat.questions.length < 6) return false;
+    return POINT_TIERS.every(
+      (tier) => cat.questions.filter((q) => Number(q.points) === tier).length >= 2
+    );
+  }
+
+  function hasMinimumBoardQuestions(cat) {
+    return Boolean(cat && Array.isArray(cat.questions) && cat.questions.length >= 6);
+  }
+
+  /**
+   * اختيار عشوائي موزون بين أفضل المرشحين بحيث تتصدر الفئات الأكثر أسئلة جديدة وتتغير التشكيلة في كل ضغطة
+   */
+  function pickWeightedBestCategory(candidates, excludeIds) {
+    const pool = candidates.filter((c) => c && !excludeIds.has(c.id));
+    if (pool.length === 0) return null;
+
+    const scored = pool
+      .map((cat) => ({ cat, newCount: getCategoryNewCount(cat) }))
+      .sort((a, b) => b.newCount - a.newCount);
+
+    const topPool = scored.slice(0, Math.min(4, scored.length));
+    const weights = topPool.map((item, idx) => Math.max(1, item.newCount + (topPool.length - idx) * 2));
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    let r = Math.random() * totalWeight;
+    for (let i = 0; i < topPool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return topPool[i].cat;
+    }
+    return topPool[0].cat;
+  }
+
+  /**
+   * اختيار «تشكيلة سريعة متوازنة» تلقائياً:
+   * - تستبعد الفئات التي لا تملك الحد الأدنى من الأسئلة المطلوبة لبناء اللوحة
+   * - توزّع الاختيار عبر أكبر عدد ممكن من المجموعات المختلفة (group)
+   * - تعطي أولوية للأسئلة الجديدة في الملف النشط مع عشوائية موزونة بين أفضل المرشحين
    */
   function selectBalancedCategories() {
     if (!Array.isArray(state.allCategories) || state.allCategories.length === 0) return;
 
+    const fullEligible = state.allCategories.filter(hasFullBoardQuestions);
+    const minEligible =
+      fullEligible.length >= REQUIRED_CATEGORIES
+        ? fullEligible
+        : state.allCategories.filter(hasMinimumBoardQuestions);
+    const eligiblePool =
+      minEligible.length >= REQUIRED_CATEGORIES ? minEligible : state.allCategories.slice();
+
     const groupBuckets = new Map();
-    state.allCategories.forEach((cat) => {
+    eligiblePool.forEach((cat) => {
       const gid = resolveCategoryGroup(cat);
       if (!groupBuckets.has(gid)) groupBuckets.set(gid, []);
       groupBuckets.get(gid).push(cat);
     });
 
-    // ترتيب كل مجموعة بحيث تتصدر الفئات ذات الأسئلة الجديدة الأكثر مع تنويع عشوائي بين المتقاربات
-    const sortBucket = (cats) => {
-      const unplayedCats = shuffleArray(cats.filter((c) => getCategoryNewCount(c) > 0)).sort(
-        (a, b) => getCategoryNewCount(b) - getCategoryNewCount(a)
-      );
-      const playedCats = shuffleArray(cats.filter((c) => getCategoryNewCount(c) === 0));
-      // نأخذ من أعلى 3 فئات جديدة عشوائياً لإعطاء تنوّع مختلف في كل ضغطة
-      const topSlice = shuffleArray(unplayedCats.slice(0, Math.min(4, unplayedCats.length)));
-      return [...topSlice, ...unplayedCats.slice(topSlice.length), ...playedCats];
-    };
-
     const orderedGroupIds = shuffleArray(
       Array.from(groupBuckets.keys()).filter((gid) => (groupBuckets.get(gid) || []).length > 0)
     );
 
-    // التأكد من إعطاء أولوية للتنوع العالي: نختار فئة واحدة من كل تصنيف مختلف أولاً
     const picked = [];
     const pickedIds = new Set();
     const usedGroups = new Set();
 
-    // المرور الأول: فئة جديدة واحدة من كل مجموعة مختلفة
+    // المرور الأول: فئة واحدة من كل مجموعة مختلفة بأولوية للأسئلة الجديدة وعشوائية موزونة
     for (const gid of orderedGroupIds) {
       if (picked.length >= REQUIRED_CATEGORIES) break;
-      const sorted = sortBucket(groupBuckets.get(gid));
-      const candidate = sorted.find((c) => !pickedIds.has(c.id) && getCategoryNewCount(c) > 0);
+      const bucket = groupBuckets.get(gid) || [];
+      const unplayedBucket = bucket.filter((c) => getCategoryNewCount(c) > 0);
+      const candidate = pickWeightedBestCategory(
+        unplayedBucket.length > 0 ? unplayedBucket : bucket,
+        pickedIds
+      );
       if (candidate) {
         picked.push(candidate);
         pickedIds.add(candidate.id);
@@ -1368,28 +1784,13 @@
       }
     }
 
-    // المرور الثاني: إكمال من أي فئة جديدة متبقية من مجموعات أقل تمثيلاً
-    if (picked.length < REQUIRED_CATEGORIES) {
-      const remainingUnplayed = shuffleArray(
-        state.allCategories.filter((c) => !pickedIds.has(c.id) && getCategoryNewCount(c) > 0)
-      );
-      for (const cat of remainingUnplayed) {
-        if (picked.length >= REQUIRED_CATEGORIES) break;
-        picked.push(cat);
-        pickedIds.add(cat.id);
-        usedGroups.add(resolveCategoryGroup(cat));
-      }
-    }
-
-    // المرور الثالث: إكمال من أي فئة متبقية في البنك
-    if (picked.length < REQUIRED_CATEGORIES) {
-      const rest = shuffleArray(state.allCategories.filter((c) => !pickedIds.has(c.id)));
-      for (const cat of rest) {
-        if (picked.length >= REQUIRED_CATEGORIES) break;
-        picked.push(cat);
-        pickedIds.add(cat.id);
-        usedGroups.add(resolveCategoryGroup(cat));
-      }
+    // المرور الثاني: إكمال من أفضل الفئات المؤهلة المتبقية (في حال كان عدد المجموعات < 6)
+    while (picked.length < REQUIRED_CATEGORIES) {
+      const next = pickWeightedBestCategory(eligiblePool, pickedIds);
+      if (!next) break;
+      picked.push(next);
+      pickedIds.add(next.id);
+      usedGroups.add(resolveCategoryGroup(next));
     }
 
     state.selectedCategoryIds = picked.map((c) => c.id);
@@ -1402,7 +1803,7 @@
       window.SeenJeemAudio.playTileOpen();
     }
     showToast(
-      `✨ تم اختيار تشكيلة متوازنة من ${picked.length} فئات عبر ${usedGroups.size} مجالات مختلفة!`,
+      `🎲 تم اختيار تشكيلة متوازنة من ${picked.length} فئات عبر ${usedGroups.size} مجموعات مختلفة!`,
       "success"
     );
   }
@@ -2454,6 +2855,10 @@
       activeTeamAtOpen: cq.activeTeamAtOpen,
       revealed: Boolean(cq.revealed),
       phase: cq.phase || "answering",
+      isDailyDouble: Boolean(cq.isDailyDouble),
+      dailyDoublePhase: cq.dailyDoublePhase || "question",
+      dailyDoubleWager: Number(cq.dailyDoubleWager) || 0,
+      dailyDoubleMaxWager: Number(cq.dailyDoubleMaxWager) || 0,
       doubleActive: Boolean(cq.doubleActive),
       hintUsed: Boolean(cq.hintUsed),
       hintShown: Boolean(cq.hintUsed),
@@ -2497,6 +2902,7 @@
     if (dom.gameScreen.classList.contains("active") && !dom.winnerModal.classList.contains("open")) {
       if (Array.isArray(state.boardCategories) && state.boardCategories.length > 0) {
         matchStore.saveMatch({
+          matchId: state.matchId,
           activeProfileId: historyStore.getActiveProfileId(),
           selectedCategoryIds: state.selectedCategoryIds,
           matchSettings: state.matchSettings,
@@ -2505,6 +2911,8 @@
           doubleArmed: state.doubleArmed,
           answeredThisRound: state.answeredThisRound,
           matchEvents: state.matchEvents,
+          refereeAdjustments: state.refereeAdjustments,
+          finalRound: state.finalRound,
           boardCategories: state.boardCategories,
           openQuestion: buildOpenQuestionPersistPayload()
         });
@@ -2561,9 +2969,33 @@
     closeModal(dom.questionModal);
     broadcastLiveDisplayState();
     if (countRemainingPlayableQuestions() === 0 && !dom.winnerModal.classList.contains("open")) {
-      matchStore.clearSavedMatch();
-      setTimeout(() => openWinnerModal(false), 260);
+      handleBoardCompletedFlow();
     }
+  }
+
+  function cloneRefereeAdjustments(list = state.refereeAdjustments) {
+    return Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
+  }
+
+  function handleBoardCompletedFlow() {
+    const mode =
+      state.matchSettings && state.matchSettings.finalRoundMode
+        ? state.matchSettings.finalRoundMode
+        : "tie-only";
+
+    if (finalRoundEngine) {
+      if (mode === "always") {
+        setTimeout(() => startFinalRound("always"), 280);
+        return;
+      }
+      if (mode === "tie-only" && finalRoundEngine.isTopScoreTied(state.teams)) {
+        setTimeout(() => startFinalRound("tie-breaker"), 280);
+        return;
+      }
+    }
+
+    matchStore.clearSavedMatch();
+    setTimeout(() => openWinnerModal(false), 260);
   }
 
   function performUndo() {
@@ -2605,6 +3037,17 @@
     } else if (snapshot.cellState && state.matchEvents.length > 0) {
       state.matchEvents.pop();
     }
+    if (Array.isArray(snapshot.refereeAdjustments)) {
+      state.refereeAdjustments = cloneRefereeAdjustments(snapshot.refereeAdjustments);
+    }
+    if (snapshot.actionType === "final-round-resolve") {
+      if (snapshot.finalRound) {
+        state.finalRound = JSON.parse(JSON.stringify(snapshot.finalRound));
+        stopFinalRoundTimer();
+        renderFinalRoundModal();
+        openModal(dom.finalRoundModal);
+      }
+    }
 
     // 2) استعادة حالة الخلية في اللوحة (بما في ذلك السؤال الأصلي إن تم تبديله)
     if (snapshot.cellState) {
@@ -2642,22 +3085,24 @@
     if (!savedMatch || !dom.resumeMatchModal) return;
     state.pendingSavedMatch = savedMatch;
 
-    const t1 = savedMatch.teams[0];
-    const t2 = savedMatch.teams[1];
-    const turnTeam = savedMatch.teams[savedMatch.activeTurn] || t1;
+    const turnTeam = savedMatch.teams[savedMatch.activeTurn] || savedMatch.teams[0];
 
     if (dom.resumeMatchSummary) {
+      const pillsHtml = savedMatch.teams
+        .map(
+          (t, idx) => `
+          <div class="resume-team-pill team-${idx + 1}">
+            <div class="resume-team-name">${escapeHtml(t.name)}</div>
+            <div class="resume-team-score">${t.score}</div>
+          </div>
+          ${idx < savedMatch.teams.length - 1 && savedMatch.teams.length === 2 ? `<div class="resume-vs">VS</div>` : ""}
+        `
+        )
+        .join("");
+
       dom.resumeMatchSummary.innerHTML = `
-        <div class="resume-teams-row">
-          <div class="resume-team-pill team-1">
-            <div class="resume-team-name">${escapeHtml(t1.name)}</div>
-            <div class="resume-team-score">${t1.score}</div>
-          </div>
-          <div class="resume-vs">VS</div>
-          <div class="resume-team-pill team-2">
-            <div class="resume-team-name">${escapeHtml(t2.name)}</div>
-            <div class="resume-team-score">${t2.score}</div>
-          </div>
+        <div class="resume-teams-row" data-team-count="${savedMatch.teams.length}">
+          ${pillsHtml}
         </div>
         <div class="resume-meta-row">
           <span>المتبقي: <strong>${savedMatch.playableRemaining} / ${savedMatch.totalSlots}</strong></span>
@@ -2682,6 +3127,12 @@
       historyStore.setActiveProfile(saved.activeProfileId);
     }
 
+    state.matchId =
+      typeof saved.matchId === "string" && saved.matchId.trim()
+        ? saved.matchId.trim()
+        : archiveStore
+          ? archiveStore.generateMatchId("classic")
+          : `classic_${Date.now()}`;
     state.matchSettings = matchStore.sanitizeSettings(saved.matchSettings);
     state.selectedCategoryIds = Array.isArray(saved.selectedCategoryIds)
       ? saved.selectedCategoryIds.slice()
@@ -2692,10 +3143,17 @@
     state.lastRenderedScores = state.teams.map((t) => t.score);
     state.answeredThisRound = saved.answeredThisRound;
     state.matchEvents = cloneMatchEvents(saved.matchEvents);
+    state.refereeAdjustments = cloneRefereeAdjustments(saved.refereeAdjustments);
+    state.finalRound = saved.finalRound ? JSON.parse(JSON.stringify(saved.finalRound)) : null;
     state.boardCategories = saved.boardCategories;
 
-    if (dom.team1Input && state.teams[0]) dom.team1Input.value = state.teams[0].name;
-    if (dom.team2Input && state.teams[1]) dom.team2Input.value = state.teams[1].name;
+    const nameInputs = [dom.team1Input, dom.team2Input, dom.team3Input, dom.team4Input];
+    state.teams.forEach((t, idx) => {
+      if (nameInputs[idx]) nameInputs[idx].value = t.name;
+    });
+    if (state.setupSettings) {
+      state.setupSettings.teamCount = Math.min(4, Math.max(2, state.teams.length));
+    }
 
     matchStore.restoreUndoStack(saved.undoStack, state.matchSettings);
 
@@ -2712,8 +3170,12 @@
     // التحميل المسبق لصور اللوحة في الخلفية
     imagePreloader.preloadBoardImages(state.boardCategories, 5);
 
-    // استعادة نافذة السؤال إن كانت مفتوحة لحظة إغلاق/تحديث الصفحة
-    if (saved.openQuestion) {
+    // استعادة جولة الرهان النهائي أو نافذة السؤال إن كانت مفتوحة لحظة إغلاق/تحديث الصفحة
+    if (state.finalRound && dom.finalRoundModal) {
+      state.finalRound.timerRunning = false;
+      renderFinalRoundModal();
+      openModal(dom.finalRoundModal);
+    } else if (saved.openQuestion) {
       const oq = saved.openQuestion;
       const bc = state.boardCategories[oq.catIdx];
       const slot = bc && bc[oq.colKey] && bc[oq.colKey][oq.slotIdx];
@@ -2765,7 +3227,8 @@
             played: !qObj,
             previouslyPlayed: isRecycled,
             recycled: isRecycled,
-            winnerTeam: null
+            winnerTeam: null,
+            isDailyDouble: false
           };
           if (col === 0) {
             rightColumn.push(slot);
@@ -2782,6 +3245,39 @@
       };
     });
 
+    // توزيع المربعات الذهبية المخفية (Hidden Daily Double) سراً على فئات 400/600 (حد أقصى مربع واحد لكل فئة وتجنب mgk-* قدر الإمكان)
+    const ddTarget = Math.min(2, Math.max(0, Number(state.matchSettings.dailyDoubleCount) || 0));
+    if (ddTarget > 0 && state.boardCategories.length > 0) {
+      const nonCharadesCatIdxs = [];
+      const charadesCatIdxs = [];
+      state.boardCategories.forEach((bc, idx) => {
+        const eligible = [...bc.rightColumn, ...bc.leftColumn].some(
+          (s) => !s.played && s.question && (Number(s.points) === 400 || Number(s.points) === 600)
+        );
+        if (!eligible) return;
+        const isMgk =
+          String(bc.category.id || "").startsWith("mgk-") ||
+          resolveCategoryGroup(bc.category) === "charades";
+        if (isMgk) charadesCatIdxs.push(idx);
+        else nonCharadesCatIdxs.push(idx);
+      });
+
+      const orderedCatPool = [...shuffleArray(nonCharadesCatIdxs), ...shuffleArray(charadesCatIdxs)];
+      let placed = 0;
+      for (const catIdx of orderedCatPool) {
+        if (placed >= ddTarget) break;
+        const bc = state.boardCategories[catIdx];
+        const slots = [...bc.rightColumn, ...bc.leftColumn].filter(
+          (s) => !s.played && s.question && (Number(s.points) === 400 || Number(s.points) === 600)
+        );
+        if (slots.length > 0) {
+          const chosen = slots[Math.floor(Math.random() * slots.length)];
+          chosen.isDailyDouble = true;
+          placed++;
+        }
+      }
+    }
+
     return { totalRecycledCount };
   }
 
@@ -2789,34 +3285,29 @@
     if (state.selectedCategoryIds.length !== REQUIRED_CATEGORIES) return;
 
     clearClosingRevealTimer();
-    const t1Name = dom.team1Input.value.trim() || "الفريق الأول";
-    const t2Name = dom.team2Input.value.trim() || "الفريق الثاني";
+    stopFinalRoundTimer();
+    closeRefereePopover();
+    const teamNames = getSetupTeamNames();
 
+    state.matchId = archiveStore ? archiveStore.generateMatchId("classic") : `classic_${Date.now()}`;
     state.matchSettings = matchStore.sanitizeSettings(state.setupSettings);
     const initialDouble = state.matchSettings.doubleEnabled ? state.matchSettings.doubleCount : 0;
     const initialSwap = state.matchSettings.swapEnabled ? state.matchSettings.swapCount : 0;
 
-    state.teams = [
-      {
-        id: "team-0",
-        name: t1Name,
-        score: 0,
-        powerups: { doubleLeft: initialDouble, swapLeft: initialSwap },
-        lifelines: { double: initialDouble === 0, twoAnswers: false, callFriend: false }
-      },
-      {
-        id: "team-1",
-        name: t2Name,
-        score: 0,
-        powerups: { doubleLeft: initialDouble, swapLeft: initialSwap },
-        lifelines: { double: initialDouble === 0, twoAnswers: false, callFriend: false }
-      }
-    ];
+    state.teams = teamNames.map((name, idx) => ({
+      id: `team-${idx}`,
+      name,
+      score: 0,
+      powerups: { doubleLeft: initialDouble, swapLeft: initialSwap },
+      lifelines: { double: initialDouble === 0, twoAnswers: false, callFriend: false }
+    }));
     state.activeTurn = 0;
     state.doubleArmed = false;
-    state.lastRenderedScores = [0, 0];
+    state.lastRenderedScores = state.teams.map(() => 0);
     state.answeredThisRound = 0;
     state.matchEvents = [];
+    state.refereeAdjustments = [];
+    state.finalRound = null;
     state.dualScreen.closingPreviewQuestion = null;
     matchStore.clearUndoStack();
 
@@ -2825,6 +3316,7 @@
     stopVictoryConfetti();
     closeModal(dom.winnerModal);
     closeModal(dom.questionModal);
+    closeModal(dom.finalRoundModal);
 
     dom.setupScreen.classList.remove("active");
     dom.setupScreen.setAttribute("aria-hidden", "true");
@@ -2897,32 +3389,112 @@
   }
 
   function renderScoreboard() {
-    dom.boardTeam1Name.textContent = state.teams[0].name;
-    dom.boardTeam2Name.textContent = state.teams[1].name;
+    if (dom.scoreboardTeamsGrid) {
+      dom.scoreboardTeamsGrid.dataset.teamCount = String(state.teams.length);
+      dom.scoreboardTeamsGrid.innerHTML = "";
 
-    const s0 = state.teams[0].score;
-    const s1 = state.teams[1].score;
-    dom.boardTeam1Score.textContent = String(s0);
-    dom.boardTeam2Score.textContent = String(s1);
+      state.teams.forEach((team, idx) => {
+        const isActive = state.activeTurn === idx;
+        const prevScore = state.lastRenderedScores[idx];
+        const didPop = prevScore !== undefined && prevScore !== team.score;
+        state.lastRenderedScores[idx] = team.score;
 
-    if (s0 !== state.lastRenderedScores[0]) {
-      triggerScorePop(dom.boardTeam1Score);
-      state.lastRenderedScores[0] = s0;
+        const card = document.createElement("div");
+        card.id = `scoreboard-team-${idx + 1}`;
+        card.className = `score-team-card team-${idx + 1}-card${isActive ? " active-turn" : ""}`;
+        card.innerHTML = `
+          <div class="score-team-top">
+            <div class="score-team-identity">
+              <span class="team-badge-dot team-${idx + 1}-dot"></span>
+              <h2 class="score-team-name" title="${escapeHtml(team.name)}">${escapeHtml(team.name)}</h2>
+            </div>
+            <div class="score-team-top-actions">
+              <span class="turn-pill">الدور الآن</span>
+              <button
+                type="button"
+                class="team-mini-action-btn btn-set-turn-direct"
+                data-set-turn="${idx}"
+                title="تعيين الدور لهذا الفريق"
+                aria-label="تعيين الدور لـ ${escapeHtml(team.name)}"
+                ${isActive ? "hidden" : ""}
+              >
+                🎯
+              </button>
+              <button
+                type="button"
+                class="team-mini-action-btn btn-open-referee"
+                data-ref-team="${idx}"
+                title="تحكيم سريع: تعديل مخصّص للنقاط أو وسائل المساعدة"
+                aria-label="تحكيم سريع لـ ${escapeHtml(team.name)}"
+              >
+                ⚖️
+              </button>
+            </div>
+          </div>
+
+          <div class="score-team-bottom">
+            <div class="score-value-row">
+              <button
+                type="button"
+                class="score-adjust-btn minus"
+                data-team="${idx}"
+                data-delta="-100"
+                title="خصم 100 نقطة"
+                aria-label="خصم 100 نقطة لـ ${escapeHtml(team.name)}"
+              >
+                -100
+              </button>
+              <div class="score-number${didPop ? " score-pop" : ""}">${team.score}</div>
+              <button
+                type="button"
+                class="score-adjust-btn plus"
+                data-team="${idx}"
+                data-delta="100"
+                title="إضافة 100 نقطة"
+                aria-label="إضافة 100 نقطة لـ ${escapeHtml(team.name)}"
+              >
+                +100
+              </button>
+            </div>
+
+            <div class="lifelines-status-row" aria-label="وسائل المساعدة لـ ${escapeHtml(team.name)}"></div>
+          </div>
+        `;
+
+        card.querySelectorAll(".score-adjust-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            adjustScore(Number(btn.dataset.team), Number(btn.dataset.delta));
+          });
+        });
+
+        const turnBtn = card.querySelector(".btn-set-turn-direct");
+        if (turnBtn) {
+          turnBtn.addEventListener("click", () => setActiveTurnManually(idx));
+        }
+
+        const refBtn = card.querySelector(".btn-open-referee");
+        if (refBtn) {
+          refBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openRefereePopover(idx, refBtn);
+          });
+        }
+
+        const lifeRow = card.querySelector(".lifelines-status-row");
+        renderTeamPowerupsChips(lifeRow, idx);
+
+        dom.scoreboardTeamsGrid.appendChild(card);
+      });
     }
-    if (s1 !== state.lastRenderedScores[1]) {
-      triggerScorePop(dom.boardTeam2Score);
-      state.lastRenderedScores[1] = s1;
-    }
-
-    dom.scoreboardTeam1.classList.toggle("active-turn", state.activeTurn === 0);
-    dom.scoreboardTeam2.classList.toggle("active-turn", state.activeTurn === 1);
-
-    renderTeamPowerupsChips(dom.team1LifelinesStatus, 0);
-    renderTeamPowerupsChips(dom.team2LifelinesStatus, 1);
 
     const remaining = countRemainingPlayableQuestions();
     const total = countTotalBoardSlots();
-    dom.boardRemainingPill.textContent = `متبقي ${remaining} / ${total}`;
+    if (dom.boardRemainingPill) {
+      dom.boardRemainingPill.textContent = `متبقي ${remaining} / ${total}`;
+    }
+    if (state.refereePopoverTeamIdx !== null) {
+      renderRefereePopover();
+    }
   }
 
   function renderTeamPowerupsChips(container, teamIndex) {
@@ -3028,7 +3600,7 @@
     const btn = document.createElement("button");
     btn.type = "button";
     const winnerClass =
-      slot.played && (slot.winnerTeam === 0 || slot.winnerTeam === 1)
+      slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 4
         ? ` won-team-${slot.winnerTeam}`
         : "";
     const recycledClass = !slot.played && slot.recycled ? " recycled-slot" : "";
@@ -3037,7 +3609,7 @@
     btn.disabled = slot.played || !slot.question;
 
     if (slot.played) {
-      if (slot.winnerTeam === 0 || slot.winnerTeam === 1) {
+      if (Number.isInteger(slot.winnerTeam) && state.teams[slot.winnerTeam]) {
         btn.title = `فاز بها: ${state.teams[slot.winnerTeam].name}`;
       } else if (!slot.question) {
         btn.title = "لا يتوفر سؤال في هذا المستوى";
@@ -3054,20 +3626,27 @@
     return btn;
   }
 
-  function adjustScore(teamIndex, delta) {
+  function adjustScore(teamIndex, delta, isCustom = false) {
     const team = state.teams[teamIndex];
-    if (!team) return;
-    const nextScore = Math.max(0, team.score + delta);
-    if (nextScore === team.score) return;
+    const cleanDelta = Math.round(Number(delta));
+    if (!team || !Number.isFinite(cleanDelta) || cleanDelta === 0) return;
+    const nextScore = Math.max(0, team.score + cleanDelta);
+    const actualDelta = nextScore - team.score;
+    if (actualDelta === 0) {
+      showToast(`رصيد ${team.name} بالفعل 0 نقطة`, "info");
+      return;
+    }
 
     matchStore.pushUndoSnapshot(
       {
         actionType: "manual-score",
-        label: `${delta > 0 ? "إضافة" : "خصم"} ${Math.abs(delta)} نقطة (${team.name})`,
+        label: `تحكيم: ${actualDelta > 0 ? "+" : ""}${actualDelta} نقطة (${team.name})`,
         teams: cloneTeamsState(),
         activeTurn: state.activeTurn,
         doubleArmed: state.doubleArmed,
         answeredThisRound: state.answeredThisRound,
+        matchEvents: cloneMatchEvents(),
+        refereeAdjustments: cloneRefereeAdjustments(),
         cellState: null,
         questionHistorySnapshot: null
       },
@@ -3075,20 +3654,45 @@
     );
 
     team.score = nextScore;
+    state.refereeAdjustments.push({
+      id: `ref_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      teamId: team.id || `team-${teamIndex}`,
+      teamName: team.name,
+      type: "score",
+      delta: actualDelta,
+      detail: isCustom ? "تعديل تحكيمي مخصّص" : "تعديل تحكيمي سريع",
+      timestamp: Date.now()
+    });
+
     renderScoreboard();
     updateUndoButtonUI();
     persistActiveMatch();
+    if (window.SeenJeemAudio) {
+      window.SeenJeemAudio.playTileOpen();
+    }
+    showToast(
+      `⚖️ تحكيم: ${actualDelta > 0 ? `+${actualDelta}` : actualDelta} نقطة لـ ${team.name} (الرصيد: ${team.score})`,
+      "info"
+    );
   }
 
-  function switchTurnManually() {
+  function setActiveTurnManually(targetTeamIdx) {
+    if (!Number.isInteger(targetTeamIdx) || targetTeamIdx < 0 || targetTeamIdx >= state.teams.length) {
+      return;
+    }
+    if (targetTeamIdx === state.activeTurn) return;
+
+    const targetTeam = state.teams[targetTeamIdx];
     matchStore.pushUndoSnapshot(
       {
         actionType: "switch-turn",
-        label: `تبديل الدور من ${state.teams[state.activeTurn].name}`,
+        label: `تعيين الدور لـ ${targetTeam.name}`,
         teams: cloneTeamsState(),
         activeTurn: state.activeTurn,
         doubleArmed: state.doubleArmed,
         answeredThisRound: state.answeredThisRound,
+        matchEvents: cloneMatchEvents(),
+        refereeAdjustments: cloneRefereeAdjustments(),
         cellState: null,
         questionHistorySnapshot: null
       },
@@ -3096,11 +3700,109 @@
     );
 
     state.doubleArmed = false;
-    state.activeTurn = (state.activeTurn + 1) % state.teams.length;
+    state.activeTurn = targetTeamIdx;
     renderScoreboard();
     updateUndoButtonUI();
     persistActiveMatch();
-    showToast(`انتقل الدور إلى: ${state.teams[state.activeTurn].name}`, "info");
+    if (window.SeenJeemAudio) {
+      window.SeenJeemAudio.playTileOpen();
+    }
+    showToast(`🎯 تم تعيين الدور لـ ${targetTeam.name}`, "info");
+  }
+
+  function adjustTeamPowerup(teamIndex, key, delta) {
+    const team = state.teams[teamIndex];
+    if (!team || !team.powerups) return;
+    const prop = key === "swap" ? "swapLeft" : "doubleLeft";
+    const labelAr = key === "swap" ? "تبديل السؤال" : "مضاعفة 2x";
+    const curVal = Number(team.powerups[prop]) || 0;
+    const nextVal = Math.max(0, Math.min(3, curVal + delta));
+    if (nextVal === curVal) return;
+
+    matchStore.pushUndoSnapshot(
+      {
+        actionType: "referee-powerup",
+        label: `تعديل رصيد ${labelAr} (${team.name})`,
+        teams: cloneTeamsState(),
+        activeTurn: state.activeTurn,
+        doubleArmed: state.doubleArmed,
+        answeredThisRound: state.answeredThisRound,
+        matchEvents: cloneMatchEvents(),
+        refereeAdjustments: cloneRefereeAdjustments(),
+        cellState: null,
+        questionHistorySnapshot: null
+      },
+      state.matchSettings
+    );
+
+    team.powerups[prop] = nextVal;
+    if (prop === "doubleLeft") {
+      team.lifelines.double = nextVal === 0;
+      if (nextVal === 0 && state.activeTurn === teamIndex) {
+        state.doubleArmed = false;
+      }
+    }
+    state.refereeAdjustments.push({
+      id: `ref_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      teamId: team.id || `team-${teamIndex}`,
+      teamName: team.name,
+      type: "powerup",
+      delta: nextVal - curVal,
+      detail: labelAr,
+      timestamp: Date.now()
+    });
+
+    renderScoreboard();
+    updateUndoButtonUI();
+    persistActiveMatch();
+    showToast(`⚖️ ${team.name}: أصبح رصيد ${labelAr} = ${nextVal}`, "info");
+  }
+
+  function renderRefereePopover() {
+    if (!dom.refereePopover || state.refereePopoverTeamIdx === null) return;
+    const team = state.teams[state.refereePopoverTeamIdx];
+    if (!team) {
+      closeRefereePopover();
+      return;
+    }
+    if (dom.refereeTeamTitle) {
+      dom.refereeTeamTitle.textContent = `⚖️ تحكيم: ${team.name} (${team.score} نقطة)`;
+    }
+    if (dom.refDoubleVal) {
+      dom.refDoubleVal.textContent = String(team.powerups ? team.powerups.doubleLeft : 0);
+    }
+    if (dom.refSwapVal) {
+      dom.refSwapVal.textContent = String(team.powerups ? team.powerups.swapLeft : 0);
+    }
+    if (dom.btnRefSetTurn) {
+      const alreadyTurn = state.activeTurn === state.refereePopoverTeamIdx;
+      dom.btnRefSetTurn.disabled = alreadyTurn;
+      dom.btnRefSetTurn.textContent = alreadyTurn
+        ? "✓ هذا الفريق هو صاحب الدور حالياً"
+        : "🎯 تعيين الدور لهذا الفريق الآن";
+    }
+  }
+
+  function openRefereePopover(teamIdx) {
+    if (!dom.refereePopover || !state.teams[teamIdx]) return;
+    if (state.refereePopoverTeamIdx === teamIdx && !dom.refereePopover.hidden) {
+      closeRefereePopover();
+      return;
+    }
+    state.refereePopoverTeamIdx = teamIdx;
+    if (dom.refereeCustomDeltaInput) dom.refereeCustomDeltaInput.value = "";
+    renderRefereePopover();
+    dom.refereePopover.hidden = false;
+  }
+
+  function closeRefereePopover() {
+    state.refereePopoverTeamIdx = null;
+    if (dom.refereePopover) dom.refereePopover.hidden = true;
+  }
+
+  function switchTurnManually() {
+    const nextIdx = (state.activeTurn + 1) % state.teams.length;
+    setActiveTurnManually(nextIdx);
   }
 
   /* =========================================================
@@ -4366,7 +5068,14 @@
     }
 
     // ضبط المؤقت والمرحلة الحالية
-    if (cq.phase === "steal-active") {
+    if (cq.isDailyDouble && cq.dailyDoublePhase === "wager") {
+      stopTimerInterval();
+      stopMemoryInterval();
+      state.timerRunning = false;
+      state.timerRemaining = getConfiguredMainTimerSeconds() || MAIN_TIMER_SECONDS;
+      state.timerMax = state.timerRemaining;
+      state.timerMode = "main";
+    } else if (cq.phase === "steal-active") {
       const stealMax = state.matchSettings.stealTimerSeconds || 15;
       const rem =
         restoredState && Number.isFinite(Number(restoredState.timerRemaining))
@@ -4520,14 +5229,29 @@
         : state.activeTurn;
 
     const ownerTeam = state.teams[activeTeamAtOpen];
+    const isDailyDouble = Boolean(
+      (restoredOpenState && restoredOpenState.isDailyDouble) || slot.isDailyDouble
+    );
+    const basePoints = Number(slot.question.points) || Number(slot.points) || 400;
+    const ddMaxWager = Math.max(ownerTeam ? Number(ownerTeam.score) || 0 : 0, basePoints * 2, 100);
+    const ddDefaultWager = Math.min(ddMaxWager, Math.max(100, basePoints));
     let doubleActive = false;
+    let refundedDoubleForDailyDouble = false;
 
     if (restoredOpenState) {
       doubleActive = Boolean(
-        restoredOpenState.doubleActive ||
-          (Array.isArray(restoredOpenState.usedLifelinesHere) &&
-            restoredOpenState.usedLifelinesHere.includes("double"))
+        !isDailyDouble &&
+          (restoredOpenState.doubleActive ||
+            (Array.isArray(restoredOpenState.usedLifelinesHere) &&
+              restoredOpenState.usedLifelinesHere.includes("double")))
       );
+    } else if (state.doubleArmed && isDailyDouble) {
+      // حماية بطاقة 2x: لا تُستهلك إذا تزامن تفعيلها مع مربع ذهبي مخفي
+      state.doubleArmed = false;
+      doubleActive = false;
+      refundedDoubleForDailyDouble = true;
+      renderScoreboard();
+      updateUndoButtonUI();
     } else if (state.doubleArmed && ownerTeam && ownerTeam.powerups && ownerTeam.powerups.doubleLeft > 0) {
       // قاعدة التفعيل العادلة: خصم بطاقة 2x تلقائياً فور فتح السؤال
       ownerTeam.powerups.doubleLeft = Math.max(0, ownerTeam.powerups.doubleLeft - 1);
@@ -4549,6 +5273,21 @@
       category: boardCat.category,
       question: slot.question,
       visualType: "normal",
+      isDailyDouble,
+      dailyDoublePhase:
+        isDailyDouble
+          ? restoredOpenState && restoredOpenState.dailyDoublePhase === "question"
+            ? "question"
+            : "wager"
+          : "question",
+      dailyDoubleWager:
+        isDailyDouble && restoredOpenState && Number(restoredOpenState.dailyDoubleWager) >= 100
+          ? Number(restoredOpenState.dailyDoubleWager)
+          : ddDefaultWager,
+      dailyDoubleMaxWager:
+        isDailyDouble && restoredOpenState && Number(restoredOpenState.dailyDoubleMaxWager) >= 100
+          ? Number(restoredOpenState.dailyDoubleMaxWager)
+          : ddMaxWager,
       isCharades,
       charadesDuration:
         restoredOpenState && Number(restoredOpenState.charadesDuration)
@@ -4597,7 +5336,14 @@
     persistActiveMatch();
 
     if (!restoredOpenState && window.SeenJeemAudio) {
-      window.SeenJeemAudio.playTileOpen();
+      if (isDailyDouble && typeof window.SeenJeemAudio.playFanfare === "function") {
+        window.SeenJeemAudio.playFanfare();
+      } else {
+        window.SeenJeemAudio.playTileOpen();
+      }
+    }
+    if (refundedDoubleForDailyDouble) {
+      showToast("⚡ تم استرجاع بطاقة 2x لأن السؤال مربع ذهبي!", "info");
     }
   }
 
@@ -4627,7 +5373,13 @@
       dom.modalPointsPill.classList.add("pts-200");
     }
 
-    if (cq.phase === "steal-active") {
+    if (cq.isDailyDouble && cq.dailyDoublePhase === "wager") {
+      dom.modalPointsPill.classList.add("doubled");
+      dom.modalPointsPill.textContent = `🌟 مربع ذهبي (${basePoints})`;
+    } else if (cq.isDailyDouble) {
+      dom.modalPointsPill.classList.add("doubled");
+      dom.modalPointsPill.textContent = `🌟 رهان: ${cq.dailyDoubleWager} نقطة`;
+    } else if (cq.phase === "steal-active") {
       dom.modalPointsPill.classList.add("steal-pill");
       dom.modalPointsPill.innerHTML = `<span>🔥 سرقة: +${stealPoints} نقطة</span>`;
     } else if (cq.doubleActive && hasHintDiscount) {
@@ -4761,20 +5513,26 @@
     const stealingTeam = state.teams[cq.stealingTeamIdx] || state.teams[1] || state.teams[0];
     const stealPoints = computeStealQuestionPoints(cq);
 
-    // ترويسة الدور وشريط السرقة العلوي
-    dom.modalTurnBadge.classList.remove("team-1-turn", "team-2-turn", "steal-turn-0", "steal-turn-1");
+    // ترويسة الدور وشريط السرقة العلوي (يدعم 2 إلى 4 فرق)
+    dom.modalTurnBadge.classList.remove(
+      "team-1-turn",
+      "team-2-turn",
+      "team-3-turn",
+      "team-4-turn",
+      "steal-turn-0",
+      "steal-turn-1",
+      "steal-turn-2",
+      "steal-turn-3"
+    );
     if (cq.phase === "steal-active") {
-      const stealAccent = cq.stealingTeamIdx === 0 ? "steal-turn-0" : "steal-turn-1";
-      dom.modalTurnBadge.classList.add(stealAccent);
+      dom.modalTurnBadge.classList.add(`steal-turn-${cq.stealingTeamIdx}`);
       dom.modalTurnBadge.innerHTML = `🔥 فرصة سرقة لـ <strong id="modal-active-team-name">${escapeHtml(
         stealingTeam.name
       )}</strong>`;
 
       if (dom.stealStatusBanner) {
         dom.stealStatusBanner.hidden = false;
-        dom.stealStatusBanner.className = `steal-status-banner ${
-          cq.stealingTeamIdx === 0 ? "steal-team-0" : "steal-team-1"
-        }`;
+        dom.stealStatusBanner.className = `steal-status-banner steal-team-${cq.stealingTeamIdx}`;
       }
       if (dom.stealBannerText) {
         dom.stealBannerText.textContent = `فرصة سرقة لـ ${stealingTeam.name}`;
@@ -4783,7 +5541,7 @@
         dom.stealBannerPtsBadge.textContent = `+${stealPoints} نقطة`;
       }
 
-      // في حال وجود 3 فرق أو أكثر: عرض أزرار سريعة لاختيار الفريق السارق
+      // في حال وجود 3 فرق أو أكثر: عرض أزرار سريعة وملوّنة لاختيار الفريق السارق
       if (dom.stealTeamSelector) {
         if (state.teams.length >= 3) {
           dom.stealTeamSelector.innerHTML = "";
@@ -4791,8 +5549,9 @@
             if (idx === cq.activeTeamAtOpen) return;
             const pill = document.createElement("button");
             pill.type = "button";
-            pill.className = `steal-team-pill${idx === cq.stealingTeamIdx ? " active" : ""}`;
-            pill.textContent = t.name;
+            pill.className = `steal-team-pill team-${idx + 1}-pill${idx === cq.stealingTeamIdx ? " active" : ""}`;
+            pill.dataset.stealTeam = String(idx);
+            pill.innerHTML = `<span class="team-badge-dot team-${idx + 1}-dot"></span><span>${escapeHtml(t.name)}</span>`;
             pill.addEventListener("click", () => {
               cq.stealingTeamIdx = idx;
               updateModalPhaseUI();
@@ -4807,7 +5566,7 @@
         }
       }
     } else {
-      dom.modalTurnBadge.classList.add(cq.activeTeamAtOpen === 0 ? "team-1-turn" : "team-2-turn");
+      dom.modalTurnBadge.classList.add(`team-${(cq.activeTeamAtOpen || 0) + 1}-turn`);
       dom.modalTurnBadge.innerHTML = `دور: <strong id="modal-active-team-name">${escapeHtml(
         ownerTeam.name
       )}</strong>`;
@@ -4816,15 +5575,56 @@
       }
     }
 
-    if (cq.isCharades) {
-      const inSteal = cq.phase === "steal-active";
-      const isHostDual = state.dualScreen.connected;
-      if (dom.timerSection) dom.timerSection.hidden = !inSteal;
-      if (dom.charadesTimerBox) dom.charadesTimerBox.hidden = inSteal || cq.revealed;
-      if (dom.charadesActorStage) dom.charadesActorStage.hidden = cq.revealed || isHostDual;
-      if (dom.btnHoldRevealSecret) dom.btnHoldRevealSecret.hidden = inSteal || cq.revealed || isHostDual;
+    if (cq.isDailyDouble) {
+      const inWager = cq.dailyDoublePhase === "wager";
+      const basePts = Number(cq.question.points) || 400;
+      const maxW = Math.max(100, Number(cq.dailyDoubleMaxWager) || basePts * 2);
+
+      if (dom.dailyDoubleBanner) dom.dailyDoubleBanner.hidden = false;
+      if (dom.dailyDoubleBannerSub) {
+        dom.dailyDoubleBannerSub.textContent = inWager
+          ? `خاص بـ ${ownerTeam.name} — اختر رهانك قبل رؤية السؤال (الصح +رهان / الخطأ -رهان بدون سرقة)`
+          : `الرهان المثبّت لـ ${ownerTeam.name}: ±${cq.dailyDoubleWager} نقطة (لا توجد فرصة سرقة)`;
+      }
+      if (dom.dailyDoubleWagerPanel) dom.dailyDoubleWagerPanel.hidden = !inWager;
+
+      if (inWager) {
+        if (dom.ddWagerTeamLabel) dom.ddWagerTeamLabel.textContent = `🌟 رهان ${ownerTeam.name}`;
+        if (dom.ddWagerBoundsLabel) dom.ddWagerBoundsLabel.textContent = `من 100 حتى ${maxW} نقطة`;
+        if (dom.ddWagerInput) {
+          dom.ddWagerInput.min = "100";
+          dom.ddWagerInput.max = String(maxW);
+          if (
+            document.activeElement !== dom.ddWagerInput ||
+            !dom.ddWagerInput.value
+          ) {
+            dom.ddWagerInput.value = String(cq.dailyDoubleWager || Math.min(maxW, basePts));
+          }
+        }
+        if (dom.btnDdPresetBase) dom.btnDdPresetBase.textContent = `القيمة الأصلية (${Math.min(maxW, basePts)})`;
+        if (dom.btnDdPresetDouble) dom.btnDdPresetDouble.textContent = `ضعف القيمة (${Math.min(maxW, basePts * 2)})`;
+        if (dom.btnDdPresetAllin) dom.btnDdPresetAllin.textContent = `الكل All-In (${maxW})`;
+      }
+
+      if (dom.questionBodyBox) dom.questionBodyBox.hidden = inWager;
+      if (dom.questionTacticalBar && inWager) dom.questionTacticalBar.hidden = true;
+      if (dom.timerSection) dom.timerSection.hidden = inWager || cq.isCharades;
+      if (dom.btnWrongAnswer) dom.btnWrongAnswer.hidden = true;
     } else {
-      if (dom.timerSection) dom.timerSection.hidden = false;
+      if (dom.dailyDoubleBanner) dom.dailyDoubleBanner.hidden = true;
+      if (dom.dailyDoubleWagerPanel) dom.dailyDoubleWagerPanel.hidden = true;
+      if (dom.questionBodyBox) dom.questionBodyBox.hidden = false;
+      if (dom.btnWrongAnswer) dom.btnWrongAnswer.hidden = false;
+      if (cq.isCharades) {
+        const inSteal = cq.phase === "steal-active";
+        const isHostDual = state.dualScreen.connected;
+        if (dom.timerSection) dom.timerSection.hidden = !inSteal;
+        if (dom.charadesTimerBox) dom.charadesTimerBox.hidden = inSteal || cq.revealed;
+        if (dom.charadesActorStage) dom.charadesActorStage.hidden = cq.revealed || isHostDual;
+        if (dom.btnHoldRevealSecret) dom.btnHoldRevealSecret.hidden = inSteal || cq.revealed || isHostDual;
+      } else {
+        if (dom.timerSection) dom.timerSection.hidden = false;
+      }
     }
 
     // تحديث تسمية زر كشف الإجابة عند اتصال شاشة التلفزيون
@@ -4844,8 +5644,22 @@
     if (dom.stealActiveActions) dom.stealActiveActions.hidden = true;
     if (dom.closingRevealActions) dom.closingRevealActions.hidden = true;
     if (dom.postRevealActions) dom.postRevealActions.hidden = true;
+    if (dom.ddResolveActions) dom.ddResolveActions.hidden = true;
 
-    if (cq.revealed) {
+    if (cq.isDailyDouble && cq.dailyDoublePhase === "wager") {
+      // تذييل فارغ أثناء الرهان لأن زر التثبيت داخل لوحة الرهان
+    } else if (cq.revealed && cq.isDailyDouble) {
+      if (dom.ddResolvePrompt) {
+        dom.ddResolvePrompt.textContent = `🌟 حسم المربع الذهبي لفريق «${ownerTeam.name}» (الرهان: ${cq.dailyDoubleWager} نقطة):`;
+      }
+      if (dom.btnDdCorrectLabel) {
+        dom.btnDdCorrectLabel.textContent = `✅ إجابة صحيحة (+${cq.dailyDoubleWager})`;
+      }
+      if (dom.btnDdWrongLabel) {
+        dom.btnDdWrongLabel.textContent = `❌ إجابة خاطئة (-${cq.dailyDoubleWager})`;
+      }
+      if (dom.ddResolveActions) dom.ddResolveActions.hidden = false;
+    } else if (cq.revealed) {
       if (dom.postRevealActions) dom.postRevealActions.hidden = false;
     } else if (cq.phase === "steal-offer") {
       if (dom.stealOfferPrompt) {
@@ -4874,6 +5688,66 @@
     renderTimerUI();
     if (state.dualScreen.connected) {
       broadcastLiveDisplayState();
+    }
+  }
+
+  function setDailyDoublePreset(kind) {
+    if (!state.currentQ || !state.currentQ.isDailyDouble || state.currentQ.dailyDoublePhase !== "wager") return;
+    const cq = state.currentQ;
+    const basePts = Number(cq.question.points) || 400;
+    const maxW = Math.max(100, Number(cq.dailyDoubleMaxWager) || basePts * 2);
+    let target = basePts;
+    if (kind === "double") target = basePts * 2;
+    else if (kind === "allin") target = maxW;
+    const clamped = Math.min(maxW, Math.max(100, Math.round(target)));
+    cq.dailyDoubleWager = clamped;
+    if (dom.ddWagerInput) dom.ddWagerInput.value = String(clamped);
+  }
+
+  function lockDailyDoubleWager() {
+    if (!state.currentQ || !state.currentQ.isDailyDouble || state.currentQ.dailyDoublePhase !== "wager") return;
+    const cq = state.currentQ;
+    const maxW = Math.max(100, Number(cq.dailyDoubleMaxWager) || 800);
+    const raw = dom.ddWagerInput ? Number(dom.ddWagerInput.value) : cq.dailyDoubleWager;
+    const clamped = Number.isFinite(raw) ? Math.min(maxW, Math.max(100, Math.round(raw))) : Math.min(maxW, 400);
+
+    cq.dailyDoubleWager = clamped;
+    cq.dailyDoublePhase = "question";
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playDoubleArm();
+    applyCurrentQuestionStage(null);
+    persistActiveMatch();
+    showToast(`🔒 تم تثبيت رهان المربع الذهبي على ${clamped} نقطة — حظاً موفقاً!`, "success");
+  }
+
+  function resolveDailyDouble(didSucceed) {
+    if (!state.currentQ || !state.currentQ.isDailyDouble || !state.currentQ.revealed) return;
+    const cq = state.currentQ;
+    const ownerIdx = cq.activeTeamAtOpen;
+    const ownerTeam = state.teams[ownerIdx] || state.teams[0];
+    const wager = Math.max(100, Number(cq.dailyDoubleWager) || 400);
+
+    if (didSucceed) {
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playScore(true);
+      showToast(`🌟 مذهل! +${wager} نقطة لـ ${ownerTeam.name} من المربع الذهبي!`, "success");
+      commitQuestionResolution({
+        winnerTeamIndex: ownerIdx,
+        awardedPoints: wager,
+        actionType: "daily-double-win",
+        undoLabel: `مربع ذهبي ناجح (+${wager}) لـ ${ownerTeam.name}`,
+        showBriefAnswerPreview: false
+      });
+    } else {
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playWrongAnswer();
+      showToast(`❌ خسر ${ownerTeam.name} رهان المربع الذهبي (-${wager} نقطة)`, "warning");
+      commitQuestionResolution({
+        winnerTeamIndex: null,
+        awardedPoints: 0,
+        deductTeamIndex: ownerIdx,
+        deductPoints: wager,
+        actionType: "daily-double-loss",
+        undoLabel: `خسارة رهان المربع الذهبي (-${wager}) لـ ${ownerTeam.name}`,
+        showBriefAnswerPreview: false
+      });
     }
   }
 
@@ -5005,10 +5879,12 @@
   }
 
   function commitQuestionResolution({
-    winnerTeamIndex,
-    awardedPoints,
-    actionType,
-    undoLabel,
+    winnerTeamIndex = null,
+    awardedPoints = 0,
+    deductTeamIndex = null,
+    deductPoints = 0,
+    actionType = "award",
+    undoLabel = "تعديل النقاط",
     showBriefAnswerPreview = false
   }) {
     if (!state.currentQ) return;
@@ -5040,6 +5916,7 @@
         doubleArmed: Boolean(baseSnap.doubleArmed),
         answeredThisRound: baseSnap.answeredThisRound,
         matchEvents: cloneMatchEvents(),
+        refereeAdjustments: cloneRefereeAdjustments(),
         cellState: {
           catIdx: cq.catIdx,
           colKey: cq.colKey,
@@ -5064,6 +5941,16 @@
       state.teams[winnerTeamIndex].score += awardedPoints;
     }
 
+    const cleanDeductPoints = Number(deductPoints) || 0;
+    if (
+      Number.isInteger(deductTeamIndex) &&
+      deductTeamIndex >= 0 &&
+      deductTeamIndex < state.teams.length &&
+      cleanDeductPoints > 0
+    ) {
+      state.teams[deductTeamIndex].score = Math.max(0, state.teams[deductTeamIndex].score - cleanDeductPoints);
+    }
+
     // تسجيل الحدث في سجل إحصائيات المباراة (MatchEvent[])
     const askingTeam = state.teams[cq.activeTeamAtOpen] || state.teams[0];
     const awardedTeam = hasValidWinner ? state.teams[winnerTeamIndex] : null;
@@ -5081,6 +5968,8 @@
       awardedTeamId: awardedTeam ? awardedTeam.id : null,
       wasSteal: Boolean(isStealWin),
       wasDouble: Boolean(cq.doubleActive),
+      wasDailyDouble: Boolean(cq.isDailyDouble),
+      dailyDoubleWager: cq.isDailyDouble ? Number(cq.dailyDoubleWager) || 0 : 0,
       hintUsed: Boolean(cq.hintUsed),
       wasSwapped: Boolean(Array.isArray(cq.swappedOutIds) && cq.swappedOutIds.length > 0),
       timestamp: Date.now()
@@ -5144,7 +6033,7 @@
       resetVisualModalState();
       closeModal(dom.questionModal);
       if (noQuestionsLeft) {
-        setTimeout(() => openWinnerModal(false), 380);
+        handleBoardCompletedFlow();
       }
     }
   }
@@ -5371,9 +6260,9 @@
           window.SeenJeemAudio.playCharadesUrgentTick(state.timerRemaining);
         }
       }
-    } else if (state.timerRemaining > 0 && state.timerRemaining <= 5) {
+    } else if (state.timerRemaining > 0 && state.timerRemaining <= 10) {
       if (window.SeenJeemAudio) {
-        window.SeenJeemAudio.playTick(state.timerRemaining <= 3);
+        window.SeenJeemAudio.playTick(state.timerRemaining <= 5);
       }
     }
 
@@ -5405,7 +6294,7 @@
         : 0;
     dom.timerProgressBar.style.width = `${pct}%`;
 
-    const isDanger = !isUnlimited && state.timerRemaining <= 5 && state.timerMode !== "waiting-memory";
+    const isDanger = !isUnlimited && state.timerRemaining <= 10 && state.timerMode !== "waiting-memory";
     const isWarning = !isUnlimited && !isDanger && !isSteal && state.timerRemaining <= 15 && state.timerMode !== "waiting-memory";
 
     if (dom.timerSection) {
@@ -5592,15 +6481,41 @@
     const ownerPts = computeEffectiveQuestionPoints(cq);
     const rivalPts = computeDiscountedBasePoints(cq); // لا تنتقل 2x للمنافس أبداً
 
-    const t0Pts = ownerIdx === 0 ? ownerPts : rivalPts;
-    const t1Pts = ownerIdx === 1 ? ownerPts : rivalPts;
+    if (dom.awardButtonsGrid) {
+      dom.awardButtonsGrid.dataset.teamCount = String(state.teams.length);
+      dom.awardButtonsGrid.innerHTML = "";
+      state.teams.forEach((team, idx) => {
+        const pts = idx === ownerIdx ? ownerPts : rivalPts;
+        const ptsText = cq.doubleActive && idx === ownerIdx ? `(+${pts} • ⚡2x)` : `(+${pts})`;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = `btn-award-team${idx + 1}`;
+        btn.className = `btn btn-award-team${idx + 1}`;
+        btn.innerHTML = `
+          <span class="award-team-label">فاز ${escapeHtml(team.name)}</span>
+          <span class="award-points-row">
+            <span class="award-points-tag">${ptsText}</span>
+            <kbd class="kbd-hint kbd-hint-light">${idx + 1}</kbd>
+          </span>
+        `;
+        btn.addEventListener("click", () => awardQuestion(idx));
+        dom.awardButtonsGrid.appendChild(btn);
+      });
 
-    dom.awardTeam1Label.textContent = `فاز ${state.teams[0].name}`;
-    dom.awardTeam2Label.textContent = `فاز ${state.teams[1].name}`;
-    dom.awardTeam1Pts.textContent =
-      cq.doubleActive && ownerIdx === 0 ? `(+${t0Pts} • ⚡2x)` : `(+${t0Pts})`;
-    dom.awardTeam2Pts.textContent =
-      cq.doubleActive && ownerIdx === 1 ? `(+${t1Pts} • ⚡2x)` : `(+${t1Pts})`;
+      const noneBtn = document.createElement("button");
+      noneBtn.type = "button";
+      noneBtn.id = "btn-award-none";
+      noneBtn.className = "btn btn-award-none";
+      noneBtn.innerHTML = `
+        <span class="award-team-label">لا أحد</span>
+        <span class="award-points-row">
+          <span class="award-points-tag">(0)</span>
+          <kbd class="kbd-hint">0</kbd>
+        </span>
+      `;
+      noneBtn.addEventListener("click", () => awardQuestion(null));
+      dom.awardButtonsGrid.appendChild(noneBtn);
+    }
 
     dom.btnCancelQuestion.hidden = true;
     dom.answerSection.hidden = false;
@@ -5677,7 +6592,17 @@
       "playReveal",
       "playScore",
       "playNoScore",
-      "playVictory"
+      "playVictory",
+      "playVolumeTestTick",
+      "playTestChime",
+      "playDrumroll",
+      "playApplause",
+      "playSadTrombone",
+      "playAttentionChime",
+      "playFanfare",
+      "playSoundboard",
+      "playStreakSuccess",
+      "playBuzzerWin"
     ];
 
     methods.forEach((methodName) => {
@@ -5727,10 +6652,16 @@
     if (state.currentQ) {
       updateModalPhaseUI();
     }
+    if (state.charadesSolo && dom.charadesSoloModal && dom.charadesSoloModal.classList.contains("open")) {
+      renderCsoloView();
+    }
   }
 
   function renderHostCockpitUI() {
-    const isDualActive = Boolean(state.dualScreen.connected && state.currentQ);
+    const isDdWager = Boolean(
+      state.currentQ && state.currentQ.isDailyDouble && state.currentQ.dailyDoublePhase === "wager"
+    );
+    const isDualActive = Boolean(state.dualScreen.connected && state.currentQ && !isDdWager);
     const qModalCard = dom.questionModal ? dom.questionModal.querySelector(".question-modal-card") : null;
     if (qModalCard) {
       qModalCard.classList.toggle("is-host-cockpit", isDualActive);
@@ -5849,6 +6780,10 @@
       effectivePoints: computeEffectiveQuestionPoints(cq),
       stealPoints: computeStealQuestionPoints(cq),
       hintPenaltyPct,
+      isDailyDouble: Boolean(cq.isDailyDouble),
+      dailyDoublePhase: cq.dailyDoublePhase || "question",
+      dailyDoubleWager: cq.isDailyDouble ? Number(cq.dailyDoubleWager) || 0 : 0,
+      dailyDoubleMaxWager: cq.isDailyDouble ? Number(cq.dailyDoubleMaxWager) || 0 : 0,
       visualType: cq.visualType || "normal",
       isCharades: Boolean(cq.isCharades),
       charadesHeader: cq.isCharades
@@ -5915,18 +6850,20 @@
   }
 
   function buildDisplayWinnerPayload() {
-    const t0 = state.teams[0] || { id: "team-0", name: "الفريق الأول", score: 0 };
-    const t1 = state.teams[1] || { id: "team-1", name: "الفريق الثاني", score: 0 };
-    const winnerIdx = t0.score > t1.score ? 0 : t1.score > t0.score ? 1 : null;
-    const eyebrow = winnerIdx === null ? "منافسة متكافئة!" : "مبروك الفوز!";
-    const title =
-      winnerIdx === 0
-        ? `الفائز: ${t0.name}`
-        : winnerIdx === 1
-          ? `الفائز: ${t1.name}`
-          : "تعادل مثير بين الفريقين";
+    const leaderIndices = finalRoundEngine
+      ? finalRoundEngine.getLeaderIndices(state.teams)
+      : [0];
+    const isDraw = leaderIndices.length !== 1;
+    const winnerIdx = !isDraw ? leaderIndices[0] : null;
+    const eyebrow = isDraw ? "منافسة متكافئة!" : "مبروك الفوز!";
+    const title = !isDraw && state.teams[winnerIdx]
+      ? `الفائز: ${state.teams[winnerIdx].name}`
+      : leaderIndices.length === 2
+        ? `تعادل مثير بين ${state.teams[leaderIndices[0]].name} و${state.teams[leaderIndices[1]].name}`
+        : `تعادل مثير بين ${leaderIndices.length} فرق في الصدارة!`;
     return {
       winnerIdx,
+      leaderIndices,
       eyebrow,
       title,
       teams: state.teams.map((t) => ({ id: t.id, name: t.name, score: t.score })),
@@ -5937,27 +6874,61 @@
   function broadcastLiveDisplayState() {
     if (!liveSync || !liveSync.isSupported() || liveSync.isDisplayMode()) return;
 
+    const isBlitzOpen =
+      dom.blitzModal &&
+      dom.blitzModal.classList.contains("open") &&
+      Boolean(state.blitz);
+    const isCsoloOpen =
+      dom.charadesSoloModal &&
+      dom.charadesSoloModal.classList.contains("open") &&
+      Boolean(state.charadesSolo);
     const isGameActive = dom.gameScreen && dom.gameScreen.classList.contains("active");
     const isWinnerOpen = dom.winnerModal && dom.winnerModal.classList.contains("open");
+    const isFinalOpen =
+      dom.finalRoundModal &&
+      dom.finalRoundModal.classList.contains("open") &&
+      Boolean(state.finalRound);
     const isQuestionOpen =
       dom.questionModal &&
       dom.questionModal.classList.contains("open") &&
       (Boolean(state.currentQ) || Boolean(state.dualScreen.closingPreviewQuestion));
 
     let screen = "setup";
-    if (isWinnerOpen) {
+    let customWinnerView = null;
+    if (isBlitzOpen) {
+      if (state.blitz.phase === "finished") {
+        screen = "winner";
+        customWinnerView = buildSideModeWinnerPayload(state.blitz.teams, "⚡ نهاية جولة البرق السريعة!");
+      } else {
+        screen = "blitz";
+      }
+    } else if (isCsoloOpen) {
+      if (state.charadesSolo.phase === "finished") {
+        screen = "winner";
+        customWinnerView = buildSideModeWinnerPayload(
+          state.charadesSolo.teams,
+          "🎭 نهاية تحدي «من غير كلام»!"
+        );
+      } else {
+        screen = "charades-solo";
+      }
+    } else if (isWinnerOpen) {
       screen = "winner";
+    } else if (isFinalOpen) {
+      screen = "final";
     } else if (isQuestionOpen) {
       screen = "question";
     } else if (isGameActive) {
       screen = "board";
     }
 
+    const setupNames = getSetupTeamNames();
     const snapshot = {
       screen,
       setupInfo: {
-        team1Name: dom.team1Input ? dom.team1Input.value.trim() || "الفريق الأول" : "الفريق الأول",
-        team2Name: dom.team2Input ? dom.team2Input.value.trim() || "الفريق الثاني" : "الفريق الثاني",
+        team1Name: setupNames[0] || "الفريق الأول",
+        team2Name: setupNames[1] || "الفريق الثاني",
+        teamNames: setupNames,
         selectedCount: state.selectedCategoryIds.length
       },
       teams: state.teams,
@@ -5973,10 +6944,46 @@
             ? buildDisplayQuestionPayload(state.currentQ, false)
             : state.dualScreen.closingPreviewQuestion
           : null,
-      winnerView: screen === "winner" ? buildDisplayWinnerPayload() : null
+      finalRoundView:
+        screen === "final" && finalRoundEngine && state.finalRound
+          ? finalRoundEngine.buildSanitizedDisplayPayload(state.finalRound, state.teams)
+          : null,
+      winnerView:
+        screen === "winner" ? customWinnerView || buildDisplayWinnerPayload() : null,
+      blitzView:
+        screen === "blitz" && blitzEngine && state.blitz
+          ? blitzEngine.buildSanitizedDisplayPayload(state.blitz)
+          : null,
+      charadesSoloView:
+        screen === "charades-solo" && charadesEngine && state.charadesSolo
+          ? charadesEngine.buildSanitizedDisplayPayload(state.charadesSolo)
+          : null,
+      intermission: {
+        active: Boolean(state.intermission && state.intermission.active),
+        message: (state.intermission && state.intermission.message) || "استراحة قصيرة — نعود بعد قليل",
+        totalSeconds: Number(state.intermission && state.intermission.totalSeconds) || 0,
+        remainingSeconds: Number(state.intermission && state.intermission.remainingSeconds) || 0
+      },
+      displayPrefs: {
+        theme: state.theme || "dark-glass",
+        tvScale: Number(state.tvScale) || 100
+      },
+      audioSettings: getCurrentAudioSettingsPayload(),
+      wireless: state.wireless.active
+        ? {
+            active: true,
+            roomCode: state.wireless.roomCode,
+            playerUrl: state.wireless.playerUrl,
+            showQrOnTv: Boolean(state.wireless.showQrOnTv),
+            buzzer: { ...state.wireless.buzzer }
+          }
+        : { active: false, roomCode: "", playerUrl: "", showQrOnTv: false, buzzer: null }
     };
 
     liveSync.broadcastState(snapshot);
+    if (state.wireless.active) {
+      publishWirelessSnapshot(snapshot);
+    }
   }
 
   function openTVDisplayWindow() {
@@ -6015,7 +7022,10 @@
      إحصائيات نهاية المباراة (Match Analytics & Summary Dashboard)
      ========================================================= */
   function computeMatchAnalytics() {
-    const events = Array.isArray(state.matchEvents) ? state.matchEvents : [];
+    const allEvents = Array.isArray(state.matchEvents) ? state.matchEvents : [];
+    // فصل أسئلة اللوحة القياسية عن جولة الحسم النهائية لضمان دقة الإحصائيات
+    const events = allEvents.filter((e) => !e.isFinalRound);
+    const finalEvents = allEvents.filter((e) => Boolean(e.isFinalRound));
     const totalQuestions = events.length;
     const totalCorrect = events.filter((e) => e.awardedTeamId !== null).length;
     const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
@@ -6100,6 +7110,10 @@
       totalDoubleWins,
       totalHintsUsed,
       totalSwapsUsed,
+      finalRoundsPlayed: finalEvents.length,
+      refereeAdjustmentsCount: Array.isArray(state.refereeAdjustments)
+        ? state.refereeAdjustments.length
+        : 0,
       teamStats,
       categories: Array.from(catMap.values())
     };
@@ -6157,9 +7171,14 @@
     }
 
     if (dom.analyticsTeamCompare) {
+      dom.analyticsTeamCompare.dataset.teamCount = String(analytics.teamStats.length);
       dom.analyticsTeamCompare.innerHTML = analytics.teamStats
-        .map(
-          (ts, idx) => `
+        .map((ts, idx) => {
+          const maxTier = Math.max(1, ts.byTier[200], ts.byTier[400], ts.byTier[600]);
+          const pct200 = Math.round((ts.byTier[200] / maxTier) * 100);
+          const pct400 = Math.round((ts.byTier[400] / maxTier) * 100);
+          const pct600 = Math.round((ts.byTier[600] / maxTier) * 100);
+          return `
           <div class="analytics-team-card team-${idx + 1}">
             <div class="analytics-team-head">
               <span class="team-badge-dot team-${idx + 1}-dot"></span>
@@ -6173,14 +7192,26 @@
               <span class="analytics-metric-chip">💡 ${ts.hintsUsed} تلميح</span>
               <span class="analytics-metric-chip">🔄 ${ts.swapsUsed} تبديل</span>
             </div>
-            <div class="analytics-tiers-row">
-              <span class="tier-badge t200">200: ${ts.byTier[200]}</span>
-              <span class="tier-badge t400">400: ${ts.byTier[400]}</span>
-              <span class="tier-badge t600">600: ${ts.byTier[600]}</span>
+            <div class="analytics-tiers-bars">
+              <div class="tier-bar-row">
+                <span class="tier-badge t200">200</span>
+                <div class="tier-bar-track"><div class="tier-bar-fill t200" style="width:${pct200}%"></div></div>
+                <strong class="tier-bar-num">${ts.byTier[200]}</strong>
+              </div>
+              <div class="tier-bar-row">
+                <span class="tier-badge t400">400</span>
+                <div class="tier-bar-track"><div class="tier-bar-fill t400" style="width:${pct400}%"></div></div>
+                <strong class="tier-bar-num">${ts.byTier[400]}</strong>
+              </div>
+              <div class="tier-bar-row">
+                <span class="tier-badge t600">600</span>
+                <div class="tier-bar-track"><div class="tier-bar-fill t600" style="width:${pct600}%"></div></div>
+                <strong class="tier-bar-num">${ts.byTier[600]}</strong>
+              </div>
             </div>
           </div>
-        `
-        )
+        `;
+        })
         .join("");
     }
 
@@ -6195,8 +7226,12 @@
                 <div class="analytics-cat-row">
                   <span class="analytics-cat-name">${escapeHtml(cat.categoryName)}</span>
                   <div class="analytics-cat-scores">
-                    <span class="cat-score-pill t1">${escapeHtml(state.teams[0].name)}: ${cat.teamWins[0] || 0}</span>
-                    <span class="cat-score-pill t2">${escapeHtml(state.teams[1].name)}: ${cat.teamWins[1] || 0}</span>
+                    ${state.teams
+                      .map(
+                        (t, idx) =>
+                          `<span class="cat-score-pill t${idx + 1}">${escapeHtml(t.name)}: ${cat.teamWins[idx] || 0}</span>`
+                      )
+                      .join("")}
                     ${cat.unanswered > 0 ? `<span class="cat-score-pill none">بدون نقاط: ${cat.unanswered}</span>` : ""}
                   </div>
                 </div>
@@ -6223,21 +7258,28 @@
             : ev.questionText;
 
           const tags = [];
+          if (ev.isFinalRound) tags.push(`<span class="ev-tag tag-final">⚔️ جولة الحسم</span>`);
+          if (ev.wasDailyDouble) tags.push(`<span class="ev-tag tag-dd">🌟 مربع ذهبي</span>`);
           if (ev.wasDouble) tags.push(`<span class="ev-tag tag-double">⚡ 2x</span>`);
           if (ev.wasSteal) tags.push(`<span class="ev-tag tag-steal">🔥 سرقة</span>`);
           if (ev.hintUsed) tags.push(`<span class="ev-tag tag-hint">💡 تلميح</span>`);
           if (ev.wasSwapped) tags.push(`<span class="ev-tag tag-swap">🔄 مُبدَّل</span>`);
 
+          const winnerClass = winnerIdx >= 0 ? `w-team-${winnerIdx + 1}` : "w-none";
+          const winnerBadgeText = ev.isFinalRound
+            ? escapeHtml(ev.finalSummary || "جولة الرهان النهائي")
+            : winnerName
+              ? `${escapeHtml(winnerName)} (+${ev.effectivePoints})`
+              : "لا أحد (0)";
+
           return `
-            <div class="analytics-event-item">
+            <div class="analytics-event-item${ev.isFinalRound ? " is-final-event" : ""}">
               <div class="analytics-event-top">
                 <span class="analytics-event-num">#${idx + 1}</span>
                 <span class="analytics-event-cat">${escapeHtml(ev.categoryName)} (${ev.basePoints})</span>
                 <div class="analytics-event-tags">${tags.join("")}</div>
-                <span class="analytics-event-winner ${
-                  winnerIdx === 0 ? "w-team-1" : winnerIdx === 1 ? "w-team-2" : "w-none"
-                }">
-                  ${winnerName ? `${escapeHtml(winnerName)} (+${ev.effectivePoints})` : "لا أحد (0)"}
+                <span class="analytics-event-winner ${winnerClass}">
+                  ${winnerBadgeText}
                 </span>
               </div>
               <div class="analytics-event-q">${escapeHtml(displayQ)}</div>
@@ -6253,22 +7295,28 @@
 
   function copyMatchSummaryToClipboard() {
     const an = computeMatchAnalytics();
-    const t0 = state.teams[0];
-    const t1 = state.teams[1];
+    const leaderIndices = finalRoundEngine
+      ? finalRoundEngine.getLeaderIndices(state.teams)
+      : [0];
     const winnerLine =
-      t0.score > t1.score
-        ? `🏆 الفائز: ${t0.name}`
-        : t1.score > t0.score
-          ? `🏆 الفائز: ${t1.name}`
-          : "🤝 تعادل مثير!";
+      leaderIndices.length === 1 && state.teams[leaderIndices[0]]
+        ? `🏆 الفائز: ${state.teams[leaderIndices[0]].name}`
+        : `🤝 تعادل مثير في الصدارة (${leaderIndices.map((i) => state.teams[i].name).join(" / ")})!`;
+
+    const teamLines = state.teams.map((team, idx) => {
+      const ts = an.teamStats[idx] || { correct: 0, stealsWon: 0, doubleWins: 0 };
+      return `• ${team.name}: ${team.score} نقطة (✅ ${ts.correct} | 🔥 ${ts.stealsWon} سرقة | ⚡ ${ts.doubleWins} مضاعفة)`;
+    });
 
     const lines = [
       "🎯 نتائج مباراة «سين جيم»",
       winnerLine,
-      `• ${t0.name}: ${t0.score} نقطة (✅ ${an.teamStats[0].correct} | 🔥 ${an.teamStats[0].stealsWon} سرقة | ⚡ ${an.teamStats[0].doubleWins} مضاعفة)`,
-      `• ${t1.name}: ${t1.score} نقطة (✅ ${an.teamStats[1].correct} | 🔥 ${an.teamStats[1].stealsWon} سرقة | ⚡ ${an.teamStats[1].doubleWins} مضاعفة)`,
+      ...teamLines,
       `📊 إجمالي الأسئلة المحسومة: ${an.totalQuestions} • دقة الإجابة: ${an.overallAccuracy}%`
     ];
+    if (state.refereeAdjustments && state.refereeAdjustments.length > 0) {
+      lines.push(`⚖️ تعديلات تحكيمية: ${state.refereeAdjustments.length}`);
+    }
     const text = lines.join("\n");
 
     if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
@@ -6282,53 +7330,64 @@
   }
 
   /* =========================================================
-     شاشة الفائز (Winner Modal)
+     شاشة الفائز (Winner Modal — يدعم 2 إلى 4 فرق وكسر التعادل)
      ========================================================= */
   function openWinnerModal(endedManually = false) {
-    // مسح الحفظ المؤقت تلقائياً عند انتهاء المباراة وإعلان الفائز
+    closeRefereePopover();
+    stopFinalRoundTimer();
+    closeModal(dom.finalRoundModal);
     matchStore.clearSavedMatch();
 
-    const t1 = state.teams[0];
-    const t2 = state.teams[1];
+    const leaderIndices = finalRoundEngine
+      ? finalRoundEngine.getLeaderIndices(state.teams)
+      : [0];
+    const isDraw = leaderIndices.length !== 1;
+    const winnerIdx = !isDraw ? leaderIndices[0] : null;
 
-    dom.winnerTeam1Name.textContent = t1.name;
-    dom.winnerTeam2Name.textContent = t2.name;
-    dom.winnerTeam1Score.textContent = String(t1.score);
-    dom.winnerTeam2Score.textContent = String(t2.score);
-
-    const crown1 = dom.winnerCardTeam1.querySelector(".winner-crown");
-    const crown2 = dom.winnerCardTeam2.querySelector(".winner-crown");
-
-    dom.winnerCardTeam1.classList.remove("is-winner");
-    dom.winnerCardTeam2.classList.remove("is-winner");
     if (dom.winnerModalCard) {
-      dom.winnerModalCard.classList.remove("winner-team-1", "winner-team-2", "winner-draw");
+      dom.winnerModalCard.classList.remove(
+        "winner-team-1",
+        "winner-team-2",
+        "winner-team-3",
+        "winner-team-4",
+        "winner-draw"
+      );
+      dom.winnerModalCard.classList.add(
+        winnerIdx !== null ? `winner-team-${winnerIdx + 1}` : "winner-draw"
+      );
     }
-    crown1.hidden = true;
-    crown2.hidden = true;
 
     let confettiTheme = null;
-    if (t1.score > t2.score) {
+    if (!isDraw && winnerIdx !== null && state.teams[winnerIdx]) {
       dom.winnerTrophy.textContent = "🏆";
       dom.winnerSubtitle.textContent = "مبروك الفوز!";
-      dom.winnerTitle.textContent = `الفائز: ${t1.name}`;
-      dom.winnerCardTeam1.classList.add("is-winner");
-      if (dom.winnerModalCard) dom.winnerModalCard.classList.add("winner-team-1");
-      crown1.hidden = false;
-      confettiTheme = "team1";
-    } else if (t2.score > t1.score) {
-      dom.winnerTrophy.textContent = "🏆";
-      dom.winnerSubtitle.textContent = "مبروك الفوز!";
-      dom.winnerTitle.textContent = `الفائز: ${t2.name}`;
-      dom.winnerCardTeam2.classList.add("is-winner");
-      if (dom.winnerModalCard) dom.winnerModalCard.classList.add("winner-team-2");
-      crown2.hidden = false;
-      confettiTheme = "team2";
+      dom.winnerTitle.textContent = `الفائز: ${state.teams[winnerIdx].name}`;
+      confettiTheme = winnerIdx === 0 ? "team1" : winnerIdx === 1 ? "team2" : "default";
     } else {
       dom.winnerTrophy.textContent = "🤝";
       dom.winnerSubtitle.textContent = "منافسة متكافئة!";
-      dom.winnerTitle.textContent = "تعادل مثير بين الفريقين";
-      if (dom.winnerModalCard) dom.winnerModalCard.classList.add("winner-draw");
+      dom.winnerTitle.textContent =
+        leaderIndices.length === 2
+          ? `تعادل مثير بين ${state.teams[leaderIndices[0]].name} و${state.teams[leaderIndices[1]].name}`
+          : `تعادل مثير بين ${leaderIndices.length} فرق في الصدارة!`;
+    }
+
+    if (dom.winnerScoresGrid) {
+      dom.winnerScoresGrid.dataset.teamCount = String(state.teams.length);
+      dom.winnerScoresGrid.innerHTML = state.teams
+        .map((team, idx) => {
+          const isLeader = leaderIndices.includes(idx);
+          const crownLabel = isDraw ? "🤝 متعادل في الصدارة" : "👑 الفائز";
+          return `
+            <div class="winner-team-box team-${idx + 1}-box${isLeader ? " is-winner" : ""}">
+              <div class="winner-crown"${isLeader ? "" : " hidden"}>${crownLabel}</div>
+              <div class="winner-team-name">${escapeHtml(team.name)}</div>
+              <div class="winner-team-score">${team.score}</div>
+              <div class="winner-score-unit">نقطة</div>
+            </div>
+          `;
+        })
+        .join("");
     }
 
     const remaining = countRemainingPlayableQuestions();
@@ -6337,8 +7396,29 @@
         ? `تم إكمال جميع أسئلة الجولة بنجاح (${state.answeredThisRound} سؤالاً تم لعبه في هذه الجولة).`
         : `تم إنهاء الجولة بعد لعب ${state.answeredThisRound} سؤالاً (متبقي ${remaining} سؤالاً على اللوحة).`;
 
+    // عرض بند التعديلات التحكيمية بشكل مستقل فقط إن وُجدت دون تشويه دقة الإجابات
+    if (dom.winnerRefereeNote) {
+      const scoreRefs = (state.refereeAdjustments || []).filter((r) => r.type === "score");
+      if (scoreRefs.length > 0) {
+        const refSummary = scoreRefs
+          .map((r) => `${escapeHtml(r.teamName)} (${r.delta > 0 ? `+${r.delta}` : r.delta})`)
+          .join(" • ");
+        dom.winnerRefereeNote.innerHTML = `⚖️ <strong>تعديلات تحكيمية (${scoreRefs.length}):</strong> ${refSummary}`;
+        dom.winnerRefereeNote.hidden = false;
+      } else {
+        dom.winnerRefereeNote.hidden = true;
+        dom.winnerRefereeNote.textContent = "";
+      }
+    }
+
+    // زر خوض جولة كسر تعادل عند وجود تعادل في الصدارة (حتى لو كان الخيار معطّلاً بالإعدادات)
+    if (dom.btnStartTiebreakerFromWinner) {
+      dom.btnStartTiebreakerFromWinner.hidden = !isDraw;
+    }
+
     dom.btnResumeRound.hidden = !(endedManually && remaining > 0);
     renderWinnerAnalyticsDashboard();
+    recordClassicMatchToArchive();
 
     openModal(dom.winnerModal);
     broadcastLiveDisplayState();
@@ -6373,6 +7453,11 @@
     clearClosingRevealTimer();
     stopTimerInterval();
     stopMemoryInterval();
+    stopFinalRoundTimer();
+    stopIntermission(true);
+    closeRefereePopover();
+    closeAllHostToolPopovers();
+    closeResultCardModal();
     hideCharadesSecret();
     stopVictoryConfetti();
     closeLightbox();
@@ -6380,12 +7465,15 @@
     state.preQuestionSnapshot = null;
     state.doubleArmed = false;
     state.matchEvents = [];
+    state.refereeAdjustments = [];
+    state.finalRound = null;
     state.dualScreen.closingPreviewQuestion = null;
     matchStore.clearSavedMatch();
     matchStore.clearUndoStack();
     resetVisualModalState();
     closeModal(dom.winnerModal);
     closeModal(dom.questionModal);
+    closeModal(dom.finalRoundModal);
 
     dom.gameScreen.classList.remove("active");
     dom.gameScreen.setAttribute("aria-hidden", "true");
@@ -6414,11 +7502,35 @@
     syncAudioMixerUI();
   }
 
+  function getCurrentAudioSettingsPayload() {
+    if (!window.SeenJeemAudio) return null;
+    return {
+      volume:
+        typeof window.SeenJeemAudio.getVolume === "function"
+          ? window.SeenJeemAudio.getVolume()
+          : 0.75,
+      muted: Boolean(window.SeenJeemAudio.isMuted()),
+      categoryPrefs:
+        typeof window.SeenJeemAudio.getCategoryPrefs === "function"
+          ? window.SeenJeemAudio.getCategoryPrefs()
+          : null
+    };
+  }
+
+  function broadcastAudioSettingsToDisplay() {
+    if (!liveSync || !state.dualScreen.connected) return;
+    const payload = getCurrentAudioSettingsPayload();
+    if (payload && typeof liveSync.broadcastAudioSettings === "function") {
+      liveSync.broadcastAudioSettings(payload);
+    }
+  }
+
   function toggleSoundMuted() {
     if (!window.SeenJeemAudio) return;
     const nextMuted = !window.SeenJeemAudio.isMuted();
     window.SeenJeemAudio.setMuted(nextMuted);
     syncSoundButtonsUI();
+    broadcastAudioSettingsToDisplay();
     showToast(nextMuted ? "تم كتم الصوت 🔇" : "تم تشغيل الصوت 🔊", "info");
   }
 
@@ -6509,6 +7621,30 @@
       return;
     }
 
+    if (dom.resultCardModal && dom.resultCardModal.classList.contains("open")) {
+      if (e.key === "Escape") {
+        closeResultCardModal();
+      }
+      return;
+    }
+
+    // اختصارات لوحة المؤثرات الصوتية للمقدّم (Alt+1..5 — معطّلة تلقائياً داخل الحقول النصية)
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !isEditableElementFocused()) {
+      const sfxByDigit = {
+        Digit1: "drumroll",
+        Digit2: "applause",
+        Digit3: "sad_trombone",
+        Digit4: "attention_chime",
+        Digit5: "fanfare"
+      };
+      const sfxKey = sfxByDigit[e.code] || (e.key >= "1" && e.key <= "5" ? Object.values(sfxByDigit)[Number(e.key) - 1] : null);
+      if (sfxKey && dom.gameScreen && dom.gameScreen.classList.contains("active")) {
+        e.preventDefault();
+        triggerSoundboardEffect(sfxKey);
+        return;
+      }
+    }
+
     if (dom.confirmModal.classList.contains("open")) {
       if (e.key === "Escape") {
         closeConfirmDialog();
@@ -6527,7 +7663,71 @@
       return;
     }
 
+    if (dom.hallOfFameModal && dom.hallOfFameModal.classList.contains("open")) {
+      if (e.key === "Escape") {
+        closeHallOfFameModal();
+      }
+      return;
+    }
+
+    if (dom.wirelessRoomModal && dom.wirelessRoomModal.classList.contains("open")) {
+      if (e.key === "Escape") {
+        closeWirelessRoomModal();
+      }
+      return;
+    }
+
+    if (dom.blitzModal && dom.blitzModal.classList.contains("open")) {
+      if (e.key === "Escape") {
+        closeBlitzModal();
+        return;
+      }
+      if (state.blitz && state.blitz.phase === "playing" && !isEditableElementFocused()) {
+        if (e.key === "Enter" || e.key === "ArrowRight") {
+          e.preventDefault();
+          handleBlitzJudge("correct");
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          handleBlitzJudge("skip");
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          handleBlitzJudge("wrong");
+        } else if (e.code === "Space" || e.key === " ") {
+          e.preventDefault();
+          toggleBlitzPause();
+        }
+      }
+      return;
+    }
+
+    if (dom.charadesSoloModal && dom.charadesSoloModal.classList.contains("open")) {
+      if (e.key === "Escape") {
+        closeCharadesSoloModal();
+      }
+      return;
+    }
+
     if (dom.winnerModal.classList.contains("open")) {
+      return;
+    }
+
+    // اختصارات جولة الرهان النهائي (Space للمؤقت + Ctrl+Z للتراجع بعد الكشف)
+    if (dom.finalRoundModal && dom.finalRoundModal.classList.contains("open") && state.finalRound) {
+      const isUndoInFinal =
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        (e.code === "KeyZ" || e.key.toLowerCase() === "z" || e.key === "ئ");
+      if (isUndoInFinal && !isEditableElementFocused() && state.finalRound.phase === "reveal" && matchStore.canUndo()) {
+        e.preventDefault();
+        closeModal(dom.finalRoundModal);
+        performUndo();
+        return;
+      }
+      if ((e.code === "Space" || e.key === " ") && !isEditableElementFocused() && state.finalRound.phase === "question") {
+        e.preventDefault();
+        toggleFinalRoundTimer();
+      }
       return;
     }
 
@@ -6582,6 +7782,10 @@
 
     if (key === "Escape") {
       e.preventDefault();
+      if (state.flagDrawerOpen) {
+        closeFlagDrawer();
+        return;
+      }
       if (!state.currentQ.revealed) {
         cancelCurrentQuestion();
       } else {
@@ -6591,6 +7795,13 @@
     }
 
     if (!state.currentQ.revealed) {
+      if (state.currentQ.isDailyDouble && state.currentQ.dailyDoublePhase === "wager") {
+        if (key === "Enter") {
+          e.preventDefault();
+          lockDailyDoubleWager();
+        }
+        return;
+      }
       const isHintKey = code === "KeyH" || lowerKey === "h" || key === "أ";
       const isStealKey = code === "KeyS" || lowerKey === "s" || key === "س";
       const isResetKey = code === "KeyR" || lowerKey === "r" || key === "ق";
@@ -6643,12 +7854,18 @@
         }
       }
     } else {
-      if (key === "1") {
+      if (key === "1" && state.teams.length >= 1) {
         e.preventDefault();
         awardQuestion(0);
-      } else if (key === "2") {
+      } else if (key === "2" && state.teams.length >= 2) {
         e.preventDefault();
         awardQuestion(1);
+      } else if (key === "3" && state.teams.length >= 3) {
+        e.preventDefault();
+        awardQuestion(2);
+      } else if (key === "4" && state.teams.length >= 4) {
+        e.preventDefault();
+        awardQuestion(3);
       } else if (key === "0") {
         e.preventDefault();
         awardQuestion(null);
@@ -6667,6 +7884,8 @@
     persistActiveMatch();
     stopTimerInterval();
     stopMemoryInterval();
+    stopFinalRoundTimer();
+    stopIntermissionTimerOnly();
     stopVictoryConfetti();
     if (liveSync && typeof liveSync.destroy === "function") {
       liveSync.destroy();
@@ -6894,11 +8113,11 @@
     const count = items.length;
 
     if (dom.bankFlaggedCount) {
-      dom.bankFlaggedCount.textContent =
-        count === 1 ? "سؤال واحد" : count === 2 ? "سؤالان" : `${count} أسئلة`;
+      dom.bankFlaggedCount.textContent = String(count);
     }
+    if (dom.btnCopyFlaggedReport) dom.btnCopyFlaggedReport.disabled = count === 0;
+    if (dom.btnExportFlaggedJson) dom.btnExportFlaggedJson.disabled = count === 0;
     if (dom.btnExportFlaggedCsv) dom.btnExportFlaggedCsv.disabled = count === 0;
-    if (dom.btnCopyFlaggedJson) dom.btnCopyFlaggedJson.disabled = count === 0;
     if (dom.btnClearAllFlagged) dom.btnClearAllFlagged.disabled = count === 0;
 
     dom.bankFlaggedList.innerHTML = "";
@@ -6961,17 +8180,23 @@
     showToast("📄 تم تنزيل ملف الأسئلة المحدّدة للمراجعة (CSV)", "success");
   }
 
-  function copyFlaggedAsJSON() {
+  function copyFlaggedReport() {
     if (!flaggedStore || flaggedStore.getCount() === 0) return;
-    const json = flaggedStore.exportJSON();
+    const report = flaggedStore.exportReportText();
     if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
       navigator.clipboard
-        .writeText(json)
-        .then(() => showToast("📋 تم نسخ قائمة الأسئلة المحدّدة بصيغة JSON", "success"))
-        .catch(() => showToast("تعذّر النسخ للحافظة — استخدم زر تصدير CSV", "warning"));
+        .writeText(report)
+        .then(() => showToast("📋 تم نسخ تقرير الأسئلة للمراجعة بنجاح", "success"))
+        .catch(() => showToast("تعذّر النسخ للحافظة — استخدم زر تصدير JSON", "warning"));
     } else {
-      showToast("تعذّر النسخ للحافظة — استخدم زر تصدير CSV", "warning");
+      showToast("تعذّر النسخ للحافظة — استخدم زر تصدير JSON", "warning");
     }
+  }
+
+  function exportFlaggedAsJSON() {
+    if (!flaggedStore || flaggedStore.getCount() === 0) return;
+    const filename = flaggedStore.downloadJSON();
+    showToast(`⬇️ تم تنزيل ملف المراجعة (${filename})`, "success");
   }
 
   // --- Full Backup & Restore (النسخ الاحتياطي والاستعادة) ---
@@ -7011,6 +8236,7 @@
         if (!check.ok) {
           clearPendingBackupImport();
           showBackupFeedback("error", `❌ ${check.error}`);
+          showToast(`❌ ${check.error}`, "error");
           return;
         }
         state.pendingBackupData = check.parsed;
@@ -7030,48 +8256,77 @@
       } catch (_err) {
         clearPendingBackupImport();
         showBackupFeedback("error", "❌ تعذّر قراءة الملف — تأكد أنه ملف JSON صالح.");
+        showToast("❌ ملف النسخة الاحتياطية تالف أو غير صالح — لم تُعدَّل بياناتك الحالية", "error");
       }
     };
     reader.readAsText(file, "utf-8");
   }
 
-  function confirmRestoreBackup() {
+  function executeBackupRestore(mode) {
     if (!backupManager || !state.pendingBackupData) return;
-    const res = backupManager.restoreBackupObject(state.pendingBackupData, state.backupRestoreMode);
+    const res = backupManager.restoreBackupObject(state.pendingBackupData, mode);
     if (!res.ok) {
       showBackupFeedback("error", `❌ ${res.error || "تعذّرت الاستعادة"}`);
+      showToast(`❌ ${res.error || "تعذّرت الاستعادة"}`, "error");
       return;
     }
 
     // تحديث جميع أجزاء التطبيق فوراً بالبيانات المستعادة
     state.customCategories = loadCustomCategoriesFromStorage();
     state.setupSettings = matchStore.loadSavedSettings();
+    applyTheme(matchStore.loadTheme(), false);
+    applyTvScale(matchStore.loadTvScale(), false);
+    broadcastDisplayPrefsToTV();
     rebuildMergedCategories();
     syncSoundButtonsUI();
+    broadcastAudioSettingsToDisplay();
     syncWakeLockSetupUI();
     renderSetupScreen();
     renderBankManagerModal();
     renderBankFlaggedSection();
+    if (dom.hallOfFameModal && dom.hallOfFameModal.classList.contains("open")) {
+      renderHallOfFameModal();
+    }
     clearPendingBackupImport();
 
-    const modeLabel = res.mode === "replace" ? "الاستبدال الكامل" : "الدمج الآمن";
+    const modeLabel = res.mode === "replace" ? "الاستبدال الكامل" : "الدمج الذكي";
     showBackupFeedback("success", `✅ تمت استعادة النسخة الاحتياطية بنجاح (${modeLabel}) وتحديث الواجهة فوراً.`);
     showToast(`🛡️ تمت استعادة النسخة الاحتياطية (${modeLabel}) بنجاح!`, "success");
+  }
+
+  function confirmRestoreBackup() {
+    if (!backupManager || !state.pendingBackupData) return;
+    if (state.backupRestoreMode === "replace") {
+      openConfirmDialog({
+        title: "تأكيد الاستبدال الكامل للبيانات المحلية؟",
+        message:
+          "سيتم استبدال جميع ملفات المجموعات وسجل الأسئلة الملعوبة وقائمة المراجعة والتفضيلات بمحتوى النسخة الاحتياطية المختارة. هل أنت متأكد؟",
+        confirmText: "نعم، استبدل البيانات",
+        onConfirm: () => executeBackupRestore("replace")
+      });
+      return;
+    }
+    executeBackupRestore("merge");
   }
 
   // --- Audio Mixer Popover (التحكم المتقدم بالصوت) ---
   function syncAudioMixerUI() {
     if (!window.SeenJeemAudio) return;
     const audio = window.SeenJeemAudio;
-    const volPct = Math.round((typeof audio.getVolume === "function" ? audio.getVolume() : 0.8) * 100);
+    const volPct = Math.round((typeof audio.getVolume === "function" ? audio.getVolume() : 0.75) * 100);
     const prefs =
       typeof audio.getCategoryPrefs === "function"
         ? audio.getCategoryPrefs()
         : { timerTicks: true, uiEffects: true, celebrations: true };
     const isMuted = audio.isMuted();
+    const displayPct = isMuted ? "0%" : `${volPct}%`;
 
-    if (dom.audioVolumeSlider) dom.audioVolumeSlider.value = String(volPct);
+    [dom.audioVolumeSlider, dom.setupVolumeSlider, dom.gameVolumeSlider].forEach((sl) => {
+      if (sl) sl.value = String(isMuted ? 0 : volPct);
+    });
     if (dom.audioVolumeValue) dom.audioVolumeValue.textContent = isMuted ? "مكتوم" : `${volPct}%`;
+    if (dom.setupVolumePct) dom.setupVolumePct.textContent = displayPct;
+    if (dom.gameVolumePct) dom.gameVolumePct.textContent = displayPct;
 
     const setSw = (el, val) => {
       if (!el) return;
@@ -7105,6 +8360,2616 @@
     dom.audioMixerPopover.hidden = false;
     if (anchorBtn) {
       anchorBtn.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  /* =========================================================
+     الحزمة الخامسة: جولة الرهان النهائي وكسر التعادل (Final Wager Round)
+     ========================================================= */
+  function stopFinalRoundTimer() {
+    if (state.finalTimerInterval) {
+      clearInterval(state.finalTimerInterval);
+      state.finalTimerInterval = null;
+    }
+    if (state.finalRound) {
+      state.finalRound.timerRunning = false;
+    }
+  }
+
+  function startFinalRound(triggerReason = "tie-breaker", roundNumber = 1, previousUsedIds = []) {
+    if (!finalRoundEngine || !dom.finalRoundModal) return;
+    closeRefereePopover();
+    stopVictoryConfetti();
+    closeModal(dom.winnerModal);
+    closeModal(dom.questionModal);
+    stopFinalRoundTimer();
+
+    const picked = finalRoundEngine.pickFinalQuestion({
+      allCategories: state.allCategories,
+      boardCategories: state.boardCategories,
+      historyStore,
+      flaggedStore,
+      excludeQuestionIds: previousUsedIds
+    });
+
+    if (!picked) {
+      showToast("لا تتوفر أسئلة نصية بديلة في البنك لجولة الحسم حالياً", "warning");
+      openWinnerModal(false);
+      return;
+    }
+
+    state.finalRound = finalRoundEngine.createFinalRoundState({
+      triggerReason,
+      teams: state.teams,
+      picked,
+      roundNumber,
+      usedQuestionIds: previousUsedIds
+    });
+
+    renderFinalRoundModal();
+    openModal(dom.finalRoundModal);
+    persistActiveMatch();
+
+    if (window.SeenJeemAudio) {
+      window.SeenJeemAudio.playStealAlert();
+    }
+    showToast(
+      triggerReason === "always"
+        ? "⚔️ بدأت جولة الرهان النهائي الختامية!"
+        : `⚔️ بدأت جولة كسر التعادل #${roundNumber}!`,
+      "info"
+    );
+  }
+
+  function rerollFinalQuestion() {
+    if (!state.finalRound || state.finalRound.phase !== "wager" || !finalRoundEngine) return;
+    const picked = finalRoundEngine.pickFinalQuestion({
+      allCategories: state.allCategories,
+      boardCategories: state.boardCategories,
+      historyStore,
+      flaggedStore,
+      excludeQuestionIds: state.finalRound.usedQuestionIds || []
+    });
+
+    if (!picked) {
+      showToast("لا توجد أسئلة حسم بديلة إضافية متاحة حالياً", "warning");
+      return;
+    }
+
+    state.finalRound.category = picked.category;
+    state.finalRound.question = picked.question;
+    state.finalRound.usedQuestionIds = Array.from(
+      new Set([...(state.finalRound.usedQuestionIds || []), picked.question.id])
+    );
+
+    renderFinalRoundModal();
+    persistActiveMatch();
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playLifeline();
+    showToast(`🔄 تم تغيير سؤال الحسم إلى فئة «${picked.category.name}»`, "info");
+  }
+
+  function renderFinalRoundTimerUI() {
+    if (!state.finalRound || !dom.finalTimerDisplay) return;
+    const fr = state.finalRound;
+    const pct = fr.timerMax > 0 ? Math.min(100, (fr.timerRemaining / fr.timerMax) * 100) : 0;
+    const isDanger = fr.timerRemaining <= 10;
+
+    dom.finalTimerDisplay.textContent = formatTime(fr.timerRemaining);
+    dom.finalTimerDisplay.classList.toggle("danger", isDanger);
+    if (dom.finalTimerProgress) {
+      dom.finalTimerProgress.style.width = `${pct}%`;
+      dom.finalTimerProgress.classList.toggle("danger", isDanger);
+    }
+    if (dom.finalTimerLabel) {
+      dom.finalTimerLabel.textContent =
+        fr.timerRemaining === 0
+          ? "⏰ انتهى وقت سؤال الحسم!"
+          : fr.timerRunning
+            ? "مؤقت سؤال الحسم جارٍ"
+            : "المؤقت متوقف مؤقتاً";
+    }
+    if (dom.finalTimerToggleIcon && dom.finalTimerToggleText && dom.btnFinalTimerToggle) {
+      dom.finalTimerToggleIcon.textContent = fr.timerRunning ? "⏸️" : "▶️";
+      dom.finalTimerToggleText.textContent = fr.timerRunning ? "إيقاف مؤقت" : "ابدأ";
+      dom.btnFinalTimerToggle.disabled = fr.timerRemaining === 0;
+    }
+  }
+
+  function onFinalRoundTimerTick() {
+    if (!state.finalRound || !state.finalRound.timerRunning) return;
+    state.finalRound.timerRemaining = Math.max(0, state.finalRound.timerRemaining - 1);
+
+    if (state.finalRound.timerRemaining > 0 && state.finalRound.timerRemaining <= 10) {
+      if (window.SeenJeemAudio) {
+        window.SeenJeemAudio.playTick(state.finalRound.timerRemaining <= 5);
+      }
+    }
+    if (state.finalRound.timerRemaining === 0) {
+      stopFinalRoundTimer();
+      if (window.SeenJeemAudio) {
+        window.SeenJeemAudio.playTimeUp();
+      }
+    }
+
+    renderFinalRoundTimerUI();
+    if (state.dualScreen.connected) {
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function toggleFinalRoundTimer() {
+    if (!state.finalRound || state.finalRound.phase !== "question") return;
+    if (state.finalRound.timerRunning) {
+      stopFinalRoundTimer();
+    } else if (state.finalRound.timerRemaining > 0) {
+      stopFinalRoundTimer();
+      state.finalRound.timerRunning = true;
+      state.finalTimerInterval = setInterval(onFinalRoundTimerTick, 1000);
+    }
+    renderFinalRoundTimerUI();
+    persistActiveMatch();
+  }
+
+  function resetFinalRoundTimer() {
+    if (!state.finalRound || state.finalRound.phase !== "question") return;
+    stopFinalRoundTimer();
+    state.finalRound.timerRemaining = state.finalRound.timerMax || 60;
+    renderFinalRoundTimerUI();
+    persistActiveMatch();
+  }
+
+  function renderFinalRoundModal() {
+    if (!state.finalRound || !finalRoundEngine) return;
+    const fr = state.finalRound;
+    const isTieBreaker = fr.triggerReason === "tie-breaker" || fr.triggerReason === "manual";
+
+    if (dom.finalRoundEyebrow) {
+      dom.finalRoundEyebrow.textContent = isTieBreaker
+        ? `⚔️ كسر التعادل — الجولة ${fr.roundNumber}`
+        : "⚔️ جولة الحسم الختامية";
+    }
+    if (dom.finalRoundTitle) {
+      dom.finalRoundTitle.textContent = isTieBreaker ? "جولة كسر التعادل" : "جولة الرهان النهائي";
+    }
+
+    if (dom.finalTvStatusPill) {
+      dom.finalTvStatusPill.hidden = !state.dualScreen.connected;
+      if (state.dualScreen.connected) {
+        dom.finalTvStatusPill.classList.remove("state-hidden", "state-hint", "state-revealed");
+        if (fr.phase === "wager") {
+          dom.finalTvStatusPill.textContent = "📺 التلفزيون: الفئة فقط (الرهان والسؤال مخفيان)";
+          dom.finalTvStatusPill.classList.add("state-hidden");
+        } else if (fr.phase === "question") {
+          dom.finalTvStatusPill.textContent = "📺 التلفزيون: السؤال والمؤقت (الإجابة والرهانات مخفية)";
+          dom.finalTvStatusPill.classList.add("state-hint");
+        } else {
+          dom.finalTvStatusPill.textContent = "✅ التلفزيون: الإجابة والرهانات مكشوفة";
+          dom.finalTvStatusPill.classList.add("state-revealed");
+        }
+      }
+    }
+
+    if (dom.finalStepWager) dom.finalStepWager.classList.toggle("active", fr.phase === "wager");
+    if (dom.finalStepQuestion) dom.finalStepQuestion.classList.toggle("active", fr.phase === "question");
+    if (dom.finalStepReveal) dom.finalStepReveal.classList.toggle("active", fr.phase === "reveal");
+
+    if (dom.finalCatIcon) dom.finalCatIcon.textContent = (fr.category && fr.category.icon) || "🏆";
+    if (dom.finalCatName) dom.finalCatName.textContent = (fr.category && fr.category.name) || "";
+    if (dom.finalQTierPill) {
+      const pts = Number(fr.question && fr.question.points) || 600;
+      dom.finalQTierPill.textContent = `${pts} نقطة`;
+      dom.finalQTierPill.className = `q-points-pill pts-${pts}`;
+    }
+    if (dom.btnFinalReroll) {
+      dom.btnFinalReroll.hidden = fr.phase !== "wager";
+    }
+
+    if (dom.finalPhaseWager) dom.finalPhaseWager.hidden = fr.phase !== "wager";
+    if (dom.finalPhaseQuestion) dom.finalPhaseQuestion.hidden = fr.phase !== "question";
+    if (dom.finalPhaseReveal) dom.finalPhaseReveal.hidden = fr.phase !== "reveal";
+
+    if (dom.btnFinalShowQuestion) dom.btnFinalShowQuestion.hidden = fr.phase !== "wager";
+    if (dom.btnFinalRevealResults) dom.btnFinalRevealResults.hidden = fr.phase !== "question";
+    if (dom.finalRevealFooterActions) dom.finalRevealFooterActions.hidden = fr.phase !== "reveal";
+
+    // المرحلة 1: بطاقات إدخال وتثبيت الرهانات السرية
+    if (fr.phase === "wager" && dom.finalWagersGrid) {
+      dom.finalWagersGrid.innerHTML = "";
+      fr.participantIndices.forEach((teamIdx) => {
+        const team = state.teams[teamIdx];
+        const w = fr.wagers[teamIdx] || { amount: 0, locked: false, maxWager: 400 };
+        if (!team) return;
+
+        const card = document.createElement("div");
+        card.className = `final-wager-card team-${teamIdx + 1}-card${w.locked ? " is-locked" : ""}`;
+        card.innerHTML = `
+          <div class="final-wager-head">
+            <div class="final-wager-id">
+              <span class="team-badge-dot team-${teamIdx + 1}-dot"></span>
+              <strong>${escapeHtml(team.name)}</strong>
+            </div>
+            <span class="final-wager-cap">الرصيد: ${team.score} • الأقصى: ${w.maxWager}</span>
+          </div>
+          <div class="final-wager-input-row">
+            <input
+              type="number"
+              class="final-wager-input"
+              min="0"
+              max="${w.maxWager}"
+              step="10"
+              value="${w.amount}"
+              ${w.locked ? "disabled" : ""}
+              aria-label="رهان ${escapeHtml(team.name)}"
+            />
+            <button type="button" class="btn ${w.locked ? "btn-ghost" : "btn-primary"} btn-xs btn-lock-wager">
+              ${w.locked ? "🔓 تعديل" : "✅ تثبيت الرهان"}
+            </button>
+          </div>
+          <div class="final-wager-presets">
+            <button type="button" class="wager-preset-chip" data-pct="0" ${w.locked ? "disabled" : ""}>0</button>
+            <button type="button" class="wager-preset-chip" data-pct="0.25" ${w.locked ? "disabled" : ""}>25%</button>
+            <button type="button" class="wager-preset-chip" data-pct="0.5" ${w.locked ? "disabled" : ""}>50%</button>
+            <button type="button" class="wager-preset-chip is-allin" data-pct="1" ${w.locked ? "disabled" : ""}>الكل (All-In)</button>
+          </div>
+        `;
+
+        const inputEl = card.querySelector(".final-wager-input");
+        inputEl.addEventListener("input", () => {
+          const val = Math.max(0, Math.min(w.maxWager, Math.round(Number(inputEl.value) || 0)));
+          fr.wagers[teamIdx].amount = val;
+        });
+
+        card.querySelectorAll(".wager-preset-chip").forEach((chip) => {
+          chip.addEventListener("click", () => {
+            const pct = Number(chip.dataset.pct);
+            const nextAmt = Math.round(w.maxWager * pct);
+            fr.wagers[teamIdx].amount = nextAmt;
+            inputEl.value = String(nextAmt);
+          });
+        });
+
+        const lockBtn = card.querySelector(".btn-lock-wager");
+        lockBtn.addEventListener("click", () => {
+          if (!fr.wagers[teamIdx].locked) {
+            const clamped = Math.max(
+              0,
+              Math.min(w.maxWager, Math.round(Number(inputEl.value) || 0))
+            );
+            fr.wagers[teamIdx].amount = clamped;
+            fr.wagers[teamIdx].locked = true;
+            if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
+          } else {
+            fr.wagers[teamIdx].locked = false;
+          }
+          renderFinalRoundModal();
+          persistActiveMatch();
+        });
+
+        dom.finalWagersGrid.appendChild(card);
+      });
+
+      if (dom.btnFinalShowQuestion) {
+        dom.btnFinalShowQuestion.disabled = !finalRoundEngine.areAllWagersLocked(fr);
+      }
+    }
+
+    // المرحلة 2: عرض السؤال والمؤقت والتحكيم
+    if (fr.phase === "question") {
+      if (dom.finalQuestionText) dom.finalQuestionText.textContent = fr.question.question || "";
+      if (dom.finalHostAnswerText) dom.finalHostAnswerText.textContent = fr.question.answer || "";
+      const exp = typeof fr.question.explanation === "string" ? fr.question.explanation.trim() : "";
+      if (dom.finalHostExpRow && dom.finalHostExpText) {
+        dom.finalHostExpRow.hidden = !exp;
+        dom.finalHostExpText.textContent = exp;
+      }
+      renderFinalRoundTimerUI();
+
+      if (dom.finalJudgmentsGrid) {
+        dom.finalJudgmentsGrid.innerHTML = "";
+        fr.participantIndices.forEach((teamIdx) => {
+          const team = state.teams[teamIdx];
+          const w = fr.wagers[teamIdx] || { amount: 0 };
+          const curJ = fr.judgments[teamIdx] || null;
+          if (!team) return;
+
+          const row = document.createElement("div");
+          row.className = `final-judge-card team-${teamIdx + 1}-card`;
+          row.innerHTML = `
+            <div class="final-judge-info">
+              <span class="team-badge-dot team-${teamIdx + 1}-dot"></span>
+              <strong>${escapeHtml(team.name)}</strong>
+              <span class="final-judge-wager-tag">الرهان السري: ${w.amount}</span>
+            </div>
+            <div class="final-judge-btns">
+              <button type="button" class="btn btn-xs final-judge-btn is-correct${curJ === "correct" ? " active" : ""}" data-judge="correct">
+                ✅ صحيحة (+${w.amount})
+              </button>
+              <button type="button" class="btn btn-xs final-judge-btn is-wrong${curJ === "wrong" ? " active" : ""}" data-judge="wrong">
+                ❌ خاطئة (-${w.amount})
+              </button>
+            </div>
+          `;
+          row.querySelectorAll(".final-judge-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              fr.judgments[teamIdx] = btn.dataset.judge === "correct" ? "correct" : "wrong";
+              renderFinalRoundModal();
+              persistActiveMatch();
+            });
+          });
+          dom.finalJudgmentsGrid.appendChild(row);
+        });
+      }
+
+      if (dom.btnFinalRevealResults) {
+        dom.btnFinalRevealResults.disabled = !finalRoundEngine.areAllJudgmentsSet(fr);
+      }
+    }
+
+    // المرحلة 3: كشف الإجابة والرهانات والنتائج
+    if (fr.phase === "reveal") {
+      if (dom.finalRevealAnswerText) dom.finalRevealAnswerText.textContent = fr.question.answer || "";
+      const exp = typeof fr.question.explanation === "string" ? fr.question.explanation.trim() : "";
+      if (dom.finalRevealExpText) {
+        dom.finalRevealExpText.hidden = !exp;
+        dom.finalRevealExpText.textContent = exp ? `📌 التوضيح: ${exp}` : "";
+      }
+
+      if (dom.finalResultsGrid && fr.results) {
+        dom.finalResultsGrid.innerHTML = fr.participantIndices
+          .map((teamIdx) => {
+            const r = fr.results[teamIdx];
+            if (!r) return "";
+            const deltaText =
+              r.effectiveDelta > 0
+                ? `+${r.effectiveDelta}`
+                : r.effectiveDelta < 0
+                  ? `${r.effectiveDelta}`
+                  : "0";
+            return `
+              <div class="final-result-card team-${teamIdx + 1}-card ${r.correct ? "is-correct" : "is-wrong"}">
+                <div class="final-result-head">
+                  <span class="team-badge-dot team-${teamIdx + 1}-dot"></span>
+                  <strong>${escapeHtml(r.teamName)}</strong>
+                  <span class="final-verdict-pill ${r.correct ? "ok" : "bad"}">
+                    ${r.correct ? "✅ إجابة صحيحة" : "❌ إجابة خاطئة"}
+                  </span>
+                </div>
+                <div class="final-result-body">
+                  <span>الرهان: <strong>${r.wager}</strong></span>
+                  <span class="final-result-delta ${r.correct ? "pos" : "neg"}">${deltaText}</span>
+                  <span>الرصيد: ${r.prevScore} ← <strong>${r.nextScore}</strong></span>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      const stillTied = finalRoundEngine.isTopScoreTied(state.teams);
+      if (dom.btnFinalExtraTiebreaker) {
+        dom.btnFinalExtraTiebreaker.hidden = !stillTied;
+      }
+    }
+  }
+
+  function proceedToFinalQuestionPhase() {
+    if (!state.finalRound || state.finalRound.phase !== "wager") return;
+    if (!finalRoundEngine.areAllWagersLocked(state.finalRound)) return;
+
+    state.finalRound.phase = "question";
+    state.finalRound.timerRemaining = state.finalRound.timerMax || 60;
+    stopFinalRoundTimer();
+    state.finalRound.timerRunning = true;
+    state.finalTimerInterval = setInterval(onFinalRoundTimerTick, 1000);
+
+    renderFinalRoundModal();
+    persistActiveMatch();
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playReveal();
+  }
+
+  function resolveFinalRoundResults() {
+    if (!state.finalRound || state.finalRound.phase !== "question" || !finalRoundEngine) return;
+    if (!finalRoundEngine.areAllJudgmentsSet(state.finalRound)) return;
+
+    stopFinalRoundTimer();
+    const fr = state.finalRound;
+    const preFinalSnapshot = JSON.parse(JSON.stringify(fr));
+    const questionHistorySnapshot = historyStore.captureQuestionSnapshot(fr.question.id);
+
+    // حفظ لقطة التراجع الكاملة (Undo Stack) قبل تطبيق تعديلات الرهان
+    matchStore.pushUndoSnapshot(
+      {
+        actionType: "final-round-resolve",
+        label: `حسم جولة الرهان النهائي (${fr.category.name})`,
+        teams: cloneTeamsState(),
+        activeTurn: state.activeTurn,
+        doubleArmed: state.doubleArmed,
+        answeredThisRound: state.answeredThisRound,
+        matchEvents: cloneMatchEvents(),
+        refereeAdjustments: cloneRefereeAdjustments(),
+        finalRound: preFinalSnapshot,
+        cellState: null,
+        questionHistorySnapshot
+      },
+      state.matchSettings
+    );
+
+    const results = finalRoundEngine.computeFinalResolution(fr, state.teams);
+    fr.results = results;
+    fr.phase = "reveal";
+
+    const summaryParts = [];
+    fr.participantIndices.forEach((idx) => {
+      const r = results[idx];
+      if (!r || !state.teams[idx]) return;
+      state.teams[idx].score = r.nextScore;
+      const d = r.effectiveDelta > 0 ? `+${r.effectiveDelta}` : String(r.effectiveDelta);
+      summaryParts.push(`${r.teamName} (${d})`);
+    });
+
+    // تسجيل السؤال في historyStore وإضافة حدث للجولة النهائية في matchEvents
+    historyStore.markQuestionPlayed(fr.question.id, Date.now());
+    const finalEv = matchStore.sanitizeMatchEvent({
+      questionId: fr.question.id,
+      categoryId: fr.category.id,
+      categoryName: fr.category.name,
+      questionText: fr.question.question,
+      answerText: fr.question.answer,
+      explanation: fr.question.explanation || undefined,
+      basePoints: Number(fr.question.points) || 600,
+      effectivePoints: 0,
+      askingTeamId: state.teams[fr.participantIndices[0]]
+        ? state.teams[fr.participantIndices[0]].id
+        : "team-0",
+      awardedTeamId: null,
+      wasSteal: false,
+      wasDouble: false,
+      hintUsed: false,
+      wasSwapped: false,
+      isFinalRound: true,
+      finalSummary: summaryParts.join(" • "),
+      timestamp: Date.now()
+    });
+    if (finalEv) {
+      state.matchEvents.push(finalEv);
+    }
+
+    renderScoreboard();
+    updateUndoButtonUI();
+    renderFinalRoundModal();
+    persistActiveMatch();
+
+    const anyCorrect = Object.values(results).some((r) => r.correct);
+    if (window.SeenJeemAudio) {
+      window.SeenJeemAudio.playScore(anyCorrect);
+    }
+    showToast("🏆 تم كشف الإجابة واحتساب نتائج الرهان النهائي!", "success");
+  }
+
+  function startExtraTieBreakerRound() {
+    if (!state.finalRound) return;
+    const nextRoundNum = (Number(state.finalRound.roundNumber) || 1) + 1;
+    const usedIds = state.finalRound.usedQuestionIds ? state.finalRound.usedQuestionIds.slice() : [];
+    startFinalRound("tie-breaker", nextRoundNum, usedIds);
+  }
+
+  function finishFinalRoundToWinner() {
+    stopFinalRoundTimer();
+    state.finalRound = null;
+    closeModal(dom.finalRoundModal);
+    openWinnerModal(false);
+  }
+
+  function cancelFinalRound() {
+    stopFinalRoundTimer();
+    state.finalRound = null;
+    closeModal(dom.finalRoundModal);
+    persistActiveMatch();
+    if (countRemainingPlayableQuestions() === 0) {
+      openWinnerModal(false);
+    }
+  }
+
+  /* =========================================================
+     الحزمة السادسة: بطاقة النتيجة، لوحة المؤثرات، الاستراحة، الثيمات ومقياس التلفزيون
+     ========================================================= */
+  function broadcastDisplayPrefsToTV() {
+    if (!liveSync || !state.dualScreen.connected) return;
+    if (typeof liveSync.broadcastDisplayPrefs === "function") {
+      liveSync.broadcastDisplayPrefs({
+        theme: state.theme,
+        tvScale: state.tvScale
+      });
+    }
+  }
+
+  function applyTheme(themeName, shouldPersistAndSync = true) {
+    const clean =
+      shouldPersistAndSync && matchStore
+        ? matchStore.saveTheme(themeName)
+        : themeName === "royal-gold" || themeName === "high-contrast"
+          ? themeName
+          : "dark-glass";
+    state.theme = clean;
+    document.documentElement.dataset.theme = clean;
+
+    document.querySelectorAll(".theme-choice-btn").forEach((btn) => {
+      const active = btn.dataset.themeChoice === clean;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+
+    if (shouldPersistAndSync) {
+      broadcastDisplayPrefsToTV();
+    }
+  }
+
+  function applyTvScale(scalePct, shouldPersistAndSync = true) {
+    const clean =
+      shouldPersistAndSync && matchStore
+        ? matchStore.saveTvScale(scalePct)
+        : Math.min(130, Math.max(90, Math.round((Number(scalePct) || 100) / 5) * 5));
+    state.tvScale = clean;
+
+    if (dom.setupTvScaleSlider) dom.setupTvScaleSlider.value = String(clean);
+    if (dom.setupTvScaleVal) dom.setupTvScaleVal.textContent = `${clean}%`;
+    if (dom.gameTvScaleSlider) dom.gameTvScaleSlider.value = String(clean);
+    if (dom.gameTvScaleVal) dom.gameTvScaleVal.textContent = `${clean}%`;
+
+    if (shouldPersistAndSync) {
+      broadcastDisplayPrefsToTV();
+    }
+  }
+
+  function closeAllHostToolPopovers(exceptEl = null) {
+    const pairs = [
+      [dom.soundboardPopover, dom.btnOpenSoundboard],
+      [dom.intermissionPopover, dom.btnOpenIntermission],
+      [dom.displayPrefsPopover, dom.btnOpenDisplayPrefs]
+    ];
+    pairs.forEach(([pop, btn]) => {
+      if (pop && pop !== exceptEl) {
+        pop.hidden = true;
+      }
+      if (btn && pop !== exceptEl) {
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  function toggleHostToolPopover(popoverEl, triggerBtn) {
+    if (!popoverEl) return;
+    const willOpen = popoverEl.hidden;
+    closeAllHostToolPopovers(willOpen ? popoverEl : null);
+    popoverEl.hidden = !willOpen;
+    if (triggerBtn) {
+      triggerBtn.setAttribute("aria-expanded", String(willOpen));
+    }
+    if (willOpen && popoverEl === dom.intermissionPopover) {
+      syncIntermissionHostUI();
+    }
+  }
+
+  // --- لوحة المؤثرات الصوتية للمقدّم (Host Soundboard) ---
+  const SOUNDBOARD_LABELS = {
+    drumroll: "🥁 قرع طبول التشويق",
+    applause: "👏 تصفيق واحتفال",
+    sad_trombone: "🎺 خطأ كوميدي درامي",
+    attention_chime: "🔔 تنبيه هدوء / انتباه",
+    fanfare: "🎉 افتتاحية حماسية"
+  };
+
+  function triggerSoundboardEffect(sfxKey) {
+    if (!window.SeenJeemAudio || !SOUNDBOARD_LABELS[sfxKey]) return;
+    if (typeof window.SeenJeemAudio.playSoundboard === "function") {
+      window.SeenJeemAudio.playSoundboard(sfxKey);
+    }
+    const btn = dom.soundboardPopover
+      ? dom.soundboardPopover.querySelector(`[data-sfx="${sfxKey}"]`)
+      : null;
+    if (btn) {
+      btn.classList.remove("is-firing");
+      void btn.offsetWidth;
+      btn.classList.add("is-firing");
+    }
+  }
+
+  // --- شاشة الاستراحة التلفزيونية (Intermission Screen) ---
+  function stopIntermissionTimerOnly() {
+    if (state.intermissionInterval) {
+      clearInterval(state.intermissionInterval);
+      state.intermissionInterval = null;
+    }
+  }
+
+  function syncIntermissionHostUI() {
+    const active = Boolean(state.intermission && state.intermission.active);
+    if (dom.hostIntermissionActiveBar) {
+      dom.hostIntermissionActiveBar.hidden = !active;
+    }
+    if (dom.hostIntermissionCountdown) {
+      dom.hostIntermissionCountdown.textContent =
+        active && state.intermission.totalSeconds > 0
+          ? `(${formatTime(state.intermission.remainingSeconds)})`
+          : "";
+    }
+    if (dom.btnStartIntermission) dom.btnStartIntermission.hidden = active;
+    if (dom.btnStopIntermissionPopover) dom.btnStopIntermissionPopover.hidden = !active;
+    if (dom.btnOpenIntermission) {
+      dom.btnOpenIntermission.classList.toggle("is-intermission-live", active);
+    }
+  }
+
+  function startIntermission(rawMessage, durationMinutes = 0) {
+    stopIntermissionTimerOnly();
+
+    // إيقاف مؤقت أي عدّاد جارٍ (عام، من غير كلام، سرقة، أو الجولة النهائية) دون إغلاق السؤال
+    if (state.timerRunning) {
+      pauseTimer();
+    }
+    if (state.finalRound && state.finalRound.timerRunning) {
+      stopFinalRoundTimer();
+      renderFinalRoundTimerUI();
+    }
+
+    const msg =
+      typeof rawMessage === "string" && rawMessage.trim()
+        ? rawMessage.trim().slice(0, 120)
+        : "استراحة قصيرة — نعود بعد قليل";
+    const mins = Math.max(0, Math.floor(Number(durationMinutes) || 0));
+    const totalSecs = mins * 60;
+
+    state.intermission = {
+      active: true,
+      message: msg,
+      durationMinutes: mins,
+      totalSeconds: totalSecs,
+      remainingSeconds: totalSecs
+    };
+
+    if (totalSecs > 0) {
+      state.intermissionInterval = setInterval(() => {
+        if (!state.intermission || !state.intermission.active) {
+          stopIntermissionTimerOnly();
+          return;
+        }
+        state.intermission.remainingSeconds = Math.max(0, state.intermission.remainingSeconds - 1);
+        syncIntermissionHostUI();
+        broadcastLiveDisplayState();
+        if (state.intermission.remainingSeconds === 0) {
+          stopIntermissionTimerOnly();
+          if (window.SeenJeemAudio) window.SeenJeemAudio.playAttentionChime();
+          showToast("☕ انتهى وقت الاستراحة — اضغط «استئناف اللعب» للعودة", "info");
+        }
+      }, 1000);
+    }
+
+    closeAllHostToolPopovers();
+    syncIntermissionHostUI();
+    broadcastLiveDisplayState();
+
+    showToast(
+      mins > 0
+        ? `☕ تم تفعيل شاشة الاستراحة (${mins} دقائق) وإيقاف المؤقت مؤقتاً`
+        : "☕ تم تفعيل شاشة الاستراحة وإيقاف المؤقت مؤقتاً",
+      "info"
+    );
+  }
+
+  function stopIntermission(isSilent = false) {
+    const wasActive = Boolean(state.intermission && state.intermission.active);
+    stopIntermissionTimerOnly();
+    state.intermission = matchStore
+      ? matchStore.getDefaultIntermission()
+      : { active: false, message: "استراحة قصيرة — نعود بعد قليل", durationMinutes: 0, totalSeconds: 0, remainingSeconds: 0 };
+
+    closeAllHostToolPopovers();
+    syncIntermissionHostUI();
+    if (wasActive) {
+      broadcastLiveDisplayState();
+      if (!isSilent) {
+        showToast("▶️ تم إنهاء الاستراحة والعودة للعرض (المؤقت يبقى متوقفاً حتى تستأنفه يدوياً)", "success");
+      }
+    }
+  }
+
+  // --- بطاقة نتيجة المباراة للمشاركة (Shareable Result Card) ---
+  function clearResultCardObjectUrl() {
+    if (state.currentResultCardUrl) {
+      try {
+        URL.revokeObjectURL(state.currentResultCardUrl);
+      } catch (_e) {}
+      state.currentResultCardUrl = "";
+    }
+    state.currentResultCardBlob = null;
+  }
+
+  async function openResultCardModal(customPayload = null) {
+    if (!resultCardGen || !dom.resultCardModal) return;
+    clearResultCardObjectUrl();
+    state.customResultCardPayload = customPayload || null;
+
+    if (dom.resultCardLoading) {
+      dom.resultCardLoading.textContent = "⏳ جاري رسم بطاقة النتيجة عالية الدقة...";
+      dom.resultCardLoading.hidden = false;
+    }
+    if (dom.resultCardPreviewImg) {
+      dom.resultCardPreviewImg.hidden = true;
+      dom.resultCardPreviewImg.removeAttribute("src");
+    }
+    if (dom.btnDownloadResultCard) dom.btnDownloadResultCard.disabled = true;
+    if (dom.btnCopyResultCard) dom.btnCopyResultCard.disabled = true;
+    if (dom.btnShareResultCard) {
+      dom.btnShareResultCard.disabled = true;
+      dom.btnShareResultCard.hidden = !resultCardGen.canNativeShareFiles();
+    }
+
+    openModal(dom.resultCardModal);
+
+    try {
+      const payload = customPayload || {
+        teams: state.teams,
+        analytics: computeMatchAnalytics(),
+        matchEvents: state.matchEvents,
+        profileName: historyStore.getActiveProfile().name,
+        theme: state.theme,
+        timestamp: Date.now()
+      };
+      const canvas = await resultCardGen.generateCanvas({
+        teams: payload.teams,
+        analytics: payload.analytics,
+        matchEvents: payload.matchEvents || [],
+        profileName: payload.profileName || historyStore.getActiveProfile().name,
+        theme: payload.theme || state.theme,
+        timestamp: payload.timestamp || Date.now()
+      });
+      const blob = await resultCardGen.canvasToBlob(canvas);
+      if (!blob) {
+        if (dom.resultCardLoading) dom.resultCardLoading.textContent = "تعذّر توليد الصورة في هذا المتصفح";
+        return;
+      }
+
+      state.currentResultCardBlob = blob;
+      state.currentResultCardUrl = URL.createObjectURL(blob);
+
+      if (dom.resultCardPreviewImg) {
+        dom.resultCardPreviewImg.src = state.currentResultCardUrl;
+        dom.resultCardPreviewImg.hidden = false;
+      }
+      if (dom.resultCardLoading) dom.resultCardLoading.hidden = true;
+      if (dom.btnDownloadResultCard) dom.btnDownloadResultCard.disabled = false;
+      if (dom.btnCopyResultCard) dom.btnCopyResultCard.disabled = false;
+      if (dom.btnShareResultCard && !dom.btnShareResultCard.hidden) {
+        dom.btnShareResultCard.disabled = false;
+      }
+    } catch (_err) {
+      if (dom.resultCardLoading) dom.resultCardLoading.textContent = "تعذّر رسم بطاقة النتيجة";
+      showToast("تعذّر توليد بطاقة النتيجة — حاول مرة أخرى", "warning");
+    }
+  }
+
+  function closeResultCardModal() {
+    closeModal(dom.resultCardModal);
+    clearResultCardObjectUrl();
+    state.customResultCardPayload = null;
+  }
+
+  /* =========================================================
+     المرحلة الرابعة — الحزمة السابعة:
+     1) طور «جولة البرق السريعة» (60-Second Blitz Mode)
+     2) طور «من غير كلام» المستقل (Standalone Charades Mode)
+     3) قاعة المشاهير وأرشيف المباريات (Hall of Fame & Archive)
+     ========================================================= */
+
+  function buildSideModeWinnerPayload(teamsList, eyebrowText) {
+    const teams = Array.isArray(teamsList) ? teamsList : [];
+    const maxScore = teams.reduce((m, t) => Math.max(m, Number(t.score) || 0), -Infinity);
+    const leaderIndices = [];
+    teams.forEach((t, idx) => {
+      if ((Number(t.score) || 0) === maxScore) leaderIndices.push(idx);
+    });
+    const isDraw = teams.length > 1 && leaderIndices.length !== 1;
+    const winnerIdx = !isDraw && leaderIndices.length === 1 ? leaderIndices[0] : null;
+    const title =
+      teams.length === 1
+        ? `نتيجة ${teams[0].name}: ${teams[0].score} نقطة!`
+        : !isDraw && winnerIdx !== null
+          ? `الفائز: ${teams[winnerIdx].name}`
+          : "تعادل مثير في الصدارة!";
+    return {
+      winnerIdx,
+      leaderIndices,
+      eyebrow: eyebrowText || "نهاية التحدي!",
+      title,
+      teams: teams.map((t, i) => ({ id: t.id || `team-${i}`, name: t.name, score: Number(t.score) || 0 })),
+      analytics: null
+    };
+  }
+
+  function renderSideTeamInputs(container, count, prefix, fallbackSolo) {
+    if (!container) return;
+    const existingValues = Array.from(container.querySelectorAll("input")).map((el) => el.value);
+    const defaults =
+      count === 1 && fallbackSolo
+        ? ["اللاعب الأول"]
+        : ["الفريق الأول", "الفريق الثاني", "الفريق الثالث", "الفريق الرابع"];
+    container.innerHTML = "";
+    for (let i = 0; i < count; i++) {
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "text-input side-team-input";
+      inp.dataset.sideTeamIdx = String(i);
+      inp.maxLength = 24;
+      inp.autocomplete = "off";
+      inp.placeholder = defaults[i];
+      inp.value = existingValues[i] && existingValues[i].trim() ? existingValues[i] : defaults[i];
+      inp.setAttribute("aria-label", `${prefix} ${i + 1}`);
+      container.appendChild(inp);
+    }
+  }
+
+  function getSideTeamNames(container, count, fallbackSolo) {
+    const defaults =
+      count === 1 && fallbackSolo
+        ? ["اللاعب الأول"]
+        : ["الفريق الأول", "الفريق الثاني", "الفريق الثالث", "الفريق الرابع"];
+    const inputs = container ? Array.from(container.querySelectorAll("input")) : [];
+    const names = [];
+    for (let i = 0; i < count; i++) {
+      const v = inputs[i] && typeof inputs[i].value === "string" ? inputs[i].value.trim() : "";
+      names.push(v || defaults[i]);
+    }
+    return names;
+  }
+
+  // --- 1) طور جولة البرق السريعة (60-Second Blitz Mode) ---
+  function stopBlitzTimer() {
+    if (state.blitzTimerInterval) {
+      clearInterval(state.blitzTimerInterval);
+      state.blitzTimerInterval = null;
+    }
+  }
+
+  function renderBlitzSetupUI() {
+    const cfg = state.blitzConfig;
+    if (dom.blitzTeamCountPills) {
+      dom.blitzTeamCountPills.querySelectorAll("[data-blitz-teams]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.blitzTeams) === cfg.teamCount);
+      });
+    }
+    renderSideTeamInputs(dom.blitzTeamNamesInputs, cfg.teamCount, "اسم اللاعب أو الفريق", true);
+
+    if (dom.blitzDurationPills) {
+      dom.blitzDurationPills.querySelectorAll("[data-blitz-dur]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.blitzDur) === cfg.durationSeconds);
+      });
+    }
+    if (dom.blitzRoundsPills) {
+      dom.blitzRoundsPills.querySelectorAll("[data-blitz-rounds]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.blitzRounds) === cfg.roundsPerTeam);
+      });
+    }
+    if (dom.blitzSourceGroup) {
+      dom.blitzSourceGroup.innerHTML = `<option value="all">✨ كل الفئات النصية المتاحة</option>`;
+      CATEGORY_GROUPS.filter((g) => g.id !== "all" && g.id !== "charades" && g.id !== "visual").forEach(
+        (g) => {
+          const opt = document.createElement("option");
+          opt.value = g.id;
+          opt.textContent = `${g.icon} ${g.label}`;
+          if (g.id === cfg.groupId) opt.selected = true;
+          dom.blitzSourceGroup.appendChild(opt);
+        }
+      );
+    }
+  }
+
+  function openBlitzModal() {
+    if (!blitzEngine || !dom.blitzModal) return;
+    stopBlitzTimer();
+    state.blitz = null;
+    state.blitzLastFeedback = null;
+    renderBlitzSetupUI();
+    showOnlyBlitzSubView("setup");
+    openModal(dom.blitzModal);
+    if (wakeLock && state.setupSettings.wakeLockEnabled) wakeLock.syncForContext(true);
+  }
+
+  function closeBlitzModal() {
+    stopBlitzTimer();
+    state.blitz = null;
+    state.blitzLastFeedback = null;
+    closeModal(dom.blitzModal);
+    broadcastLiveDisplayState();
+    syncWakeLockForCurrentScreen();
+  }
+
+  function showOnlyBlitzSubView(viewName) {
+    if (dom.blitzSetupView) dom.blitzSetupView.hidden = viewName !== "setup";
+    if (dom.blitzReadyView) dom.blitzReadyView.hidden = viewName !== "ready";
+    if (dom.blitzPlayView) dom.blitzPlayView.hidden = viewName !== "playing";
+    if (dom.blitzSummaryView) dom.blitzSummaryView.hidden = viewName !== "turn-summary";
+    if (dom.blitzFinishView) dom.blitzFinishView.hidden = viewName !== "finished";
+  }
+
+  function startBlitzSession() {
+    if (!blitzEngine) return;
+    const cfg = state.blitzConfig;
+    const groupId = dom.blitzSourceGroup ? dom.blitzSourceGroup.value : "all";
+    cfg.groupId = groupId;
+    const teamNames = getSideTeamNames(dom.blitzTeamNamesInputs, cfg.teamCount, true);
+
+    const deck = blitzEngine.buildDeck({
+      allCategories: state.allCategories,
+      sourceMode: groupId === "all" ? "all" : "group",
+      selectedGroup: groupId,
+      resolveGroupFn: resolveCategoryGroup,
+      historyStore,
+      flaggedStore
+    });
+    if (!deck || deck.length === 0) {
+      showToast("⚠️ لا توجد أسئلة نصية عادية متاحة في هذا التصنيف!", "warning");
+      return;
+    }
+
+    state.blitz = blitzEngine.createSession({
+      matchId: archiveStore ? archiveStore.generateMatchId("blitz") : `blitz_${Date.now()}`,
+      teamNames,
+      durationSeconds: cfg.durationSeconds,
+      roundsPerTeam: cfg.roundsPerTeam,
+      deck
+    });
+    state.blitzLastFeedback = null;
+    renderBlitzView();
+    broadcastLiveDisplayState();
+  }
+
+  function renderBlitzView() {
+    const s = state.blitz;
+    if (!s) {
+      showOnlyBlitzSubView("setup");
+      return;
+    }
+    showOnlyBlitzSubView(s.phase);
+    const activeTeam = s.teams[s.activeTeamIdx] || s.teams[0];
+    const currentRound = s.currentRoundForTeam || Math.floor(s.currentTurnNumber / s.teams.length) + 1;
+
+    if (s.phase === "ready") {
+      if (dom.blitzReadyBadge) {
+        dom.blitzReadyBadge.textContent = `الجولة ${currentRound} من ${s.roundsPerTeam}`;
+      }
+      if (dom.blitzReadyTeamTitle) {
+        dom.blitzReadyTeamTitle.textContent = `استعد: ${activeTeam.name}`;
+      }
+      if (dom.blitzReadyDesc) {
+        dom.blitzReadyDesc.textContent = `أجب على أكبر عدد ممكن من الأسئلة خلال ${s.durationSeconds} ثانية (+100 نقطة لكل إجابة صحيحة)!`;
+      }
+      if (dom.blitzReadyScoreboard) {
+        dom.blitzReadyScoreboard.innerHTML = s.teams
+          .map(
+            (t, idx) =>
+              `<div class="side-mini-score-pill team-${idx + 1}-card"><span>${escapeHtml(t.name)}</span><strong>${t.score}</strong></div>`
+          )
+          .join("");
+      }
+    } else if (s.phase === "playing") {
+      if (dom.blitzPlayTeamName) dom.blitzPlayTeamName.textContent = activeTeam.name;
+      if (dom.blitzPlayTeamScore) dom.blitzPlayTeamScore.textContent = `${activeTeam.score} نقطة`;
+      if (dom.blitzStreakPill) {
+        if (s.currentStreak >= 2) {
+          dom.blitzStreakPill.textContent = `🔥 سلسلة ×${s.currentStreak}`;
+          dom.blitzStreakPill.hidden = false;
+        } else {
+          dom.blitzStreakPill.hidden = true;
+        }
+      }
+      renderBlitzTimerUI();
+      if (s.currentQuestion) {
+        if (dom.blitzQCatPill) {
+          dom.blitzQCatPill.textContent = `${s.currentQuestion.categoryIcon || "⚡"} ${s.currentQuestion.categoryName}`;
+        }
+        if (dom.blitzQText) dom.blitzQText.textContent = s.currentQuestion.question;
+        if (dom.blitzQAnswer) dom.blitzQAnswer.textContent = s.currentQuestion.answer;
+      }
+    } else if (s.phase === "turn-summary") {
+      if (dom.blitzSummaryTitle) {
+        dom.blitzSummaryTitle.textContent = `⏰ انتهى دور ${activeTeam.name}!`;
+      }
+      const correctInTurn = s.turnLog.filter((x) => x.outcome === "correct").length;
+      const wrongInTurn = s.turnLog.filter((x) => x.outcome === "wrong").length;
+      const skippedInTurn = s.turnLog.filter((x) => x.outcome === "skip").length;
+      if (dom.blitzSummaryStats) {
+        dom.blitzSummaryStats.innerHTML = `
+          <span class="analytics-metric-chip">✅ صح: ${correctInTurn} (+${correctInTurn * 100})</span>
+          <span class="analytics-metric-chip">❌ خطأ: ${wrongInTurn}</span>
+          <span class="analytics-metric-chip">⏭️ تخطي: ${skippedInTurn}</span>
+          <span class="analytics-metric-chip">🔥 أفضل سلسلة: ${activeTeam.bestStreak}</span>
+        `;
+      }
+      if (dom.blitzSummaryList) {
+        dom.blitzSummaryList.innerHTML =
+          s.turnLog.length === 0
+            ? `<div class="empty-inline-note">لم تُحسم أسئلة في هذا الدور.</div>`
+            : s.turnLog
+                .map((item) => {
+                  const tag =
+                    item.outcome === "correct"
+                      ? `<span class="ev-tag tag-double">✅ +100</span>`
+                      : item.outcome === "wrong"
+                        ? `<span class="ev-tag tag-steal">❌ خطأ</span>`
+                        : `<span class="ev-tag tag-swap">⏭️ تخطي</span>`;
+                  return `
+                    <div class="side-summary-item">
+                      <div class="side-summary-q">${escapeHtml(item.question)}</div>
+                      <div class="side-summary-bottom">
+                        <span class="side-summary-a">✅ ${escapeHtml(item.answer)}</span>
+                        ${tag}
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("");
+      }
+      if (dom.btnBlitzNextTurn) {
+        const isLastTurn = s.currentTurnNumber + 1 >= s.totalTurns;
+        dom.btnBlitzNextTurn.textContent = isLastTurn ? "🏆 عرض النتيجة النهائية" : "الدور التالي ←";
+      }
+    } else if (s.phase === "finished") {
+      const winPayload = buildSideModeWinnerPayload(s.teams, "⚡ نهاية جولة البرق السريعة!");
+      if (dom.blitzFinishTitle) dom.blitzFinishTitle.textContent = winPayload.title;
+      if (dom.blitzFinishScores) {
+        dom.blitzFinishScores.dataset.teamCount = String(s.teams.length);
+        dom.blitzFinishScores.innerHTML = s.teams
+          .map((t, idx) => {
+            const isLeader = winPayload.leaderIndices.includes(idx);
+            return `
+              <div class="winner-team-box team-${idx + 1}-box${isLeader ? " is-winner" : ""}">
+                ${isLeader ? `<div class="winner-crown">👑 الصدارة</div>` : ""}
+                <div class="winner-team-name">${escapeHtml(t.name)}</div>
+                <div class="winner-team-score">${t.score}</div>
+                <div class="winner-score-unit">✅ ${t.correctCount} صح • 🔥 سلسلة ${t.bestStreak}</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+    }
+  }
+
+  function renderBlitzTimerUI() {
+    const s = state.blitz;
+    if (!s) return;
+    const rem = Math.max(0, Number(s.timerRemaining) || 0);
+    const max = Math.max(1, Number(s.durationSeconds) || 60);
+    const pct = Math.min(100, (rem / max) * 100);
+    const isDanger = s.phase === "playing" && rem > 0 && rem <= 10;
+
+    if (dom.blitzTimerDisplay) {
+      dom.blitzTimerDisplay.textContent = formatTime(rem);
+      dom.blitzTimerDisplay.classList.toggle("danger", isDanger);
+    }
+    if (dom.blitzTimerProgress) {
+      dom.blitzTimerProgress.style.width = `${pct}%`;
+      dom.blitzTimerProgress.classList.toggle("danger", isDanger);
+    }
+    if (dom.btnBlitzPause) {
+      dom.btnBlitzPause.innerHTML = s.timerRunning
+        ? `⏸️ إيقاف <kbd class="kbd-hint">Space</kbd>`
+        : `▶️ استئناف <kbd class="kbd-hint">Space</kbd>`;
+    }
+  }
+
+  function beginBlitzTurn() {
+    const s = state.blitz;
+    if (!s || !blitzEngine) return;
+    s.phase = "playing";
+    s.timerRemaining = s.durationSeconds;
+    s.timerRunning = true;
+    s.currentStreak = 0;
+    s.turnLog = [];
+    s.currentQuestion = blitzEngine.drawNextQuestion(s);
+    state.blitzLastFeedback = null;
+
+    if (!s.currentQuestion) {
+      showToast("نفدت الأسئلة المتاحة في الرزمة!", "warning");
+      finishBlitzTurn();
+      return;
+    }
+
+    stopBlitzTimer();
+    state.blitzTimerInterval = setInterval(() => {
+      if (!state.blitz || state.blitz.phase !== "playing" || !state.blitz.timerRunning) return;
+      state.blitz.timerRemaining = Math.max(0, state.blitz.timerRemaining - 1);
+      if (state.blitz.timerRemaining > 0 && state.blitz.timerRemaining <= 10 && window.SeenJeemAudio) {
+        window.SeenJeemAudio.playCharadesUrgentTick(state.blitz.timerRemaining);
+      }
+      renderBlitzTimerUI();
+      broadcastLiveDisplayState();
+      if (state.blitz.timerRemaining === 0) {
+        if (window.SeenJeemAudio) window.SeenJeemAudio.playTimeUp();
+        finishBlitzTurn();
+      }
+    }, 1000);
+
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
+    renderBlitzView();
+    broadcastLiveDisplayState();
+  }
+
+  function toggleBlitzPause() {
+    const s = state.blitz;
+    if (!s || s.phase !== "playing") return;
+    s.timerRunning = !s.timerRunning;
+    renderBlitzTimerUI();
+    broadcastLiveDisplayState();
+  }
+
+  function handleBlitzJudge(outcome) {
+    const s = state.blitz;
+    if (!s || s.phase !== "playing" || !s.currentQuestion || !blitzEngine) return;
+    const team = s.teams[s.activeTeamIdx];
+    const q = s.currentQuestion;
+
+    s.turnLog.push({
+      questionId: q.id,
+      question: q.question,
+      answer: q.answer,
+      categoryName: q.categoryName,
+      outcome
+    });
+
+    if (outcome === "correct") {
+      team.score += 100;
+      team.correctCount += 1;
+      s.currentStreak += 1;
+      if (s.currentStreak > team.bestStreak) team.bestStreak = s.currentStreak;
+      historyStore.markQuestionPlayed(q.id, Date.now());
+      if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playStreakSuccess === "function") {
+        window.SeenJeemAudio.playStreakSuccess(s.currentStreak);
+      }
+      s.lastFeedback = { type: "correct", ts: Date.now() };
+    } else if (outcome === "wrong") {
+      team.wrongCount += 1;
+      s.currentStreak = 0;
+      historyStore.markQuestionPlayed(q.id, Date.now());
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playWrongAnswer();
+      s.lastFeedback = { type: "wrong", ts: Date.now() };
+    } else {
+      team.skipCount += 1;
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playTick(false);
+      s.lastFeedback = { type: "skip", ts: Date.now() };
+    }
+
+    s.currentQuestion = blitzEngine.drawNextQuestion(s);
+    if (!s.currentQuestion) {
+      finishBlitzTurn();
+      return;
+    }
+
+    renderBlitzView();
+    broadcastLiveDisplayState();
+  }
+
+  function finishBlitzTurn() {
+    stopBlitzTimer();
+    const s = state.blitz;
+    if (!s) return;
+    s.timerRunning = false;
+    s.phase = "turn-summary";
+    renderBlitzView();
+    broadcastLiveDisplayState();
+  }
+
+  function advanceBlitzTurn() {
+    const s = state.blitz;
+    if (!s) return;
+    s.currentTurnNumber += 1;
+    if (s.currentTurnNumber >= s.totalTurns) {
+      s.phase = "finished";
+      recordBlitzToArchive();
+      renderBlitzView();
+      broadcastLiveDisplayState();
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playVictory();
+      startVictoryConfetti("default");
+    } else {
+      s.activeTeamIdx = s.currentTurnNumber % s.teams.length;
+      s.currentRoundForTeam = Math.floor(s.currentTurnNumber / s.teams.length) + 1;
+      s.phase = "ready";
+      s.timerRemaining = s.durationSeconds;
+      s.currentStreak = 0;
+      s.turnLog = [];
+      renderBlitzView();
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function recordBlitzToArchive() {
+    const s = state.blitz;
+    if (!archiveStore || !s) return;
+    const totalAnswered = s.teams.reduce((sum, t) => sum + t.correctCount + t.wrongCount, 0);
+    const maxScore = s.teams.reduce((m, t) => Math.max(m, t.score), -Infinity);
+    const leaders = s.teams.filter((t) => t.score === maxScore);
+    const isDraw = s.teams.length > 1 && leaders.length > 1;
+    const winnerNames = leaders.map((t) => t.name);
+
+    archiveStore.recordCompletedMatch({
+      matchId: s.matchId,
+      profileId: historyStore.getActiveProfileId(),
+      mode: "blitz",
+      playedAt: Date.now(),
+      teams: s.teams.map((t) => {
+        const attempts = t.correctCount + t.wrongCount;
+        return {
+          name: t.name,
+          score: t.score,
+          accuracy: attempts > 0 ? Math.round((t.correctCount / attempts) * 100) : 0,
+          stealsCount: 0
+        };
+      }),
+      winnerNames,
+      isDraw,
+      totalQuestions: totalAnswered,
+      highestSingleHit: 100,
+      topCategory: "⚡ جولة البرق"
+    });
+  }
+
+  function openBlitzResultCard() {
+    const s = state.blitz;
+    if (!s) return;
+    const totalQ = s.teams.reduce((sum, t) => sum + t.correctCount + t.wrongCount, 0);
+    const totalCorrect = s.teams.reduce((sum, t) => sum + t.correctCount, 0);
+    openResultCardModal({
+      teams: s.teams.map((t, i) => ({ id: `team-${i}`, name: t.name, score: t.score })),
+      analytics: {
+        totalQuestions: totalQ,
+        overallAccuracy: totalQ > 0 ? Math.round((totalCorrect / totalQ) * 100) : 0,
+        totalSteals: 0,
+        totalDoubleWins: 0,
+        teamStats: s.teams.map((t) => ({
+          name: t.name,
+          correct: t.correctCount,
+          accuracy:
+            t.correctCount + t.wrongCount > 0
+              ? Math.round((t.correctCount / (t.correctCount + t.wrongCount)) * 100)
+              : 0
+        }))
+      },
+      matchEvents: [],
+      profileName: `${historyStore.getActiveProfile().name} • ⚡ جولة البرق`,
+      theme: state.theme,
+      timestamp: Date.now()
+    });
+  }
+
+  // --- 2) طور «من غير كلام» المستقل (Standalone Charades Mode) ---
+  function stopCsoloTimer() {
+    if (state.csoloTimerInterval) {
+      clearInterval(state.csoloTimerInterval);
+      state.csoloTimerInterval = null;
+    }
+  }
+
+  function renderCsoloSetupUI() {
+    const cfg = state.csoloConfig;
+    if (dom.csoloTeamCountPills) {
+      dom.csoloTeamCountPills.querySelectorAll("[data-csolo-teams]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.csoloTeams) === cfg.teamCount);
+      });
+    }
+    renderSideTeamInputs(dom.csoloTeamNamesInputs, cfg.teamCount, "اسم الفريق", false);
+
+    if (dom.csoloDurationPills) {
+      dom.csoloDurationPills.querySelectorAll("[data-csolo-dur]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.csoloDur) === cfg.durationSeconds);
+      });
+    }
+    if (dom.csoloRoundsPills) {
+      dom.csoloRoundsPills.querySelectorAll("[data-csolo-rounds]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.csoloRounds) === cfg.roundsPerTeam);
+      });
+    }
+    if (dom.csoloSkipPills) {
+      dom.csoloSkipPills.querySelectorAll("[data-csolo-skip]").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.csoloSkip) === cfg.skipLimit);
+      });
+    }
+
+    if (dom.csoloCategoriesChips && charadesEngine) {
+      const cats = charadesEngine.getCharadesCategories(state.allCategories);
+      dom.csoloCategoriesChips.innerHTML = "";
+      if (cats.length === 0) {
+        dom.csoloCategoriesChips.innerHTML = `<span class="empty-inline-note">لا توجد فئات «من غير كلام» متاحة حالياً.</span>`;
+        return;
+      }
+      cats.forEach((cat) => {
+        const selected = cfg.selectedCategoryIds.includes(cat.id);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `csolo-cat-chip${selected ? " active" : ""}`;
+        btn.dataset.catId = cat.id;
+        btn.textContent = `${cat.icon || "🎭"} ${cat.name.replace(/^من غير كلام\s*[-–:]\s*/i, "")}`;
+        btn.addEventListener("click", () => {
+          const idx = cfg.selectedCategoryIds.indexOf(cat.id);
+          if (idx >= 0) cfg.selectedCategoryIds.splice(idx, 1);
+          else cfg.selectedCategoryIds.push(cat.id);
+          btn.classList.toggle("active", cfg.selectedCategoryIds.includes(cat.id));
+        });
+        dom.csoloCategoriesChips.appendChild(btn);
+      });
+    }
+  }
+
+  function showOnlyCsoloSubView(viewName) {
+    if (dom.csoloSetupView) dom.csoloSetupView.hidden = viewName !== "setup";
+    if (dom.csoloReadyView) dom.csoloReadyView.hidden = viewName !== "ready";
+    if (dom.csoloPlayView) dom.csoloPlayView.hidden = viewName !== "playing";
+    if (dom.csoloSummaryView) dom.csoloSummaryView.hidden = viewName !== "turn-summary";
+    if (dom.csoloFinishView) dom.csoloFinishView.hidden = viewName !== "finished";
+  }
+
+  function openCharadesSoloModal() {
+    if (!charadesEngine || !dom.charadesSoloModal) return;
+    stopCsoloTimer();
+    state.charadesSolo = null;
+    state.csoloHoldActive = false;
+    state.csoloLastFeedback = null;
+    renderCsoloSetupUI();
+    showOnlyCsoloSubView("setup");
+    openModal(dom.charadesSoloModal);
+    if (wakeLock && state.setupSettings.wakeLockEnabled) wakeLock.syncForContext(true);
+  }
+
+  function closeCharadesSoloModal() {
+    stopCsoloTimer();
+    setCsoloHoldReveal(false);
+    state.charadesSolo = null;
+    state.csoloLastFeedback = null;
+    closeModal(dom.charadesSoloModal);
+    broadcastLiveDisplayState();
+    syncWakeLockForCurrentScreen();
+  }
+
+  function startCsoloSession() {
+    if (!charadesEngine) return;
+    const cfg = state.csoloConfig;
+    const teamNames = getSideTeamNames(dom.csoloTeamNamesInputs, cfg.teamCount, false);
+    const deck = charadesEngine.buildDeck({
+      allCategories: state.allCategories,
+      selectedCategoryIds: cfg.selectedCategoryIds,
+      parseHeaderFn: parseCharadesHeader,
+      historyStore,
+      flaggedStore
+    });
+
+    if (!deck || deck.length === 0) {
+      showToast("⚠️ لا توجد بطاقات «من غير كلام» متاحة للفئات المختارة!", "warning");
+      return;
+    }
+
+    state.charadesSolo = charadesEngine.createSession({
+      matchId: archiveStore ? archiveStore.generateMatchId("charades") : `charades_${Date.now()}`,
+      teamNames,
+      durationSeconds: cfg.durationSeconds,
+      roundsPerTeam: cfg.roundsPerTeam,
+      skipLimit: cfg.skipLimit,
+      deck
+    });
+    state.csoloLastFeedback = null;
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function setCsoloHoldReveal(isRevealing) {
+    state.csoloHoldActive = Boolean(isRevealing);
+    if (dom.csoloDecoyCard) dom.csoloDecoyCard.hidden = state.csoloHoldActive;
+    if (dom.csoloSecretCard) dom.csoloSecretCard.hidden = !state.csoloHoldActive;
+    if (dom.btnCsoloHoldReveal) {
+      dom.btnCsoloHoldReveal.classList.toggle("is-holding", state.csoloHoldActive);
+    }
+  }
+
+  function renderCsoloTimerUI() {
+    const s = state.charadesSolo;
+    if (!s) return;
+    const rem = Math.max(0, Number(s.timerRemaining) || 0);
+    const max = Math.max(1, Number(s.durationSeconds) || 90);
+    const pct = Math.min(100, (rem / max) * 100);
+    const isDanger = s.phase === "playing" && rem > 0 && rem <= 10;
+
+    if (dom.csoloTimerDisplay) {
+      dom.csoloTimerDisplay.textContent = formatTime(rem);
+      dom.csoloTimerDisplay.classList.toggle("danger", isDanger);
+    }
+    if (dom.csoloTimerProgress) {
+      dom.csoloTimerProgress.style.width = `${pct}%`;
+      dom.csoloTimerProgress.classList.toggle("danger", isDanger);
+    }
+    if (dom.btnCsoloPause) {
+      dom.btnCsoloPause.textContent = s.timerRunning ? "⏸️ إيقاف" : "▶️ استئناف";
+    }
+  }
+
+  function renderCsoloView() {
+    const s = state.charadesSolo;
+    if (!s) {
+      showOnlyCsoloSubView("setup");
+      return;
+    }
+    showOnlyCsoloSubView(s.phase);
+    const activeTeam = s.teams[s.activeTeamIdx] || s.teams[0];
+    const currentRound = s.currentRoundForTeam || Math.floor(s.currentTurnNumber / s.teams.length) + 1;
+
+    if (s.phase === "ready") {
+      if (dom.csoloReadyBadge) dom.csoloReadyBadge.textContent = `الجولة ${currentRound} من ${s.roundsPerTeam}`;
+      if (dom.csoloReadyTeamTitle) dom.csoloReadyTeamTitle.textContent = `دور التمثيل: ${activeTeam.name}`;
+      if (dom.csoloReadyDesc) {
+        dom.csoloReadyDesc.textContent = state.dualScreen.connected
+          ? `📺 شاشة التلفزيون متصلة — ستظهر الكلمة وفكرة التمثيل لك هنا سراً فقط بينما يشاهد الجمهور التصنيف وعدد الكلمات.`
+          : `يستعد الممثّل أمام الشاشة بينما يدير الفريق ظهره، ويستخدم زر الضغط المطوّل لكشف الكلمة سراً.`;
+      }
+      if (dom.csoloReadyScoreboard) {
+        dom.csoloReadyScoreboard.innerHTML = s.teams
+          .map(
+            (t, idx) =>
+              `<div class="side-mini-score-pill team-${idx + 1}-card"><span>${escapeHtml(t.name)}</span><strong>${t.score}</strong></div>`
+          )
+          .join("");
+      }
+    } else if (s.phase === "playing") {
+      if (dom.csoloPlayTeamName) dom.csoloPlayTeamName.textContent = activeTeam.name;
+      if (dom.csoloPlayTeamScore) dom.csoloPlayTeamScore.textContent = `${activeTeam.score} نقطة`;
+      if (dom.csoloSkipsPill) {
+        dom.csoloSkipsPill.textContent =
+          s.skipLimit === 0
+            ? "تخطي: غير محدود"
+            : `تخطي متبقي: ${Math.max(0, s.skipLimit - s.skipsUsedThisTurn)}`;
+      }
+      renderCsoloTimerUI();
+
+      const card = s.currentCard;
+      if (card) {
+        const hdr = card.header || { eyebrow: "🎭 من غير كلام", topic: card.categoryName, wordCount: "" };
+        if (dom.csoloEyebrow) dom.csoloEyebrow.textContent = hdr.eyebrow || "🎭 من غير كلام";
+        if (dom.csoloTopic) dom.csoloTopic.textContent = hdr.topic || card.categoryName;
+        if (dom.csoloWordCount) {
+          dom.csoloWordCount.textContent = `🔢 عدد الكلمات: ${hdr.wordCount || hdr.wordCountLabel || ""}`;
+        }
+
+        const isDual = state.dualScreen.connected;
+        if (dom.csoloHostSecretBox) dom.csoloHostSecretBox.hidden = !isDual;
+        if (dom.csoloHoldStage) dom.csoloHoldStage.hidden = isDual;
+
+        if (dom.csoloHostWord) dom.csoloHostWord.textContent = card.answer;
+        if (dom.csoloHostExpRow && dom.csoloHostExp) {
+          dom.csoloHostExp.textContent = card.explanation || "";
+          dom.csoloHostExpRow.hidden = !card.explanation;
+        }
+        if (dom.csoloSecretWord) dom.csoloSecretWord.textContent = card.answer;
+        if (dom.csoloSecretExp) {
+          dom.csoloSecretExp.textContent = card.explanation ? `🎬 فكرة التمثيل: ${card.explanation}` : "";
+          dom.csoloSecretExp.hidden = !card.explanation;
+        }
+
+        if (dom.csoloHintBox) {
+          if (s.hintRevealedForCurrent && card.hint) {
+            dom.csoloHintBox.textContent = `💡 تلميح للجمهور: ${card.hint}`;
+            dom.csoloHintBox.hidden = false;
+          } else {
+            dom.csoloHintBox.hidden = true;
+            dom.csoloHintBox.textContent = "";
+          }
+        }
+        if (dom.btnCsoloHint) {
+          dom.btnCsoloHint.disabled = !card.hint || s.hintRevealedForCurrent;
+          dom.btnCsoloHint.textContent = !card.hint
+            ? "💡 لا يوجد تلميح"
+            : s.hintRevealedForCurrent
+              ? "✓ التلميح ظاهر للجمهور"
+              : "💡 تلميح للجمهور";
+        }
+        if (dom.btnCsoloSkip && charadesEngine) {
+          dom.btnCsoloSkip.disabled = !charadesEngine.canSkipInCurrentTurn(s);
+        }
+      }
+    } else if (s.phase === "turn-summary") {
+      if (dom.csoloSummaryTitle) dom.csoloSummaryTitle.textContent = `⏰ انتهى دور ${activeTeam.name}!`;
+      const guessedCount = s.turnLog.filter((x) => x.outcome === "guessed").length;
+      const skippedCount = s.turnLog.filter((x) => x.outcome === "skip").length;
+      if (dom.csoloSummaryStats) {
+        dom.csoloSummaryStats.innerHTML = `
+          <span class="analytics-metric-chip">✅ تم التخمين: ${guessedCount} (+${guessedCount * 100})</span>
+          <span class="analytics-metric-chip">⏭️ تخطي: ${skippedCount}</span>
+        `;
+      }
+      if (dom.csoloSummaryList) {
+        dom.csoloSummaryList.innerHTML =
+          s.turnLog.length === 0
+            ? `<div class="empty-inline-note">لم تُخمَّن كلمات في هذا الدور.</div>`
+            : s.turnLog
+                .map((item) => {
+                  const tag =
+                    item.outcome === "guessed"
+                      ? `<span class="ev-tag tag-double">✅ +100</span>`
+                      : `<span class="ev-tag tag-swap">⏭️ تخطي</span>`;
+                  return `
+                    <div class="side-summary-item">
+                      <div class="side-summary-q">🎭 ${escapeHtml(item.answer || item.word)}</div>
+                      <div class="side-summary-bottom">
+                        <span class="side-summary-a">${escapeHtml(item.topic || item.categoryName)}</span>
+                        ${tag}
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("");
+      }
+      if (dom.btnCsoloNextTurn) {
+        const isLast = s.currentTurnNumber + 1 >= s.totalTurns;
+        dom.btnCsoloNextTurn.textContent = isLast ? "🏆 عرض النتيجة النهائية" : "الدور التالي ←";
+      }
+    } else if (s.phase === "finished") {
+      const winPayload = buildSideModeWinnerPayload(s.teams, "🎭 نهاية تحدي «من غير كلام»!");
+      if (dom.csoloFinishTitle) dom.csoloFinishTitle.textContent = winPayload.title;
+      if (dom.csoloFinishScores) {
+        dom.csoloFinishScores.dataset.teamCount = String(s.teams.length);
+        dom.csoloFinishScores.innerHTML = s.teams
+          .map((t, idx) => {
+            const isLeader = winPayload.leaderIndices.includes(idx);
+            return `
+              <div class="winner-team-box team-${idx + 1}-box${isLeader ? " is-winner" : ""}">
+                ${isLeader ? `<div class="winner-crown">👑 الفائز</div>` : ""}
+                <div class="winner-team-name">${escapeHtml(t.name)}</div>
+                <div class="winner-team-score">${t.score}</div>
+                <div class="winner-score-unit">✅ ${t.guessedCount} كلمة • ⏭️ ${t.skippedCount} تخطي</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+    }
+  }
+
+  function beginCsoloTurn() {
+    const s = state.charadesSolo;
+    if (!s || !charadesEngine) return;
+    setCsoloHoldReveal(false);
+    s.phase = "playing";
+    s.timerRemaining = s.durationSeconds;
+    s.timerRunning = true;
+    s.skipsUsedThisTurn = 0;
+    s.turnLog = [];
+    s.currentCard = charadesEngine.drawNextCard(s);
+    s.lastFeedback = null;
+
+    if (!s.currentCard) {
+      showToast("نفدت البطاقات المتاحة!", "warning");
+      finishCsoloTurn();
+      return;
+    }
+
+    stopCsoloTimer();
+    state.csoloTimerInterval = setInterval(() => {
+      if (!state.charadesSolo || state.charadesSolo.phase !== "playing" || !state.charadesSolo.timerRunning) return;
+      state.charadesSolo.timerRemaining = Math.max(0, state.charadesSolo.timerRemaining - 1);
+      if (
+        state.charadesSolo.timerRemaining > 0 &&
+        state.charadesSolo.timerRemaining <= 10 &&
+        window.SeenJeemAudio
+      ) {
+        window.SeenJeemAudio.playCharadesUrgentTick(state.charadesSolo.timerRemaining);
+      }
+      renderCsoloTimerUI();
+      broadcastLiveDisplayState();
+      if (state.charadesSolo.timerRemaining === 0) {
+        if (window.SeenJeemAudio) window.SeenJeemAudio.playTimeUp();
+        finishCsoloTurn();
+      }
+    }, 1000);
+
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function toggleCsoloPause() {
+    const s = state.charadesSolo;
+    if (!s || s.phase !== "playing") return;
+    s.timerRunning = !s.timerRunning;
+    renderCsoloTimerUI();
+    broadcastLiveDisplayState();
+  }
+
+  function handleCsoloGuessed() {
+    const s = state.charadesSolo;
+    if (!s || s.phase !== "playing" || !s.currentCard || !charadesEngine) return;
+    setCsoloHoldReveal(false);
+    const team = s.teams[s.activeTeamIdx];
+    const card = s.currentCard;
+
+    team.score += 100;
+    team.guessedCount += 1;
+    s.turnLog.push({
+      questionId: card.id,
+      topic: (card.header && card.header.topic) || card.categoryName,
+      answer: card.answer,
+      word: card.answer,
+      categoryName: card.categoryName,
+      outcome: "guessed"
+    });
+    // تسجيل الكلمة المخمَّنة كـ «ملعوبة» في historyStore
+    historyStore.markQuestionPlayed(card.id, Date.now());
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playScore(true);
+    s.lastFeedback = { type: "guessed", ts: Date.now() };
+
+    s.currentCard = charadesEngine.drawNextCard(s);
+    if (!s.currentCard) {
+      finishCsoloTurn();
+      return;
+    }
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function handleCsoloSkip() {
+    const s = state.charadesSolo;
+    if (!s || s.phase !== "playing" || !s.currentCard || !charadesEngine) return;
+    if (!charadesEngine.canSkipInCurrentTurn(s)) {
+      showToast("استنفدت حد التخطي المسموح في هذا الدور!", "warning");
+      return;
+    }
+    setCsoloHoldReveal(false);
+    const team = s.teams[s.activeTeamIdx];
+    const card = s.currentCard;
+
+    s.skipsUsedThisTurn += 1;
+    team.skippedCount += 1;
+    // لا تُسجَّل الكلمة المتخطّاة كـ «ملعوبة» في historyStore ليتمكن اللاعبون من رؤيتها لاحقاً
+    s.turnLog.push({
+      questionId: card.id,
+      topic: (card.header && card.header.topic) || card.categoryName,
+      answer: card.answer,
+      word: card.answer,
+      categoryName: card.categoryName,
+      outcome: "skip"
+    });
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playTick(false);
+    s.lastFeedback = { type: "skip", ts: Date.now() };
+
+    s.currentCard = charadesEngine.drawNextCard(s);
+    if (!s.currentCard) {
+      finishCsoloTurn();
+      return;
+    }
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function handleCsoloHint() {
+    const s = state.charadesSolo;
+    if (!s || s.phase !== "playing" || !s.currentCard || !s.currentCard.hint || s.hintRevealedForCurrent) return;
+    s.hintRevealedForCurrent = true;
+    if (window.SeenJeemAudio) window.SeenJeemAudio.playHint();
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function finishCsoloTurn() {
+    stopCsoloTimer();
+    setCsoloHoldReveal(false);
+    const s = state.charadesSolo;
+    if (!s) return;
+    s.timerRunning = false;
+    s.phase = "turn-summary";
+    renderCsoloView();
+    broadcastLiveDisplayState();
+  }
+
+  function advanceCsoloTurn() {
+    const s = state.charadesSolo;
+    if (!s) return;
+    s.currentTurnNumber += 1;
+    if (s.currentTurnNumber >= s.totalTurns) {
+      s.phase = "finished";
+      recordCsoloToArchive();
+      renderCsoloView();
+      broadcastLiveDisplayState();
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playVictory();
+      startVictoryConfetti("default");
+    } else {
+      s.activeTeamIdx = s.currentTurnNumber % s.teams.length;
+      s.currentRoundForTeam = Math.floor(s.currentTurnNumber / s.teams.length) + 1;
+      s.phase = "ready";
+      s.timerRemaining = s.durationSeconds;
+      s.skipsUsedThisTurn = 0;
+      s.turnLog = [];
+      renderCsoloView();
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function recordCsoloToArchive() {
+    const s = state.charadesSolo;
+    if (!archiveStore || !s) return;
+    const totalGuessed = s.teams.reduce((sum, t) => sum + t.guessedCount, 0);
+    const maxScore = s.teams.reduce((m, t) => Math.max(m, t.score), -Infinity);
+    const leaders = s.teams.filter((t) => t.score === maxScore);
+    const isDraw = s.teams.length > 1 && leaders.length > 1;
+    const winnerNames = leaders.map((t) => t.name);
+
+    archiveStore.recordCompletedMatch({
+      matchId: s.matchId,
+      profileId: historyStore.getActiveProfileId(),
+      mode: "charades",
+      playedAt: Date.now(),
+      teams: s.teams.map((t) => ({
+        name: t.name,
+        score: t.score,
+        accuracy:
+          t.guessedCount + t.skippedCount > 0
+            ? Math.round((t.guessedCount / (t.guessedCount + t.skippedCount)) * 100)
+            : 0,
+        stealsCount: 0
+      })),
+      winnerNames,
+      isDraw,
+      totalQuestions: totalGuessed,
+      highestSingleHit: 100,
+      topCategory: "🎭 من غير كلام"
+    });
+  }
+
+  function openCsoloResultCard() {
+    const s = state.charadesSolo;
+    if (!s) return;
+    const totalG = s.teams.reduce((sum, t) => sum + t.guessedCount, 0);
+    openResultCardModal({
+      teams: s.teams.map((t, i) => ({ id: `team-${i}`, name: t.name, score: t.score })),
+      analytics: {
+        totalQuestions: totalG,
+        overallAccuracy: 100,
+        totalSteals: 0,
+        totalDoubleWins: 0,
+        teamStats: s.teams.map((t) => ({ name: t.name, correct: t.guessedCount, accuracy: 100 }))
+      },
+      matchEvents: [],
+      profileName: `${historyStore.getActiveProfile().name} • 🎭 من غير كلام`,
+      theme: state.theme,
+      timestamp: Date.now()
+    });
+  }
+
+  // --- 3) قاعة المشاهير وأرشيف المباريات (Hall of Fame & Match Archive) ---
+  function recordClassicMatchToArchive() {
+    if (!archiveStore) return;
+    if (state.answeredThisRound <= 0 && (!state.matchEvents || state.matchEvents.length === 0)) return;
+    if (!state.matchId) {
+      state.matchId = archiveStore.generateMatchId("classic");
+    }
+
+    const an = computeMatchAnalytics();
+    const leaderIndices = finalRoundEngine
+      ? finalRoundEngine.getLeaderIndices(state.teams)
+      : [0];
+    const isDraw = leaderIndices.length !== 1;
+    const winnerNames = leaderIndices
+      .map((idx) => (state.teams[idx] ? state.teams[idx].name : ""))
+      .filter(Boolean);
+
+    const highestSingleHit = (state.matchEvents || []).reduce(
+      (max, ev) => (!ev.isFinalRound ? Math.max(max, Number(ev.effectivePoints) || 0) : max),
+      0
+    );
+    const topCat =
+      an.categories && an.categories.length > 0
+        ? an.categories.slice().sort((a, b) => b.total - a.total)[0].categoryName
+        : "";
+
+    archiveStore.recordCompletedMatch({
+      matchId: state.matchId,
+      profileId: historyStore.getActiveProfileId(),
+      mode: "classic",
+      playedAt: Date.now(),
+      teams: state.teams.map((t, idx) => {
+        const ts = an.teamStats[idx] || { stealsWon: 0, accuracy: 0 };
+        return {
+          name: t.name,
+          score: Number(t.score) || 0,
+          accuracy: Number(ts.accuracy) || 0,
+          stealsCount: Number(ts.stealsWon) || 0
+        };
+      }),
+      winnerNames,
+      isDraw,
+      totalQuestions: an.totalQuestions,
+      highestSingleHit,
+      topCategory: topCat
+    });
+  }
+
+  function openHallOfFameModal() {
+    if (!archiveStore || !dom.hallOfFameModal) return;
+    renderHallOfFameModal();
+    openModal(dom.hallOfFameModal);
+  }
+
+  function closeHallOfFameModal() {
+    closeModal(dom.hallOfFameModal);
+  }
+
+  function openArchivedMatchResultCard(record) {
+    if (!record || !Array.isArray(record.teams) || record.teams.length === 0) return;
+    const modeLabels = {
+      classic: "كلاسيكي",
+      blitz: "⚡ جولة البرق",
+      charades: "🎭 من غير كلام"
+    };
+    const totalAcc =
+      record.teams.length > 0
+        ? Math.round(
+            record.teams.reduce((s, t) => s + (Number(t.accuracy) || 0), 0) / record.teams.length
+          )
+        : 0;
+    openResultCardModal({
+      teams: record.teams.map((t, i) => ({
+        id: `team-${i}`,
+        name: t.name,
+        score: Number(t.score) || 0
+      })),
+      analytics: {
+        totalQuestions: Number(record.totalQuestions) || 0,
+        overallAccuracy: totalAcc,
+        totalSteals: record.teams.reduce((s, t) => s + (Number(t.stealsCount) || 0), 0),
+        totalDoubleWins: 0,
+        teamStats: record.teams.map((t) => ({
+          name: t.name,
+          correct: 0,
+          accuracy: Number(t.accuracy) || 0
+        }))
+      },
+      matchEvents: [],
+      profileName: `${historyStore.getActiveProfile().name} • ${
+        modeLabels[record.mode] || "كلاسيكي"
+      }`,
+      theme: state.theme,
+      timestamp: record.playedAt || Date.now()
+    });
+  }
+
+  function renderHallOfFameModal() {
+    if (!archiveStore) return;
+    const profile = historyStore.getActiveProfile();
+    const hof = archiveStore.computeHallOfFame(profile.id);
+    const filtered = archiveStore.getForProfile(profile.id, state.hofModeFilter);
+
+    if (dom.hofProfileSubtitle) {
+      dom.hofProfileSubtitle.textContent = `المجموعة النشطة: ${profile.name} • يتم حفظ آخر 50 مباراة تلقائياً لكل مجموعة`;
+    }
+    if (dom.hofTotalMatchesPill) {
+      dom.hofTotalMatchesPill.textContent = `${hof.totalMatches} مباراة`;
+    }
+    if (dom.btnHofClearArchive) {
+      dom.btnHofClearArchive.disabled = hof.totalMatches === 0;
+    }
+
+    if (dom.hofModeFilters) {
+      dom.hofModeFilters.querySelectorAll(".hof-filter-pill").forEach((pill) => {
+        pill.classList.toggle("active", pill.dataset.hofMode === state.hofModeFilter);
+      });
+    }
+
+    // 1) بطاقات الأرقام القياسية الأربع
+    if (dom.hofRecordsGrid) {
+      const r = hof.records;
+      dom.hofRecordsGrid.innerHTML = `
+        <div class="hof-record-card">
+          <div class="hof-rec-icon">💎</div>
+          <div class="hof-rec-val">${r.highestScore ? r.highestScore.score : "—"}</div>
+          <div class="hof-rec-lbl">أعلى رصيد في مباراة</div>
+          <div class="hof-rec-sub">${r.highestScore ? escapeHtml(r.highestScore.teamName) : "لا توجد مباريات بعد"}</div>
+        </div>
+        <div class="hof-record-card">
+          <div class="hof-rec-icon">🌟</div>
+          <div class="hof-rec-val">${r.highestSingleHit ? `+${r.highestSingleHit.points}` : "—"}</div>
+          <div class="hof-rec-lbl">أكبر ضربة سؤال كلاسيكي</div>
+          <div class="hof-rec-sub">${r.highestSingleHit ? escapeHtml(r.highestSingleHit.category || "مربع ذهبي / 2x") : "مضاعفة أو مربع ذهبي"}</div>
+        </div>
+        <div class="hof-record-card">
+          <div class="hof-rec-icon">👑</div>
+          <div class="hof-rec-val">${r.mostWinsTeam ? `${r.mostWinsTeam.wins} فوز` : "—"}</div>
+          <div class="hof-rec-lbl">أكثر فريق فوزاً</div>
+          <div class="hof-rec-sub">${r.mostWinsTeam ? `${escapeHtml(r.mostWinsTeam.name)} (${r.mostWinsTeam.winRate}%)` : "بانتظار الأبطال"}</div>
+        </div>
+        <div class="hof-record-card">
+          <div class="hof-rec-icon">🔥</div>
+          <div class="hof-rec-val">${r.longestWinStreak ? `×${r.longestWinStreak.streak}` : "—"}</div>
+          <div class="hof-rec-lbl">أطول سلسلة انتصارات</div>
+          <div class="hof-rec-sub">${r.longestWinStreak ? escapeHtml(r.longestWinStreak.name) : "انتصارات متتالية"}</div>
+        </div>
+      `;
+    }
+
+    // 2) جدول المتصدرين التراكمي
+    if (dom.hofLeaderboardWrap) {
+      if (hof.leaderboard.length === 0) {
+        dom.hofLeaderboardWrap.innerHTML = `<div class="empty-inline-note">أكمل أول مباراة ليظهر جدول المتصدرين التراكمي لمجموعة «${escapeHtml(profile.name)}».</div>`;
+      } else {
+        dom.hofLeaderboardWrap.innerHTML = `
+          <div class="hof-table-scroll">
+            <table class="hof-leaderboard-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>الفريق</th>
+                  <th>المباريات</th>
+                  <th>الفوز</th>
+                  <th>النسبة</th>
+                  <th>مجموع النقاط</th>
+                  <th>متوسط النقاط</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${hof.leaderboard
+                  .slice(0, 15)
+                  .map(
+                    (row, idx) => `
+                  <tr class="${idx === 0 ? "is-rank-1" : ""}">
+                    <td><strong>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}</strong></td>
+                    <td><strong>${escapeHtml(row.displayName)}</strong></td>
+                    <td>${row.matches}</td>
+                    <td>${row.wins}</td>
+                    <td>${row.winRate}%</td>
+                    <td><strong>${row.totalScore}</strong></td>
+                    <td>${row.avgScore}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    // 3) أرشيف المباريات
+    if (dom.hofArchiveList) {
+      if (filtered.length === 0) {
+        dom.hofArchiveList.innerHTML = `<div class="empty-inline-note">لا توجد مباريات محفوظة ضمن هذا التصنيف بعد.</div>`;
+        return;
+      }
+      const modeBadges = {
+        classic: `<span class="hof-mode-badge mode-classic">🎯 كلاسيكي</span>`,
+        blitz: `<span class="hof-mode-badge mode-blitz">⚡ البرق</span>`,
+        charades: `<span class="hof-mode-badge mode-charades">🎭 من غير كلام</span>`
+      };
+
+      dom.hofArchiveList.innerHTML = "";
+      filtered.forEach((rec) => {
+        const card = document.createElement("article");
+        card.className = "hof-archive-card";
+        const winnerSet = new Set(Array.isArray(rec.winnerNames) ? rec.winnerNames : []);
+        const primaryWinner = rec.winnerNames && rec.winnerNames[0] ? rec.winnerNames[0] : "";
+        const scoresHtml = rec.teams
+          .map(
+            (t, i) =>
+              `<span class="hof-team-chip team-${(i % 4) + 1}${!rec.isDraw && winnerSet.has(t.name) ? " is-winner" : ""}">${escapeHtml(t.name)}: <strong>${t.score}</strong></span>`
+          )
+          .join("");
+        const outcomeText = rec.isDraw
+          ? "🤝 تعادل"
+          : primaryWinner
+            ? `🏆 الفائز: ${escapeHtml(primaryWinner)}`
+            : "🏁 مكتملة";
+
+        card.innerHTML = `
+          <div class="hof-archive-top">
+            <div class="hof-archive-meta">
+              ${modeBadges[rec.mode] || modeBadges.classic}
+              <span class="hof-archive-date">${escapeHtml(formatTimestampArabic(rec.playedAt))}</span>
+              <span class="hof-archive-winner">${outcomeText}</span>
+            </div>
+            <div class="hof-archive-actions">
+              <button type="button" class="btn btn-gold-outline btn-xxs" data-hof-card="${escapeHtml(rec.matchId)}" title="توليد بطاقة نتيجة PNG لهذه المباراة">
+                📸 بطاقة النتيجة
+              </button>
+              <button type="button" class="btn btn-danger-outline btn-xxs" data-hof-del="${escapeHtml(rec.matchId)}" title="حذف السجل">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="hof-archive-teams">${scoresHtml}</div>
+          <div class="hof-archive-foot">
+            <span>📊 الأسئلة: <strong>${rec.totalQuestions}</strong></span>
+            ${rec.highestSingleHit > 0 && rec.mode === "classic" ? `<span>🌟 أكبر ضربة: <strong>+${rec.highestSingleHit}</strong></span>` : ""}
+            ${rec.topCategory ? `<span>🎯 ${escapeHtml(rec.topCategory)}</span>` : ""}
+          </div>
+        `;
+
+        const cardBtn = card.querySelector("[data-hof-card]");
+        if (cardBtn) {
+          cardBtn.addEventListener("click", () => openArchivedMatchResultCard(rec));
+        }
+        const delBtn = card.querySelector("[data-hof-del]");
+        if (delBtn) {
+          delBtn.addEventListener("click", () => {
+            archiveStore.deleteMatch(rec.matchId);
+            renderHallOfFameModal();
+            showToast("🗑️ تم حذف سجل المباراة من الأرشيف", "info");
+          });
+        }
+        dom.hofArchiveList.appendChild(card);
+      });
+    }
+  }
+
+  /* =========================================================
+     المرحلة الرابعة — الحزمة التاسعة:
+     التحكم اللاسلكي عبر QR Code + جرس السرعة + الرهان السري (Firebase RTDB)
+     ========================================================= */
+
+  function setWirelessFeedback(kind, msg) {
+    if (!dom.wirelessRoomFeedback) return;
+    if (!msg) {
+      dom.wirelessRoomFeedback.hidden = true;
+      dom.wirelessRoomFeedback.textContent = "";
+      return;
+    }
+    dom.wirelessRoomFeedback.hidden = false;
+    dom.wirelessRoomFeedback.className = `wireless-feedback-box is-${kind || "info"}`;
+    dom.wirelessRoomFeedback.textContent = msg;
+  }
+
+  function populateFirebaseSettingsInputs() {
+    if (!firebaseCfgStore) return;
+    const cfg = firebaseCfgStore.getConfig();
+    if (dom.fbApiKey) dom.fbApiKey.value = cfg.apiKey || "";
+    if (dom.fbAuthDomain) dom.fbAuthDomain.value = cfg.authDomain || "";
+    if (dom.fbDatabaseUrl) dom.fbDatabaseUrl.value = cfg.databaseURL || "";
+    if (dom.fbProjectId) dom.fbProjectId.value = cfg.projectId || "";
+    if (dom.fbAppId) dom.fbAppId.value = cfg.appId || "";
+  }
+
+  function readFirebaseSettingsFromForm() {
+    return {
+      apiKey: dom.fbApiKey ? dom.fbApiKey.value.trim() : "",
+      authDomain: dom.fbAuthDomain ? dom.fbAuthDomain.value.trim() : "",
+      databaseURL: dom.fbDatabaseUrl ? dom.fbDatabaseUrl.value.trim() : "",
+      projectId: dom.fbProjectId ? dom.fbProjectId.value.trim() : "",
+      appId: dom.fbAppId ? dom.fbAppId.value.trim() : ""
+    };
+  }
+
+  function saveFirebaseSettingsFromForm() {
+    if (!firebaseCfgStore) return;
+    const res = firebaseCfgStore.saveOverrideConfig(readFirebaseSettingsFromForm());
+    if (!res.ok) {
+      setWirelessFeedback("error", `❌ ${res.error}`);
+      return;
+    }
+    setWirelessFeedback("success", "✅ تم حفظ إعدادات Firebase محلياً — يمكنك الآن اختبار الاتصال أو إنشاء غرفة لاسلكية.");
+    showToast("💾 تم حفظ إعدادات Firebase محلياً", "success");
+  }
+
+  async function testFirebaseConnectionFromForm() {
+    if (!realtimeSync) return;
+    const cfg = readFirebaseSettingsFromForm();
+    setWirelessFeedback("info", "⏳ جاري الاتصال بـ Firebase وتسجيل الدخول المجهول...");
+    if (dom.btnFbTestConn) dom.btnFbTestConn.disabled = true;
+    const res = await realtimeSync.testConnection(cfg);
+    if (dom.btnFbTestConn) dom.btnFbTestConn.disabled = false;
+    if (res.ok) {
+      setWirelessFeedback("success", `✅ ${res.message}`);
+      showToast("🔌 تم التحقق من اتصال Firebase بنجاح!", "success");
+    } else {
+      setWirelessFeedback("error", `❌ ${res.error}`);
+    }
+  }
+
+  function openWirelessRoomModal() {
+    if (!dom.wirelessRoomModal) return;
+    populateFirebaseSettingsInputs();
+    if (firebaseCfgStore && !firebaseCfgStore.isConfigured() && !state.wireless.active) {
+      state.wireless.settingsOpen = true;
+    }
+    renderWirelessRoomModal();
+    openModal(dom.wirelessRoomModal);
+  }
+
+  function closeWirelessRoomModal() {
+    closeModal(dom.wirelessRoomModal);
+  }
+
+  function renderWirelessRoomModal() {
+    const wl = state.wireless;
+
+    if (dom.wirelessSettingsPanel) {
+      dom.wirelessSettingsPanel.hidden = !wl.settingsOpen;
+    }
+    if (dom.btnToggleWirelessSettings) {
+      dom.btnToggleWirelessSettings.setAttribute("aria-expanded", String(Boolean(wl.settingsOpen)));
+    }
+
+    if (dom.wirelessConnBadge) {
+      if (!wl.active) {
+        dom.wirelessConnBadge.className = "dual-status-pill is-single";
+        dom.wirelessConnBadge.textContent = "⚪ الوضع المحلي (الغرفة غير مفعّلة)";
+      } else if (wl.connected) {
+        dom.wirelessConnBadge.className = "dual-status-pill is-connected";
+        dom.wirelessConnBadge.textContent = "🟢 الغرفة اللاسلكية متصلة";
+      } else {
+        dom.wirelessConnBadge.className = "dual-status-pill is-single";
+        dom.wirelessConnBadge.textContent = "🟡 جاري إعادة الاتصال بـ Firebase...";
+      }
+    }
+
+    if (dom.btnOpenWirelessGameLabel) {
+      dom.btnOpenWirelessGameLabel.textContent = wl.active ? `📡 ${wl.roomCode}` : "لاسلكي";
+    }
+    if (dom.btnOpenWirelessGame) {
+      dom.btnOpenWirelessGame.classList.toggle("is-live", wl.active);
+    }
+
+    if (dom.wirelessRoomCodePill) dom.wirelessRoomCodePill.hidden = !wl.active;
+    if (dom.wirelessRoomCodeText) dom.wirelessRoomCodeText.textContent = wl.roomCode || "------";
+    if (dom.btnCreateWirelessRoom) dom.btnCreateWirelessRoom.hidden = wl.active;
+    if (dom.btnCloseWirelessRoom) dom.btnCloseWirelessRoom.hidden = !wl.active;
+    if (dom.wirelessQrGrid) dom.wirelessQrGrid.hidden = !wl.active;
+    if (dom.wirelessBuzzerPanel) dom.wirelessBuzzerPanel.hidden = !wl.active;
+
+    if (wl.active) {
+      if (dom.wirelessHostQrBox && dom.wirelessHostQrMasked) {
+        dom.wirelessHostQrBox.hidden = wl.hostQrHidden;
+        dom.wirelessHostQrMasked.hidden = !wl.hostQrHidden;
+        if (!wl.hostQrHidden && qrGenerator && wl.remoteUrl && dom.wirelessHostQrBox.dataset.qrUrl !== wl.remoteUrl) {
+          dom.wirelessHostQrBox.dataset.qrUrl = wl.remoteUrl;
+          dom.wirelessHostQrBox.innerHTML = qrGenerator.toSVG(wl.remoteUrl, {
+            size: 196,
+            margin: 3,
+            ariaLabel: "رمز QR السري لريموت المقدّم"
+          });
+        }
+      }
+      if (dom.btnToggleHostQrPrivacy) {
+        dom.btnToggleHostQrPrivacy.textContent = wl.hostQrHidden ? "👁️ إظهار QR المقدّم" : "🙈 إخفاء QR المقدّم";
+      }
+      if (dom.linkOpenRemoteTab) dom.linkOpenRemoteTab.href = wl.remoteUrl || "#";
+
+      if (dom.wirelessPlayerQrBox && qrGenerator && wl.playerUrl && dom.wirelessPlayerQrBox.dataset.qrUrl !== wl.playerUrl) {
+        dom.wirelessPlayerQrBox.dataset.qrUrl = wl.playerUrl;
+        dom.wirelessPlayerQrBox.innerHTML = qrGenerator.toSVG(wl.playerUrl, {
+          size: 196,
+          margin: 3,
+          ariaLabel: `رمز QR لانضمام الفرق للغرفة ${wl.roomCode}`
+        });
+      }
+      if (dom.wirelessPlayerCodeBig) dom.wirelessPlayerCodeBig.textContent = wl.roomCode || "------";
+      if (dom.linkOpenPlayerTab) dom.linkOpenPlayerTab.href = wl.playerUrl || "#";
+      if (dom.btnToggleTvQr) {
+        dom.btnToggleTvQr.textContent = wl.showQrOnTv ? "🙈 إخفاء QR من التلفزيون" : "📺 إظهار QR على التلفزيون";
+      }
+
+      renderWirelessConnectedTeamsUI();
+    }
+
+    renderWirelessBuzzerBars();
+  }
+
+  function renderWirelessConnectedTeamsUI() {
+    if (!dom.wirelessConnectedTeams) return;
+    const counts = {};
+    Object.values(state.wireless.playersMap || {}).forEach((p) => {
+      if (p && Number.isInteger(Number(p.teamIdx))) {
+        const idx = Number(p.teamIdx);
+        counts[idx] = (counts[idx] || 0) + 1;
+      }
+    });
+    const teams = state.teams && state.teams.length ? state.teams : [];
+    dom.wirelessConnectedTeams.innerHTML = teams
+      .map(
+        (t, idx) =>
+          `<span class="wireless-team-count-chip team-${idx + 1}"><span class="team-badge-dot team-${idx + 1}-dot"></span>${escapeHtml(t.name)}: <strong>${counts[idx] || 0} 📱</strong></span>`
+      )
+      .join("");
+  }
+
+  function renderWirelessBuzzerBars() {
+    const wl = state.wireless;
+    const bz = wl.buzzer;
+
+    if (dom.wirelessBuzzerHostBar) {
+      dom.wirelessBuzzerHostBar.hidden = !wl.active;
+    }
+
+    let summaryText = "🔒 مقفل";
+    if (bz.state === "open") {
+      summaryText = "🔔 مفتوح الآن للفرق — بانتظار أسرع ضغطة!";
+    } else if (bz.state === "buzzed" && bz.winnerTeamName) {
+      const deltaTxt =
+        bz.runnerUpDeltaMs !== null && bz.runnerUpDeltaMs !== undefined
+          ? ` (+${bz.runnerUpDeltaMs}ms عن الثاني)`
+          : "";
+      summaryText = `🏆 الأسرع: ${bz.winnerTeamName}${deltaTxt}`;
+    }
+
+    if (dom.wbStatusText) dom.wbStatusText.textContent = summaryText;
+    if (dom.wirelessBuzzerStatePill) {
+      dom.wirelessBuzzerStatePill.textContent =
+        bz.state === "open" ? "🔔 مفتوح" : bz.state === "buzzed" ? `🏆 ${bz.winnerTeamName}` : "🔒 مقفل";
+    }
+    if (dom.wirelessBuzzerResultBox) {
+      dom.wirelessBuzzerResultBox.textContent = summaryText;
+    }
+  }
+
+  function buildWirelessHostPrivatePayload() {
+    const priv = {
+      updatedAt: Date.now(),
+      dailyDoubleKeys: [],
+      questionText: null,
+      answerText: null,
+      hintText: null,
+      explanationText: null,
+      blitzAnswer: null,
+      csoloWord: null,
+      csoloExp: null,
+      finalAnswer: null,
+      receivedWagers: state.wireless.receivedWagers || {}
+    };
+
+    if (Array.isArray(state.boardCategories)) {
+      state.boardCategories.forEach((bc, catIdx) => {
+        ["rightColumn", "leftColumn"].forEach((colKey) => {
+          (bc[colKey] || []).forEach((slot, slotIdx) => {
+            if (slot && slot.isDailyDouble && !slot.played) {
+              priv.dailyDoubleKeys.push(`${catIdx}:${colKey}:${slotIdx}`);
+            }
+          });
+        });
+      });
+    }
+
+    if (state.currentQ && state.currentQ.question) {
+      const q = state.currentQ.question;
+      priv.questionText = q.question || "";
+      priv.answerText = q.answer || "";
+      priv.hintText = q.hint || "";
+      priv.explanationText = q.explanation || "";
+    }
+
+    if (state.blitz && state.blitz.currentQuestion) {
+      priv.blitzAnswer = state.blitz.currentQuestion.answer || "";
+    }
+
+    if (state.charadesSolo && state.charadesSolo.currentCard) {
+      priv.csoloWord = state.charadesSolo.currentCard.answer || "";
+      priv.csoloExp = state.charadesSolo.currentCard.explanation || "";
+    }
+
+    if (state.finalRound && state.finalRound.question) {
+      priv.finalAnswer = state.finalRound.question.answer || "";
+    }
+
+    return priv;
+  }
+
+  function publishWirelessSnapshot(rawSnapshot) {
+    if (!state.wireless.active || !realtimeSync || !realtimeSync.isActive()) return;
+    // تطبيق نفس تنقية Anti-Spoiler الصارمة المستخدمة لشاشة التلفزيون
+    const cleanPublic =
+      liveSync && typeof liveSync.sanitizeSnapshot === "function"
+        ? liveSync.sanitizeSnapshot(rawSnapshot)
+        : rawSnapshot;
+    cleanPublic.buzzer = { ...state.wireless.buzzer };
+    const hostPrivate = buildWirelessHostPrivatePayload();
+    realtimeSync.publishStates(cleanPublic, hostPrivate);
+  }
+
+  async function createWirelessRoom() {
+    if (!realtimeSync) return;
+    if (!firebaseCfgStore || !firebaseCfgStore.isConfigured()) {
+      state.wireless.settingsOpen = true;
+      renderWirelessRoomModal();
+      setWirelessFeedback("warning", "⚠️ يرجى إدخال وحفظ إعدادات Firebase أولاً قبل إنشاء الغرفة اللاسلكية.");
+      return;
+    }
+
+    setWirelessFeedback("info", "⏳ جاري إنشاء الغرفة اللاسلكية وتوليد رموز QR المحلية...");
+    if (dom.btnCreateWirelessRoom) dom.btnCreateWirelessRoom.disabled = true;
+
+    try {
+      const info = await realtimeSync.createRoom({
+        onCommand: (cmd) => handleRemoteHostCommand(cmd),
+        onBuzzes: (allBuzzes) => handleIncomingBuzzes(allBuzzes),
+        onWagers: (allWagers) => handleIncomingWagers(allWagers),
+        onPlayers: (playersMap) => handleIncomingPlayers(playersMap),
+        onConnectionState: (isConn) => {
+          state.wireless.connected = isConn;
+          renderWirelessRoomModal();
+        }
+      });
+
+      state.wireless.active = true;
+      state.wireless.connected = true;
+      state.wireless.roomCode = info.roomCode;
+      state.wireless.hostToken = info.hostToken;
+      state.wireless.remoteUrl = info.remoteUrl;
+      state.wireless.playerUrl = info.playerUrl;
+      state.wireless.hostQrHidden = false;
+      state.wireless.settingsOpen = false;
+      state.wireless.buzzer = {
+        state: "locked",
+        roundId: "",
+        winnerTeamIdx: null,
+        winnerTeamName: "",
+        runnerUpDeltaMs: null
+      };
+
+      setWirelessFeedback("success", `✅ تم إنشاء الغرفة ${info.roomCode} بنجاح — امسح QR المقدّم بهاتفك ثم أخفه قبل عرض الشاشة للاعبين.`);
+      renderWirelessRoomModal();
+      broadcastLiveDisplayState();
+      showToast(`📡 الغرفة اللاسلكية ${info.roomCode} جاهزة الآن!`, "success");
+    } catch (err) {
+      setWirelessFeedback("error", `❌ ${(err && err.message) || "تعذّر إنشاء الغرفة اللاسلكية."}`);
+    } finally {
+      if (dom.btnCreateWirelessRoom) dom.btnCreateWirelessRoom.disabled = false;
+    }
+  }
+
+  async function closeWirelessRoom() {
+    if (!realtimeSync) return;
+    await realtimeSync.closeRoom();
+    state.wireless.active = false;
+    state.wireless.connected = false;
+    state.wireless.roomCode = "";
+    state.wireless.hostToken = "";
+    state.wireless.remoteUrl = "";
+    state.wireless.playerUrl = "";
+    state.wireless.showQrOnTv = false;
+    state.wireless.playersMap = {};
+    state.wireless.receivedWagers = {};
+    state.wireless.buzzer = {
+      state: "locked",
+      roundId: "",
+      winnerTeamIdx: null,
+      winnerTeamName: "",
+      runnerUpDeltaMs: null
+    };
+    setWirelessFeedback("info", "تم إغلاق الغرفة اللاسلكية وحذف بياناتها من Firebase بنجاح.");
+    renderWirelessRoomModal();
+    broadcastLiveDisplayState();
+    showToast("🔴 تم إغلاق الغرفة اللاسلكية", "info");
+  }
+
+  function openSpeedBuzzer() {
+    if (!state.wireless.active) return;
+    const roundId = `bz_${Date.now().toString(36)}`;
+    state.wireless.buzzer = {
+      state: "open",
+      roundId,
+      winnerTeamIdx: null,
+      winnerTeamName: "",
+      runnerUpDeltaMs: null
+    };
+    if (realtimeSync) realtimeSync.clearBuzzRound(roundId);
+    renderWirelessBuzzerBars();
+    broadcastLiveDisplayState();
+    showToast("🔔 تم فتح جرس السرعة لجميع الفرق!", "info");
+  }
+
+  function lockSpeedBuzzer() {
+    if (!state.wireless.active) return;
+    state.wireless.buzzer.state = "locked";
+    renderWirelessBuzzerBars();
+    broadcastLiveDisplayState();
+  }
+
+  function resetSpeedBuzzer() {
+    if (!state.wireless.active) return;
+    const prevRound = state.wireless.buzzer.roundId;
+    state.wireless.buzzer = {
+      state: "locked",
+      roundId: "",
+      winnerTeamIdx: null,
+      winnerTeamName: "",
+      runnerUpDeltaMs: null
+    };
+    if (realtimeSync && prevRound) realtimeSync.clearBuzzRound(prevRound);
+    renderWirelessBuzzerBars();
+    broadcastLiveDisplayState();
+  }
+
+  function handleIncomingBuzzes(allBuzzes) {
+    if (!state.wireless.active) return;
+    const bz = state.wireless.buzzer;
+    if (!bz.roundId || (bz.state !== "open" && bz.state !== "buzzed")) return;
+
+    const roundEntries = allBuzzes && allBuzzes[bz.roundId];
+    if (!roundEntries || typeof roundEntries !== "object") return;
+
+    const sorted = Object.values(roundEntries)
+      .filter((e) => e && typeof e.ts === "number")
+      .sort((a, b) => a.ts - b.ts);
+
+    if (sorted.length === 0) return;
+
+    const first = sorted[0];
+    const second = sorted[1] || null;
+    const deltaMs = second ? Math.max(0, Math.round(second.ts - first.ts)) : null;
+    const wasOpen = bz.state === "open";
+
+    state.wireless.buzzer = {
+      state: "buzzed",
+      roundId: bz.roundId,
+      winnerTeamIdx: Number(first.teamIdx),
+      winnerTeamName: first.teamName || (state.teams[first.teamIdx] && state.teams[first.teamIdx].name) || "فريق",
+      runnerUpDeltaMs: deltaMs
+    };
+
+    if (wasOpen) {
+      if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playBuzzerWin === "function") {
+        window.SeenJeemAudio.playBuzzerWin();
+      }
+      showToast(`🔔 الأسرع بالجرس: ${state.wireless.buzzer.winnerTeamName}!`, "success");
+    }
+
+    renderWirelessBuzzerBars();
+    broadcastLiveDisplayState();
+  }
+
+  function handleIncomingWagers(allWagers) {
+    if (!state.wireless.active || !state.finalRound) return;
+    const fr = state.finalRound;
+    const roundKey = `r${fr.roundNumber || 1}`;
+    const roundWagers = (allWagers && allWagers[roundKey]) || {};
+    state.wireless.receivedWagers = roundWagers;
+
+    let changed = false;
+    Object.keys(roundWagers).forEach((teamKey) => {
+      const entry = roundWagers[teamKey];
+      if (!entry || !Number.isInteger(Number(entry.teamIdx))) return;
+      const idx = Number(entry.teamIdx);
+      if (fr.wagers && fr.wagers[idx]) {
+        const clamped = Math.max(0, Math.min(fr.wagers[idx].maxWager, Math.round(Number(entry.amount) || 0)));
+        if (fr.phase === "wager") {
+          if (fr.wagers[idx].amount !== clamped || fr.wagers[idx].locked !== Boolean(entry.locked)) {
+            fr.wagers[idx].amount = clamped;
+            fr.wagers[idx].locked = Boolean(entry.locked);
+            changed = true;
+          }
+        }
+      }
+    });
+
+    if (changed) {
+      renderFinalRoundModal();
+      persistActiveMatch();
+    } else {
+      broadcastLiveDisplayState();
+    }
+  }
+
+  function handleIncomingPlayers(playersMap) {
+    state.wireless.playersMap = playersMap && typeof playersMap === "object" ? playersMap : {};
+    renderWirelessConnectedTeamsUI();
+  }
+
+  function handleRemoteHostCommand(cmd) {
+    if (!cmd || typeof cmd.type !== "string") return;
+    const p = cmd.payload && typeof cmd.payload === "object" ? cmd.payload : {};
+
+    switch (cmd.type) {
+      case "OPEN_CELL":
+        if (dom.gameScreen.classList.contains("active") && !state.currentQ) {
+          openQuestionModal(Number(p.catIdx), p.colKey === "leftColumn" ? "leftColumn" : "rightColumn", Number(p.slotIdx));
+        }
+        break;
+      case "TOGGLE_DOUBLE_ARM":
+        toggleArmDoublePoints(state.activeTurn);
+        break;
+      case "REVEAL_HINT":
+        useQuestionHint();
+        break;
+      case "REVEAL_ANSWER":
+        revealAnswer(false);
+        break;
+      case "AWARD_TEAM":
+        if (state.currentQ && state.currentQ.isDailyDouble && typeof p.dailyDoubleSuccess === "boolean") {
+          resolveDailyDouble(p.dailyDoubleSuccess);
+        } else {
+          awardQuestion(p.teamIdx === null || p.teamIdx === undefined ? null : Number(p.teamIdx));
+        }
+        break;
+      case "WRONG_ANSWER":
+        handleWrongAnswerClick();
+        break;
+      case "OPEN_STEAL":
+        openStealPhase();
+        break;
+      case "STEAL_RESULT":
+        if (p.skip) closeWithoutPointsAndReveal();
+        else resolveSteal(Boolean(p.success));
+        break;
+      case "SWAP_QUESTION":
+        swapCurrentQuestion();
+        break;
+      case "TOGGLE_TIMER":
+        toggleTimer();
+        break;
+      case "RESET_TIMER":
+        if (dom.btnTimerReset && !dom.btnTimerReset.disabled) dom.btnTimerReset.click();
+        break;
+      case "SET_DAILY_DOUBLE_WAGER":
+        if (state.currentQ && state.currentQ.isDailyDouble && state.currentQ.dailyDoublePhase === "wager") {
+          if (dom.ddWagerInput && Number.isFinite(Number(p.wager))) {
+            dom.ddWagerInput.value = String(Math.round(Number(p.wager)));
+          }
+          lockDailyDoubleWager();
+        }
+        break;
+      case "PLAY_SFX":
+        if (typeof p.sfx === "string") triggerSoundboardEffect(p.sfx);
+        break;
+      case "TOGGLE_INTERMISSION":
+        if (state.intermission && state.intermission.active) stopIntermission(false);
+        else startIntermission(state.intermission ? state.intermission.message : "", 0);
+        break;
+      case "REFEREE_ACTION":
+        if (p.setTurn && Number.isInteger(Number(p.teamIdx))) {
+          setActiveTurnManually(Number(p.teamIdx));
+        } else if (Number.isInteger(Number(p.teamIdx)) && Number(p.delta)) {
+          adjustScore(Number(p.teamIdx), Number(p.delta), true);
+        }
+        break;
+      case "UNDO":
+        if (dom.questionModal.classList.contains("open") && state.currentQ) {
+          performInModalUndo();
+        } else {
+          const wasWirelessOpen = dom.wirelessRoomModal && dom.wirelessRoomModal.classList.contains("open");
+          if (wasWirelessOpen) closeWirelessRoomModal();
+          performUndo();
+          if (wasWirelessOpen) openWirelessRoomModal();
+        }
+        break;
+      case "BUZZER_OPEN":
+        openSpeedBuzzer();
+        break;
+      case "BUZZER_LOCK":
+        lockSpeedBuzzer();
+        break;
+      case "BUZZER_RESET":
+        resetSpeedBuzzer();
+        break;
+      case "BLITZ_ACTION":
+        if (p.action === "correct" || p.action === "skip" || p.action === "wrong") handleBlitzJudge(p.action);
+        else if (p.action === "pause") toggleBlitzPause();
+        else if (p.action === "begin") beginBlitzTurn();
+        else if (p.action === "next") advanceBlitzTurn();
+        break;
+      case "CHARADES_ACTION":
+        if (p.action === "guessed") handleCsoloGuessed();
+        else if (p.action === "skip") handleCsoloSkip();
+        else if (p.action === "hint") handleCsoloHint();
+        else if (p.action === "pause") toggleCsoloPause();
+        else if (p.action === "begin") beginCsoloTurn();
+        else if (p.action === "next") advanceCsoloTurn();
+        break;
+      case "FINAL_ROUND_ACTION":
+        if (!state.finalRound) break;
+        if (p.action === "start-question") {
+          state.finalRound.participantIndices.forEach((idx) => {
+            if (state.finalRound.wagers[idx]) state.finalRound.wagers[idx].locked = true;
+          });
+          proceedToFinalQuestionPhase();
+        } else if (p.action === "judge" && Number.isInteger(Number(p.teamIdx))) {
+          state.finalRound.judgments[Number(p.teamIdx)] = p.correct ? "correct" : "wrong";
+          renderFinalRoundModal();
+          persistActiveMatch();
+        } else if (p.action === "reveal") {
+          resolveFinalRoundResults();
+        }
+        break;
+      default:
+        break;
     }
   }
 
@@ -7156,9 +11021,27 @@
       dom.tacticalSetupPanel.querySelectorAll(".tactical-opt-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
           const key = btn.dataset.setting;
-          const val = Number(btn.dataset.value);
-          if (key && Number.isFinite(val)) {
-            updateSetupSetting({ [key]: val });
+          const rawVal = btn.dataset.value;
+          if (!key) return;
+          if (key === "finalRoundMode") {
+            updateSetupSetting({ [key]: String(rawVal || "tie-only") });
+          } else {
+            const val = Number(rawVal);
+            if (Number.isFinite(val)) {
+              updateSetupSetting({ [key]: val });
+            }
+          }
+        });
+      });
+    }
+    if (dom.teamCountSelector) {
+      dom.teamCountSelector.querySelectorAll(".team-count-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          const count = Number(pill.dataset.teamCount);
+          if (count === 2 || count === 3 || count === 4) {
+            updateSetupSetting({ teamCount: count });
+            renderTeamCountSetupUI();
+            if (state.dualScreen.connected) broadcastLiveDisplayState();
           }
         });
       });
@@ -7531,16 +11414,102 @@
     if (dom.btnHostProjectHint) {
       dom.btnHostProjectHint.addEventListener("click", useQuestionHint);
     }
-    if (dom.team1Input) {
-      dom.team1Input.addEventListener("input", () => {
+    [dom.team1Input, dom.team2Input, dom.team3Input, dom.team4Input].forEach((inp) => {
+      if (!inp) return;
+      inp.addEventListener("input", () => {
         if (state.dualScreen.connected) broadcastLiveDisplayState();
       });
-    }
-    if (dom.team2Input) {
-      dom.team2Input.addEventListener("input", () => {
-        if (state.dualScreen.connected) broadcastLiveDisplayState();
+    });
+
+    // أحداث الحزمة الخامسة: جولة الرهان النهائي + التحكم التحكيمي السريع
+    if (dom.btnStartTiebreakerFromWinner) {
+      dom.btnStartTiebreakerFromWinner.addEventListener("click", () => {
+        startFinalRound("manual", 1, []);
       });
     }
+    if (dom.btnFinalCancel) {
+      dom.btnFinalCancel.addEventListener("click", cancelFinalRound);
+    }
+    if (dom.btnFinalReroll) {
+      dom.btnFinalReroll.addEventListener("click", rerollFinalQuestion);
+    }
+    if (dom.btnFinalShowQuestion) {
+      dom.btnFinalShowQuestion.addEventListener("click", proceedToFinalQuestionPhase);
+    }
+    if (dom.btnFinalTimerToggle) {
+      dom.btnFinalTimerToggle.addEventListener("click", toggleFinalRoundTimer);
+    }
+    if (dom.btnFinalTimerReset) {
+      dom.btnFinalTimerReset.addEventListener("click", resetFinalRoundTimer);
+    }
+    if (dom.btnFinalRevealResults) {
+      dom.btnFinalRevealResults.addEventListener("click", resolveFinalRoundResults);
+    }
+    if (dom.btnFinalExtraTiebreaker) {
+      dom.btnFinalExtraTiebreaker.addEventListener("click", startExtraTieBreakerRound);
+    }
+    if (dom.btnFinalGoWinner) {
+      dom.btnFinalGoWinner.addEventListener("click", finishFinalRoundToWinner);
+    }
+
+    // قائمة التحكم التحكيمي السريع (Referee Popover)
+    if (dom.btnCloseRefereePopover) {
+      dom.btnCloseRefereePopover.addEventListener("click", closeRefereePopover);
+    }
+    if (dom.btnRefereeApplyDelta) {
+      dom.btnRefereeApplyDelta.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx === null || !dom.refereeCustomDeltaInput) return;
+        const val = Number(dom.refereeCustomDeltaInput.value);
+        if (!Number.isFinite(val) || val === 0) {
+          showToast("أدخل قيمة موجبة أو سالبة صالحة (مثال: 150 أو -50)", "warning");
+          return;
+        }
+        adjustScore(state.refereePopoverTeamIdx, val, true);
+        dom.refereeCustomDeltaInput.value = "";
+      });
+    }
+    if (dom.refereePopover) {
+      dom.refereePopover.querySelectorAll(".ref-delta-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          if (state.refereePopoverTeamIdx === null) return;
+          adjustScore(state.refereePopoverTeamIdx, Number(chip.dataset.refDelta), true);
+        });
+      });
+    }
+    if (dom.btnRefDoubleMinus) {
+      dom.btnRefDoubleMinus.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx !== null) adjustTeamPowerup(state.refereePopoverTeamIdx, "double", -1);
+      });
+    }
+    if (dom.btnRefDoublePlus) {
+      dom.btnRefDoublePlus.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx !== null) adjustTeamPowerup(state.refereePopoverTeamIdx, "double", 1);
+      });
+    }
+    if (dom.btnRefSwapMinus) {
+      dom.btnRefSwapMinus.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx !== null) adjustTeamPowerup(state.refereePopoverTeamIdx, "swap", -1);
+      });
+    }
+    if (dom.btnRefSwapPlus) {
+      dom.btnRefSwapPlus.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx !== null) adjustTeamPowerup(state.refereePopoverTeamIdx, "swap", 1);
+      });
+    }
+    if (dom.btnRefSetTurn) {
+      dom.btnRefSetTurn.addEventListener("click", () => {
+        if (state.refereePopoverTeamIdx !== null) {
+          setActiveTurnManually(state.refereePopoverTeamIdx);
+          closeRefereePopover();
+        }
+      });
+    }
+    document.addEventListener("click", (e) => {
+      if (state.refereePopoverTeamIdx === null || !dom.refereePopover || dom.refereePopover.hidden) return;
+      if (!dom.refereePopover.contains(e.target) && !e.target.closest(".btn-open-referee")) {
+        closeRefereePopover();
+      }
+    });
 
     if (dom.btnRematchRound) {
       dom.btnRematchRound.addEventListener("click", startNewGame);
@@ -7604,19 +11573,22 @@
     }
 
     // قسم الأسئلة المحدّدة للمراجعة داخل إدارة البنك
+    if (dom.btnCopyFlaggedReport) {
+      dom.btnCopyFlaggedReport.addEventListener("click", copyFlaggedReport);
+    }
+    if (dom.btnExportFlaggedJson) {
+      dom.btnExportFlaggedJson.addEventListener("click", exportFlaggedAsJSON);
+    }
     if (dom.btnExportFlaggedCsv) {
       dom.btnExportFlaggedCsv.addEventListener("click", exportFlaggedAsCSV);
-    }
-    if (dom.btnCopyFlaggedJson) {
-      dom.btnCopyFlaggedJson.addEventListener("click", copyFlaggedAsJSON);
     }
     if (dom.btnClearAllFlagged) {
       dom.btnClearAllFlagged.addEventListener("click", () => {
         if (!flaggedStore || flaggedStore.getCount() === 0) return;
-        openConfirmModal({
+        openConfirmDialog({
           title: "مسح جميع الأسئلة المحدّدة للمراجعة؟",
-          message: `سيتم حذف ${flaggedStore.getCount()} سؤالاً من قائمة المراجعة المحلية (يمكنك تصدير CSV قبل المسح).`,
-          okText: "نعم، امسح القائمة",
+          message: `سيتم حذف ${flaggedStore.getCount()} سؤالاً من قائمة المراجعة المحلية (يمكنك تصدير JSON أو CSV قبل المسح).`,
+          confirmText: "نعم، امسح القائمة",
           onConfirm: () => {
             flaggedStore.clearAll();
             renderBankFlaggedSection();
@@ -7664,20 +11636,40 @@
     if (dom.btnCloseAudioMixer) {
       dom.btnCloseAudioMixer.addEventListener("click", closeAudioMixerPopover);
     }
-    if (dom.audioVolumeSlider) {
-      dom.audioVolumeSlider.addEventListener("input", () => {
-        if (!window.SeenJeemAudio) return;
-        const pct = Number(dom.audioVolumeSlider.value);
-        window.SeenJeemAudio.setVolume(pct / 100);
-        syncSoundButtonsUI();
-      });
-    }
+    const handleVolumeSliderInput = (sliderEl) => {
+      if (!window.SeenJeemAudio || !sliderEl) return;
+      const pct = Number(sliderEl.value);
+      window.SeenJeemAudio.setVolume(pct / 100);
+      if (pct === 0) {
+        window.SeenJeemAudio.setMuted(true);
+      } else if (window.SeenJeemAudio.isMuted()) {
+        window.SeenJeemAudio.setMuted(false);
+      }
+      syncSoundButtonsUI();
+      broadcastAudioSettingsToDisplay();
+    };
+
+    const handleVolumeSliderRelease = () => {
+      if (!window.SeenJeemAudio || window.SeenJeemAudio.isMuted()) return;
+      if (typeof window.SeenJeemAudio.playVolumeTestTick === "function") {
+        window.SeenJeemAudio.playVolumeTestTick();
+      } else if (typeof window.SeenJeemAudio.playTestChime === "function") {
+        window.SeenJeemAudio.playTestChime();
+      }
+    };
+
+    [dom.audioVolumeSlider, dom.setupVolumeSlider, dom.gameVolumeSlider].forEach((sl) => {
+      if (!sl) return;
+      sl.addEventListener("input", () => handleVolumeSliderInput(sl));
+      sl.addEventListener("change", handleVolumeSliderRelease);
+    });
     if (dom.toggleSfxTimer) {
       dom.toggleSfxTimer.addEventListener("click", () => {
         if (!window.SeenJeemAudio) return;
         const cur = window.SeenJeemAudio.getCategoryPrefs();
         window.SeenJeemAudio.setCategoryPrefs({ timerTicks: !cur.timerTicks });
         syncAudioMixerUI();
+        broadcastAudioSettingsToDisplay();
       });
     }
     if (dom.toggleSfxUi) {
@@ -7686,6 +11678,7 @@
         const cur = window.SeenJeemAudio.getCategoryPrefs();
         window.SeenJeemAudio.setCategoryPrefs({ uiEffects: !cur.uiEffects });
         syncAudioMixerUI();
+        broadcastAudioSettingsToDisplay();
       });
     }
     if (dom.toggleSfxCelebrations) {
@@ -7694,6 +11687,7 @@
         const cur = window.SeenJeemAudio.getCategoryPrefs();
         window.SeenJeemAudio.setCategoryPrefs({ celebrations: !cur.celebrations });
         syncAudioMixerUI();
+        broadcastAudioSettingsToDisplay();
       });
     }
     if (dom.btnTestAudio) {
@@ -7720,6 +11714,407 @@
       }
     });
 
+    // أحداث الحزمة السادسة: بطاقة النتيجة، لوحة المؤثرات، شاشة الاستراحة، الثيمات ومقياس التلفزيون
+    document.querySelectorAll(".theme-choice-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const chosen = btn.dataset.themeChoice || "dark-glass";
+        applyTheme(chosen, true);
+        const labels = {
+          "dark-glass": "🌌 زجاجي داكن",
+          "royal-gold": "👑 ملكي ذهبي",
+          "high-contrast": "🔆 تباين عالٍ"
+        };
+        showToast(`🎨 تم تطبيق ثيم «${labels[chosen] || chosen}»`, "info");
+      });
+    });
+
+    [dom.setupTvScaleSlider, dom.gameTvScaleSlider].forEach((sl) => {
+      if (!sl) return;
+      sl.addEventListener("input", () => {
+        applyTvScale(Number(sl.value), true);
+      });
+    });
+    [dom.btnResetTvScaleSetup, dom.btnResetTvScaleGame].forEach((btn) => {
+      if (!btn) return;
+      btn.addEventListener("click", () => {
+        applyTvScale(100, true);
+        showToast("تمت إعادة ضبط حجم خط شاشة التلفزيون إلى 100%", "info");
+      });
+    });
+
+    if (dom.btnOpenSoundboard) {
+      dom.btnOpenSoundboard.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHostToolPopover(dom.soundboardPopover, dom.btnOpenSoundboard);
+      });
+    }
+    if (dom.btnSoundboardInQuestion) {
+      dom.btnSoundboardInQuestion.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHostToolPopover(dom.soundboardPopover, dom.btnSoundboardInQuestion);
+      });
+    }
+    if (dom.btnCloseSoundboard) {
+      dom.btnCloseSoundboard.addEventListener("click", () => closeAllHostToolPopovers());
+    }
+    if (dom.soundboardPopover) {
+      dom.soundboardPopover.querySelectorAll(".soundboard-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          triggerSoundboardEffect(btn.dataset.sfx);
+        });
+      });
+    }
+
+    if (dom.btnOpenIntermission) {
+      dom.btnOpenIntermission.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHostToolPopover(dom.intermissionPopover, dom.btnOpenIntermission);
+      });
+    }
+    if (dom.btnIntermissionInQuestion) {
+      dom.btnIntermissionInQuestion.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHostToolPopover(dom.intermissionPopover, dom.btnIntermissionInQuestion);
+      });
+    }
+    if (dom.btnCloseIntermissionPopover) {
+      dom.btnCloseIntermissionPopover.addEventListener("click", () => closeAllHostToolPopovers());
+    }
+    if (dom.intermissionDurationPills) {
+      dom.intermissionDurationPills.querySelectorAll(".intermission-dur-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          state.intermissionSelectedMinutes = Math.max(0, Number(pill.dataset.intermissionMin) || 0);
+          dom.intermissionDurationPills.querySelectorAll(".intermission-dur-pill").forEach((p) => {
+            p.classList.toggle("active", p === pill);
+          });
+        });
+      });
+    }
+    if (dom.btnStartIntermission) {
+      dom.btnStartIntermission.addEventListener("click", () => {
+        const msg = dom.intermissionMessageInput ? dom.intermissionMessageInput.value : "";
+        startIntermission(msg, state.intermissionSelectedMinutes);
+      });
+    }
+    if (dom.btnStopIntermissionPopover) {
+      dom.btnStopIntermissionPopover.addEventListener("click", () => stopIntermission(false));
+    }
+    if (dom.btnResumeFromIntermission) {
+      dom.btnResumeFromIntermission.addEventListener("click", () => stopIntermission(false));
+    }
+
+    if (dom.btnOpenDisplayPrefs) {
+      dom.btnOpenDisplayPrefs.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHostToolPopover(dom.displayPrefsPopover, dom.btnOpenDisplayPrefs);
+      });
+    }
+    if (dom.btnCloseDisplayPrefs) {
+      dom.btnCloseDisplayPrefs.addEventListener("click", () => closeAllHostToolPopovers());
+    }
+
+    if (dom.btnOpenResultCard) {
+      dom.btnOpenResultCard.addEventListener("click", () => openResultCardModal(null));
+    }
+    if (dom.btnCloseResultCard) {
+      dom.btnCloseResultCard.addEventListener("click", closeResultCardModal);
+    }
+
+    // --- ربط أحداث الحزمة السابعة (المربعات الذهبية، البرق، من غير كلام المستقل، قاعة المشاهير) ---
+    if (dom.btnDdPresetBase) dom.btnDdPresetBase.addEventListener("click", () => setDailyDoublePreset("base"));
+    if (dom.btnDdPresetDouble) dom.btnDdPresetDouble.addEventListener("click", () => setDailyDoublePreset("double"));
+    if (dom.btnDdPresetAllin) dom.btnDdPresetAllin.addEventListener("click", () => setDailyDoublePreset("allin"));
+    if (dom.btnDdLockWager) dom.btnDdLockWager.addEventListener("click", lockDailyDoubleWager);
+    if (dom.ddWagerInput) {
+      dom.ddWagerInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          lockDailyDoubleWager();
+        }
+      });
+    }
+    if (dom.btnDdCorrect) dom.btnDdCorrect.addEventListener("click", () => resolveDailyDouble(true));
+    if (dom.btnDdWrong) dom.btnDdWrong.addEventListener("click", () => resolveDailyDouble(false));
+
+    // أزرار الإطلاق من شاشة الإعداد وشاشة الفائز
+    if (dom.btnLaunchBlitzMode) dom.btnLaunchBlitzMode.addEventListener("click", openBlitzModal);
+    if (dom.btnLaunchCharadesMode) dom.btnLaunchCharadesMode.addEventListener("click", openCharadesSoloModal);
+    if (dom.btnOpenHallOfFame) dom.btnOpenHallOfFame.addEventListener("click", openHallOfFameModal);
+    if (dom.btnWinnerOpenHallOfFame) dom.btnWinnerOpenHallOfFame.addEventListener("click", openHallOfFameModal);
+
+    // أحداث نافذة جولة البرق السريعة (60s Blitz)
+    if (dom.btnBlitzOpenTv) dom.btnBlitzOpenTv.addEventListener("click", openTVDisplayWindow);
+    if (dom.btnCloseBlitz) dom.btnCloseBlitz.addEventListener("click", closeBlitzModal);
+    if (dom.blitzTeamCountPills) {
+      dom.blitzTeamCountPills.querySelectorAll("[data-blitz-teams]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.blitzConfig.teamCount = Number(btn.dataset.blitzTeams) || 1;
+          renderBlitzSetupUI();
+        });
+      });
+    }
+    if (dom.blitzDurationPills) {
+      dom.blitzDurationPills.querySelectorAll("[data-blitz-dur]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.blitzConfig.durationSeconds = Number(btn.dataset.blitzDur) || 60;
+          renderBlitzSetupUI();
+        });
+      });
+    }
+    if (dom.blitzRoundsPills) {
+      dom.blitzRoundsPills.querySelectorAll("[data-blitz-rounds]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.blitzConfig.roundsPerTeam = Number(btn.dataset.blitzRounds) || 1;
+          renderBlitzSetupUI();
+        });
+      });
+    }
+    if (dom.btnBlitzStartSession) dom.btnBlitzStartSession.addEventListener("click", startBlitzSession);
+    if (dom.btnBlitzBeginTurn) dom.btnBlitzBeginTurn.addEventListener("click", beginBlitzTurn);
+    if (dom.btnBlitzPause) dom.btnBlitzPause.addEventListener("click", toggleBlitzPause);
+    if (dom.btnBlitzCorrect) dom.btnBlitzCorrect.addEventListener("click", () => handleBlitzJudge("correct"));
+    if (dom.btnBlitzSkip) dom.btnBlitzSkip.addEventListener("click", () => handleBlitzJudge("skip"));
+    if (dom.btnBlitzWrong) dom.btnBlitzWrong.addEventListener("click", () => handleBlitzJudge("wrong"));
+    if (dom.btnBlitzNextTurn) dom.btnBlitzNextTurn.addEventListener("click", advanceBlitzTurn);
+    if (dom.btnBlitzResultCard) dom.btnBlitzResultCard.addEventListener("click", openBlitzResultCard);
+    if (dom.btnBlitzOpenHof) {
+      dom.btnBlitzOpenHof.addEventListener("click", () => {
+        closeBlitzModal();
+        openHallOfFameModal();
+      });
+    }
+    if (dom.btnBlitzPlayAgain) dom.btnBlitzPlayAgain.addEventListener("click", openBlitzModal);
+
+    // أحداث نافذة طور «من غير كلام» المستقل
+    if (dom.btnCharadesOpenTv) dom.btnCharadesOpenTv.addEventListener("click", openTVDisplayWindow);
+    if (dom.btnCloseCharadesSolo) dom.btnCloseCharadesSolo.addEventListener("click", closeCharadesSoloModal);
+    if (dom.csoloTeamCountPills) {
+      dom.csoloTeamCountPills.querySelectorAll("[data-csolo-teams]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.csoloConfig.teamCount = Number(btn.dataset.csoloTeams) || 2;
+          renderCsoloSetupUI();
+        });
+      });
+    }
+    if (dom.csoloDurationPills) {
+      dom.csoloDurationPills.querySelectorAll("[data-csolo-dur]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.csoloConfig.durationSeconds = Number(btn.dataset.csoloDur) || 90;
+          renderCsoloSetupUI();
+        });
+      });
+    }
+    if (dom.csoloRoundsPills) {
+      dom.csoloRoundsPills.querySelectorAll("[data-csolo-rounds]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.csoloConfig.roundsPerTeam = Number(btn.dataset.csoloRounds) || 3;
+          renderCsoloSetupUI();
+        });
+      });
+    }
+    if (dom.csoloSkipPills) {
+      dom.csoloSkipPills.querySelectorAll("[data-csolo-skip]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.csoloConfig.skipLimit = Number(btn.dataset.csoloSkip);
+          renderCsoloSetupUI();
+        });
+      });
+    }
+    if (dom.btnCsoloStartSession) dom.btnCsoloStartSession.addEventListener("click", startCsoloSession);
+    if (dom.btnCsoloBeginTurn) dom.btnCsoloBeginTurn.addEventListener("click", beginCsoloTurn);
+    if (dom.btnCsoloPause) dom.btnCsoloPause.addEventListener("click", toggleCsoloPause);
+    if (dom.btnCsoloGuessed) dom.btnCsoloGuessed.addEventListener("click", handleCsoloGuessed);
+    if (dom.btnCsoloSkip) dom.btnCsoloSkip.addEventListener("click", handleCsoloSkip);
+    if (dom.btnCsoloHint) dom.btnCsoloHint.addEventListener("click", handleCsoloHint);
+    if (dom.btnCsoloNextTurn) dom.btnCsoloNextTurn.addEventListener("click", advanceCsoloTurn);
+    if (dom.btnCsoloResultCard) dom.btnCsoloResultCard.addEventListener("click", openCsoloResultCard);
+    if (dom.btnCsoloOpenHof) {
+      dom.btnCsoloOpenHof.addEventListener("click", () => {
+        closeCharadesSoloModal();
+        openHallOfFameModal();
+      });
+    }
+    if (dom.btnCsoloPlayAgain) dom.btnCsoloPlayAgain.addEventListener("click", openCharadesSoloModal);
+
+    if (dom.btnCsoloHoldReveal) {
+      const startHold = (e) => {
+        if (e.cancelable) e.preventDefault();
+        setCsoloHoldReveal(true);
+      };
+      const endHold = () => setCsoloHoldReveal(false);
+      dom.btnCsoloHoldReveal.addEventListener("pointerdown", startHold);
+      dom.btnCsoloHoldReveal.addEventListener("pointerup", endHold);
+      dom.btnCsoloHoldReveal.addEventListener("pointerleave", endHold);
+      dom.btnCsoloHoldReveal.addEventListener("pointercancel", endHold);
+      dom.btnCsoloHoldReveal.addEventListener("contextmenu", (e) => e.preventDefault());
+    }
+
+    // أحداث نافذة قاعة المشاهير والأرشيف
+    if (dom.btnCloseHof) dom.btnCloseHof.addEventListener("click", closeHallOfFameModal);
+    if (dom.btnHofFooterClose) dom.btnHofFooterClose.addEventListener("click", closeHallOfFameModal);
+    if (dom.hallOfFameModal) {
+      dom.hallOfFameModal.addEventListener("click", (e) => {
+        if (e.target === dom.hallOfFameModal) closeHallOfFameModal();
+      });
+    }
+    if (dom.hofModeFilters) {
+      dom.hofModeFilters.querySelectorAll(".hof-filter-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          state.hofModeFilter = pill.dataset.hofMode || "all";
+          renderHallOfFameModal();
+        });
+      });
+    }
+    if (dom.btnHofClearArchive) {
+      dom.btnHofClearArchive.addEventListener("click", () => {
+        const profile = historyStore.getActiveProfile();
+        openConfirmDialog({
+          title: `تصفير أرشيف مجموعة «${profile.name}»؟`,
+          message:
+            "سيتم حذف جميع سجلات المباريات والأرقام القياسية لهذه المجموعة فقط، دون التأثير على سجل الأسئلة الملعوبة أو المجموعات الأخرى.",
+          confirmText: "نعم، صفّر الأرشيف",
+          onConfirm: () => {
+            archiveStore.clearProfileArchive(profile.id);
+            renderHallOfFameModal();
+            showToast(`🗑️ تم تصفير أرشيف مجموعة «${profile.name}»`, "info");
+          }
+        });
+      });
+    }
+
+    // --- ربط أحداث الحزمة التاسعة (الغرفة اللاسلكية + QR + إعدادات Firebase + جرس السرعة) ---
+    if (dom.btnOpenWirelessSetup) dom.btnOpenWirelessSetup.addEventListener("click", openWirelessRoomModal);
+    if (dom.btnOpenWirelessGame) dom.btnOpenWirelessGame.addEventListener("click", openWirelessRoomModal);
+    if (dom.btnCloseWirelessModal) dom.btnCloseWirelessModal.addEventListener("click", closeWirelessRoomModal);
+    if (dom.wirelessRoomModal) {
+      dom.wirelessRoomModal.addEventListener("click", (e) => {
+        if (e.target === dom.wirelessRoomModal) closeWirelessRoomModal();
+      });
+    }
+    if (dom.btnCreateWirelessRoom) dom.btnCreateWirelessRoom.addEventListener("click", createWirelessRoom);
+    if (dom.btnCloseWirelessRoom) {
+      dom.btnCloseWirelessRoom.addEventListener("click", () => {
+        openConfirmDialog({
+          title: "إغلاق الغرفة اللاسلكية؟",
+          message: "سيتم فصل جميع الهواتف المتصلة وحذف بيانات الغرفة من Firebase فوراً، مع استمرار المباراة محلياً دون انقطاع.",
+          confirmText: "نعم، أغلق الغرفة",
+          onConfirm: () => closeWirelessRoom()
+        });
+      });
+    }
+    if (dom.btnToggleWirelessSettings) {
+      dom.btnToggleWirelessSettings.addEventListener("click", () => {
+        state.wireless.settingsOpen = !state.wireless.settingsOpen;
+        renderWirelessRoomModal();
+      });
+    }
+    if (dom.btnFbParseSnippet && dom.fbPasteSnippet) {
+      dom.btnFbParseSnippet.addEventListener("click", () => {
+        if (!firebaseCfgStore) return;
+        const parsed = firebaseCfgStore.parseConfigSnippet(dom.fbPasteSnippet.value);
+        if (!parsed) {
+          setWirelessFeedback("warning", "تعذّر استخراج الإعدادات من النص — تأكد من لصق كائن firebaseConfig بشكل صحيح.");
+          return;
+        }
+        if (dom.fbApiKey) dom.fbApiKey.value = parsed.apiKey;
+        if (dom.fbAuthDomain) dom.fbAuthDomain.value = parsed.authDomain;
+        if (dom.fbDatabaseUrl) dom.fbDatabaseUrl.value = parsed.databaseURL;
+        if (dom.fbProjectId) dom.fbProjectId.value = parsed.projectId;
+        if (dom.fbAppId) dom.fbAppId.value = parsed.appId;
+        setWirelessFeedback("success", "✨ تم استخراج حقول Firebase بنجاح — اضغط «💾 حفظ الإعدادات» ثم «🔌 اختبار الاتصال».");
+      });
+    }
+    if (dom.btnFbSaveConfig) dom.btnFbSaveConfig.addEventListener("click", saveFirebaseSettingsFromForm);
+    if (dom.btnFbTestConn) dom.btnFbTestConn.addEventListener("click", testFirebaseConnectionFromForm);
+    if (dom.btnFbClearConfig) {
+      dom.btnFbClearConfig.addEventListener("click", () => {
+        if (firebaseCfgStore) firebaseCfgStore.clearOverrideConfig();
+        populateFirebaseSettingsInputs();
+        setWirelessFeedback("info", "تم مسح إعدادات Firebase المحفوظة في المتصفح.");
+      });
+    }
+    if (dom.btnToggleHostQrPrivacy) {
+      dom.btnToggleHostQrPrivacy.addEventListener("click", () => {
+        state.wireless.hostQrHidden = !state.wireless.hostQrHidden;
+        renderWirelessRoomModal();
+      });
+    }
+    if (dom.btnToggleTvQr) {
+      dom.btnToggleTvQr.addEventListener("click", () => {
+        state.wireless.showQrOnTv = !state.wireless.showQrOnTv;
+        renderWirelessRoomModal();
+        broadcastLiveDisplayState();
+      });
+    }
+    if (dom.btnCopyRemoteUrl) {
+      dom.btnCopyRemoteUrl.addEventListener("click", () => {
+        if (!state.wireless.remoteUrl) return;
+        navigator.clipboard?.writeText(state.wireless.remoteUrl).then(() => {
+          showToast("📋 تم نسخ رابط ريموت المقدّم السري", "success");
+        });
+      });
+    }
+    if (dom.btnCopyPlayerUrl) {
+      dom.btnCopyPlayerUrl.addEventListener("click", () => {
+        if (!state.wireless.playerUrl) return;
+        navigator.clipboard?.writeText(state.wireless.playerUrl).then(() => {
+          showToast("📋 تم نسخ رابط انضمام الفرق", "success");
+        });
+      });
+    }
+    [dom.btnWbOpen, dom.btnModalWbOpen].forEach((b) => b && b.addEventListener("click", openSpeedBuzzer));
+    [dom.btnWbLock, dom.btnModalWbLock].forEach((b) => b && b.addEventListener("click", lockSpeedBuzzer));
+    [dom.btnWbReset, dom.btnModalWbReset].forEach((b) => b && b.addEventListener("click", resetSpeedBuzzer));
+    if (dom.resultCardModal) {
+      dom.resultCardModal.addEventListener("click", (e) => {
+        if (e.target === dom.resultCardModal) closeResultCardModal();
+      });
+    }
+    if (dom.btnDownloadResultCard) {
+      dom.btnDownloadResultCard.addEventListener("click", () => {
+        if (!resultCardGen || !state.currentResultCardBlob) return;
+        const fname = resultCardGen.getDefaultFilename();
+        resultCardGen.downloadBlobAsPNG(state.currentResultCardBlob, fname);
+        showToast(`⬇️ تم تنزيل بطاقة النتيجة (${fname})`, "success");
+      });
+    }
+    if (dom.btnShareResultCard) {
+      dom.btnShareResultCard.addEventListener("click", async () => {
+        if (!resultCardGen || !state.currentResultCardBlob) return;
+        const res = await resultCardGen.shareResultBlob(state.currentResultCardBlob);
+        if (res.ok) {
+          showToast("📤 تمت مشاركة بطاقة النتيجة بنجاح!", "success");
+        } else if (res.reason !== "aborted") {
+          showToast("تعذّرت المشاركة المباشرة — يمكنك تنزيل الصورة أو نسخها", "warning");
+        }
+      });
+    }
+    if (dom.btnCopyResultCard) {
+      dom.btnCopyResultCard.addEventListener("click", async () => {
+        if (!resultCardGen || !state.currentResultCardBlob) return;
+        const res = await resultCardGen.copyResultBlobToClipboard(state.currentResultCardBlob);
+        if (res.ok) {
+          showToast("📋 تم نسخ صورة بطاقة النتيجة إلى الحافظة!", "success");
+        } else {
+          showToast("المتصفح لا يدعم نسخ الصور للحافظة — استخدم زر تنزيل PNG", "warning");
+        }
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const pops = [dom.soundboardPopover, dom.intermissionPopover, dom.displayPrefsPopover];
+      const triggers = [
+        dom.btnOpenSoundboard,
+        dom.btnSoundboardInQuestion,
+        dom.btnOpenIntermission,
+        dom.btnIntermissionInQuestion,
+        dom.btnOpenDisplayPrefs
+      ];
+      if (triggers.some((t) => t && (e.target === t || t.contains(e.target)))) return;
+      if (pops.some((p) => p && !p.hidden && p.contains(e.target))) return;
+      closeAllHostToolPopovers();
+    });
+
     // اختصارات لوحة المفاتيح وحفظ الحالة عند إخفاء التبويب أو الإغلاق
     document.addEventListener("keydown", handleGlobalKeydown);
     document.addEventListener("visibilitychange", () => {
@@ -7729,10 +12124,23 @@
   }
 
   function init() {
-    // 0) التوجيه التلقائي لوضع شاشة العرض التلفزيوني (?mode=display) المتوافق مع النشر الساكن
-    if (liveSync && liveSync.isDisplayMode()) {
+    // 0) التوجيه التلقائي للأوضاع المستقلة (?mode=display | ?mode=remote | ?mode=player) بتوافق تام مع النشر الساكن
+    const urlMode = realtimeUtils ? realtimeUtils.getUrlMode() : liveSync && liveSync.isDisplayMode() ? "display" : "host";
+    if (urlMode === "display") {
       if (window.SeenJeemDisplayView && typeof window.SeenJeemDisplayView.init === "function") {
         window.SeenJeemDisplayView.init();
+      }
+      return;
+    }
+    if (urlMode === "remote") {
+      if (window.SeenJeemRemoteHostView && typeof window.SeenJeemRemoteHostView.init === "function") {
+        window.SeenJeemRemoteHostView.init();
+      }
+      return;
+    }
+    if (urlMode === "player") {
+      if (window.SeenJeemPlayerView && typeof window.SeenJeemPlayerView.init === "function") {
+        window.SeenJeemPlayerView.init();
       }
       return;
     }
@@ -7804,6 +12212,8 @@
 
     rebuildMergedCategories();
     bindEvents();
+    applyTheme(state.theme, false);
+    applyTvScale(state.tvScale, false);
     initPwaUI();
     syncSoundButtonsUI();
     syncWakeLockSetupUI();

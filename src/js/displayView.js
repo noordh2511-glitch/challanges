@@ -61,7 +61,29 @@
       document.body.classList.add("display-tv-mode");
 
       // إخفاء شاشات المقدّم والنوافذ الإدارية تماماً في وضع العرض
-      ["setup-screen", "game-screen", "question-modal", "winner-modal", "bank-manager-modal", "confirm-modal", "resume-match-modal", "image-lightbox"].forEach(
+      [
+        "setup-screen",
+        "game-screen",
+        "question-modal",
+        "final-round-modal",
+        "winner-modal",
+        "result-card-modal",
+        "bank-manager-modal",
+        "blitz-modal",
+        "charades-solo-modal",
+        "hall-of-fame-modal",
+        "wireless-room-modal",
+        "remote-host-root",
+        "player-view-root",
+        "confirm-modal",
+        "resume-match-modal",
+        "image-lightbox",
+        "referee-popover",
+        "soundboard-popover",
+        "intermission-popover",
+        "display-prefs-popover",
+        "audio-mixer-popover"
+      ].forEach(
         (id) => {
           const el = document.getElementById(id);
           if (el) {
@@ -75,6 +97,14 @@
       this.root.setAttribute("aria-hidden", "false");
       this._buildShellDOM();
       this._bindControls();
+
+      // تطبيق الثيم ومقياس شاشة التلفزيون المحفوظين فور الإقلاع
+      if (window.SeenJeemMatchStore) {
+        this._applyDisplayPrefs({
+          theme: window.SeenJeemMatchStore.loadTheme(),
+          tvScale: window.SeenJeemMatchStore.loadTvScale()
+        });
+      }
 
       // تفعيل PWA وWake Lock تلقائياً طوال عرض شاشة التلفزيون
       if (window.SeenJeemPWA && typeof window.SeenJeemPWA.init === "function") {
@@ -132,41 +162,14 @@
           </div>
         </section>
 
-        <!-- شاشة لوحة اللعب التلفزيونية -->
+        <!-- شاشة لوحة اللعب التلفزيونية (تتكيف تلقائياً لـ 2 أو 3 أو 4 فرق) -->
         <section id="tv-screen-board" class="tv-screen tv-board-screen" hidden>
-          <header class="tv-scoreboard-bar">
-            <div id="tv-team-card-0" class="tv-team-card team-1-card">
-              <div class="tv-team-top">
-                <div class="tv-team-id">
-                  <span class="team-badge-dot team-1-dot"></span>
-                  <h2 id="tv-team-name-0" class="tv-team-name">الفريق الأول</h2>
-                </div>
-                <span class="tv-turn-pill">الدور الآن</span>
-              </div>
-              <div class="tv-team-bottom">
-                <div id="tv-team-score-0" class="tv-team-score">0</div>
-                <div id="tv-team-powerups-0" class="tv-powerups-row"></div>
-              </div>
-            </div>
-
-            <div class="tv-scoreboard-center">
+          <header class="tv-scoreboard-bar tv-scoreboard-adaptive">
+            <div class="tv-scoreboard-center tv-scoreboard-top-brand">
               <div class="tv-center-brand"><span>سين</span> جيم</div>
               <div id="tv-remaining-pill" class="tv-remaining-pill">متبقي 36 / 36</div>
             </div>
-
-            <div id="tv-team-card-1" class="tv-team-card team-2-card">
-              <div class="tv-team-top">
-                <div class="tv-team-id">
-                  <span class="team-badge-dot team-2-dot"></span>
-                  <h2 id="tv-team-name-1" class="tv-team-name">الفريق الثاني</h2>
-                </div>
-                <span class="tv-turn-pill">الدور الآن</span>
-              </div>
-              <div class="tv-team-bottom">
-                <div id="tv-team-score-1" class="tv-team-score">0</div>
-                <div id="tv-team-powerups-1" class="tv-powerups-row"></div>
-              </div>
-            </div>
+            <div id="tv-scoreboard-teams-grid" class="tv-scoreboard-teams-grid" data-team-count="2"></div>
           </header>
 
           <div class="tv-board-wrap">
@@ -195,6 +198,12 @@
               <span id="tv-q-steal-pts" class="tv-q-steal-pts">+100 نقطة</span>
             </div>
 
+            <div id="tv-q-dd-banner" class="tv-q-dd-banner" hidden>
+              <span>🌟</span>
+              <strong id="tv-q-dd-title">مربع ذهبي مخفي!</strong>
+              <span id="tv-q-dd-wager-pill" class="tv-q-dd-wager-pill" hidden></span>
+            </div>
+
             <div id="tv-q-timer-bar-wrap" class="tv-q-timer-wrap">
               <div class="tv-q-timer-row">
                 <div id="tv-q-timer-display" class="tv-q-timer-display">01:00</div>
@@ -208,6 +217,14 @@
             <div id="tv-q-banners" class="tv-q-banners" hidden></div>
 
             <main class="tv-q-stage">
+              <!-- شاشة رهان المربع الذهبي للجمهور (Anti-Spoiler: بدون السؤال أو الصورة قبل التثبيت) -->
+              <div id="tv-dd-wager-stage" class="tv-dd-wager-stage" hidden>
+                <div class="tv-dd-star-badge" aria-hidden="true">🌟</div>
+                <h2 class="tv-dd-stage-title">مربع ذهبي مخفي!</h2>
+                <p id="tv-dd-stage-team" class="tv-dd-stage-team">دور: الفريق الأول</p>
+                <div id="tv-dd-stage-bounds" class="tv-dd-stage-bounds">بانتظار تحديد مبلغ الرهان من جهاز المقدّم...</div>
+              </div>
+
               <!-- واجهة «من غير كلام» للجمهور (التصنيف + عدد الكلمات + المؤقت الضخم فقط!) -->
               <div id="tv-charades-stage" class="tv-charades-stage" hidden>
                 <div class="tv-charades-eyebrow" id="tv-charades-eyebrow">🎭 من غير كلام</div>
@@ -272,6 +289,45 @@
           </div>
         </section>
 
+        <!-- شاشة جولة الرهان النهائي وكسر التعادل للجمهور (Anti-Spoiler - Phase 4 Pack 5) -->
+        <section id="tv-screen-final" class="tv-screen tv-final-screen" hidden>
+          <div class="tv-final-shell">
+            <header class="tv-final-header">
+              <div id="tv-final-eyebrow" class="tv-final-eyebrow">⚔️ جولة الحسم الختامية</div>
+              <h1 id="tv-final-title" class="tv-final-title">جولة الرهان النهائي</h1>
+              <div id="tv-final-cat-pill" class="tv-final-cat-pill">
+                <span id="tv-final-cat-icon">🏆</span>
+                <span id="tv-final-cat-name">الفئة</span>
+              </div>
+            </header>
+
+            <div id="tv-final-timer-wrap" class="tv-q-timer-wrap tv-final-timer-wrap" hidden>
+              <div class="tv-q-timer-row">
+                <div id="tv-final-timer-display" class="tv-q-timer-display">01:00</div>
+                <span id="tv-final-timer-label" class="tv-q-timer-label">مؤقت سؤال الحسم</span>
+              </div>
+              <div class="tv-q-timer-track">
+                <div id="tv-final-timer-progress" class="tv-q-timer-progress"></div>
+              </div>
+            </div>
+
+            <div id="tv-final-question-card" class="tv-final-question-card" hidden>
+              <div id="tv-final-question-text" class="tv-final-question-text"></div>
+            </div>
+
+            <div id="tv-final-answer-card" class="tv-q-answer-card tv-final-answer-card" hidden>
+              <div class="tv-answer-label">✅ الإجابة الصحيحة</div>
+              <div id="tv-final-answer-text" class="tv-answer-text"></div>
+              <div id="tv-final-answer-exp" class="tv-answer-exp" hidden></div>
+            </div>
+
+            <div id="tv-final-participants-grid" class="tv-final-participants-grid"></div>
+            <div id="tv-final-tie-banner" class="tv-final-tie-banner" hidden>
+              ⚔️ ما زال التعادل قائماً — بانتظار سؤال كسر تعادل إضافي!
+            </div>
+          </div>
+        </section>
+
         <!-- شاشة الفائز وإحصائيات نهاية المباراة للجمهور -->
         <section id="tv-screen-winner" class="tv-screen tv-winner-screen" hidden>
           <div id="tv-winner-card" class="tv-winner-card">
@@ -283,6 +339,120 @@
             <div id="tv-winner-analytics" class="tv-winner-analytics"></div>
           </div>
         </section>
+
+        <!-- شاشة طور جولة البرق السريعة للجمهور (Anti-Spoiler: السؤال + المؤقت + النقاط + السلسلة فقط!) -->
+        <section id="tv-screen-blitz" class="tv-screen tv-side-mode-screen tv-blitz-screen" hidden>
+          <div id="tv-blitz-shell" class="tv-side-shell">
+            <header class="tv-side-header">
+              <div class="tv-side-team-meta">
+                <span class="tv-side-mode-tag">⚡ جولة البرق السريعة</span>
+                <h2 id="tv-blitz-team-name" class="tv-side-team-name">اللاعب الأول</h2>
+                <span id="tv-blitz-round-pill" class="tv-remaining-pill">الجولة 1</span>
+              </div>
+              <div class="tv-side-score-cluster">
+                <span id="tv-blitz-streak" class="tv-blitz-streak" hidden>🔥 سلسلة ×0</span>
+                <div id="tv-blitz-score" class="tv-side-score-val">0</div>
+              </div>
+            </header>
+
+            <div class="tv-side-timer-hero">
+              <div id="tv-blitz-timer" class="tv-side-giant-timer">01:00</div>
+              <div class="tv-q-timer-track tv-side-timer-track">
+                <div id="tv-blitz-progress" class="tv-q-timer-progress"></div>
+              </div>
+            </div>
+
+            <main id="tv-blitz-stage" class="tv-side-stage">
+              <div id="tv-blitz-ready-box" class="tv-side-ready-box" hidden>
+                <div class="tv-side-ready-icon">⚡</div>
+                <h3 id="tv-blitz-ready-title" class="tv-side-ready-title">استعد للجولة!</h3>
+                <p id="tv-blitz-ready-sub" class="tv-side-ready-sub">أجب بأقصى سرعة قبل نفاد الوقت</p>
+                <div id="tv-blitz-standings" class="tv-side-standings"></div>
+              </div>
+
+              <div id="tv-blitz-play-box" class="tv-side-play-box" hidden>
+                <span id="tv-blitz-cat" class="tv-q-cat-pill">⚡ فئة</span>
+                <p id="tv-blitz-q-text" class="tv-blitz-q-text"></p>
+              </div>
+
+              <div id="tv-blitz-summary-box" class="tv-side-summary-box" hidden>
+                <h3 class="tv-side-summary-heading">⏰ انتهى الوقت! ملخص الدور</h3>
+                <div id="tv-blitz-summary-list" class="tv-side-summary-list"></div>
+              </div>
+            </main>
+          </div>
+        </section>
+
+        <!-- شاشة طور «من غير كلام» المستقل للجمهور (Anti-Spoiler: التصنيف + عدد الكلمات + المؤقت + التلميح عند الطلب فقط!) -->
+        <section id="tv-screen-charades-solo" class="tv-screen tv-side-mode-screen tv-csolo-screen" hidden>
+          <div id="tv-csolo-shell" class="tv-side-shell">
+            <header class="tv-side-header">
+              <div class="tv-side-team-meta">
+                <span class="tv-side-mode-tag">🎭 من غير كلام</span>
+                <h2 id="tv-csolo-team-name" class="tv-side-team-name">الفريق الأول</h2>
+                <span id="tv-csolo-round-pill" class="tv-remaining-pill">الجولة 1</span>
+              </div>
+              <div class="tv-side-score-cluster">
+                <div id="tv-csolo-score" class="tv-side-score-val">0</div>
+              </div>
+            </header>
+
+            <div class="tv-side-timer-hero">
+              <div id="tv-csolo-timer" class="tv-side-giant-timer">01:30</div>
+              <div class="tv-q-timer-track tv-side-timer-track">
+                <div id="tv-csolo-progress" class="tv-q-timer-progress"></div>
+              </div>
+            </div>
+
+            <main id="tv-csolo-stage" class="tv-side-stage">
+              <div id="tv-csolo-ready-box" class="tv-side-ready-box" hidden>
+                <div class="tv-side-ready-icon">🎭</div>
+                <h3 id="tv-csolo-ready-title" class="tv-side-ready-title">استعد للتمثيل الصامت!</h3>
+                <p id="tv-csolo-ready-sub" class="tv-side-ready-sub">الفريق المخمّن يراقب الشاشة والممثّل يمثّل بدون كلام</p>
+                <div id="tv-csolo-standings" class="tv-side-standings"></div>
+              </div>
+
+              <div id="tv-csolo-play-box" class="tv-side-play-box" hidden>
+                <div id="tv-csolo-eyebrow" class="tv-charades-eyebrow">🎭 من غير كلام</div>
+                <h2 id="tv-csolo-topic" class="tv-charades-topic">التصنيف الفرعي</h2>
+                <div id="tv-csolo-words" class="tv-charades-words-pill">🔢 عدد الكلمات</div>
+                <div id="tv-csolo-hint" class="tv-q-hint" hidden></div>
+              </div>
+
+              <div id="tv-csolo-summary-box" class="tv-side-summary-box" hidden>
+                <h3 class="tv-side-summary-heading">⏰ انتهى دور التمثيل! الكلمات في هذا الدور</h3>
+                <div id="tv-csolo-summary-list" class="tv-side-summary-list"></div>
+              </div>
+            </main>
+          </div>
+        </section>
+
+        <!-- طبقة شاشة الاستراحة التلفزيونية الكاملة (Intermission Overlay — بدون أي تسريب للسؤال) -->
+        <section id="tv-intermission-overlay" class="tv-intermission-overlay" hidden aria-live="polite">
+          <div class="tv-intermission-card">
+            <div class="tv-intermission-badge">☕ استراحة تلفزيونية</div>
+            <h1 id="tv-intermission-title" class="tv-intermission-title">استراحة قصيرة — نعود بعد قليل</h1>
+            <div id="tv-intermission-timer" class="tv-intermission-timer" hidden>05:00</div>
+            <div class="tv-intermission-standings-wrap">
+              <div class="tv-intermission-standings-label">🏆 الترتيب والنقاط الحالية</div>
+              <div id="tv-intermission-standings" class="tv-intermission-standings"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- شريط فائز جرس السرعة اللاسلكي على التلفزيون (Phase 4 Pack 9) -->
+        <div id="tv-buzzer-banner" class="tv-buzzer-banner" hidden aria-live="assertive">
+          <span class="tv-buzzer-icon" aria-hidden="true">🔔</span>
+          <span id="tv-buzzer-text">الأسرع: الفريق الأول</span>
+          <span id="tv-buzzer-delta" class="tv-buzzer-delta" hidden>+0ms</span>
+        </div>
+
+        <!-- بطاقة QR الفرق الاختيارية على التلفزيون (محلية 100% بدون أي تسريب لـ hostToken) -->
+        <aside id="tv-player-qr-card" class="tv-player-qr-card" hidden aria-label="انضمام الفرق عبر الهاتف">
+          <div class="tv-qr-head">📱 جرس الفرق السريع</div>
+          <div id="tv-player-qr-svg" class="tv-player-qr-svg"></div>
+          <div class="tv-qr-code-pill">الرمز: <strong id="tv-player-qr-code">------</strong></div>
+        </aside>
 
         <!-- زر تفعيل الصوت عند الحاجة + زر ملء الشاشة العائم (يختفي تلقائياً عند السكون) -->
         <div id="tv-floating-controls" class="tv-floating-controls">
@@ -305,16 +475,26 @@
         standbyMeta: $("tv-standby-meta"),
 
         boardScreen: $("tv-screen-board"),
-        teamCard0: $("tv-team-card-0"),
-        teamCard1: $("tv-team-card-1"),
-        teamName0: $("tv-team-name-0"),
-        teamName1: $("tv-team-name-1"),
-        teamScore0: $("tv-team-score-0"),
-        teamScore1: $("tv-team-score-1"),
-        teamPowerups0: $("tv-team-powerups-0"),
-        teamPowerups1: $("tv-team-powerups-1"),
+        scoreboardTeamsGrid: $("tv-scoreboard-teams-grid"),
         remainingPill: $("tv-remaining-pill"),
         boardGrid: $("tv-board-grid"),
+
+        finalScreen: $("tv-screen-final"),
+        finalEyebrow: $("tv-final-eyebrow"),
+        finalTitle: $("tv-final-title"),
+        finalCatIcon: $("tv-final-cat-icon"),
+        finalCatName: $("tv-final-cat-name"),
+        finalTimerWrap: $("tv-final-timer-wrap"),
+        finalTimerDisplay: $("tv-final-timer-display"),
+        finalTimerLabel: $("tv-final-timer-label"),
+        finalTimerProgress: $("tv-final-timer-progress"),
+        finalQuestionCard: $("tv-final-question-card"),
+        finalQuestionText: $("tv-final-question-text"),
+        finalAnswerCard: $("tv-final-answer-card"),
+        finalAnswerText: $("tv-final-answer-text"),
+        finalAnswerExp: $("tv-final-answer-exp"),
+        finalParticipantsGrid: $("tv-final-participants-grid"),
+        finalTieBanner: $("tv-final-tie-banner"),
 
         questionScreen: $("tv-screen-question"),
         qCatIcon: $("tv-q-cat-icon"),
@@ -325,6 +505,12 @@
         qStealBanner: $("tv-q-steal-banner"),
         qStealText: $("tv-q-steal-text"),
         qStealPts: $("tv-q-steal-pts"),
+        qDdBanner: $("tv-q-dd-banner"),
+        qDdTitle: $("tv-q-dd-title"),
+        qDdWagerPill: $("tv-q-dd-wager-pill"),
+        ddWagerStage: $("tv-dd-wager-stage"),
+        ddStageTeam: $("tv-dd-stage-team"),
+        ddStageBounds: $("tv-dd-stage-bounds"),
         qTimerWrap: $("tv-q-timer-bar-wrap"),
         qTimerDisplay: $("tv-q-timer-display"),
         qTimerLabel: $("tv-q-timer-label"),
@@ -367,6 +553,55 @@
         winnerTitle: $("tv-winner-title"),
         winnerScores: $("tv-winner-scores"),
         winnerAnalytics: $("tv-winner-analytics"),
+
+        blitzScreen: $("tv-screen-blitz"),
+        blitzTeamName: $("tv-blitz-team-name"),
+        blitzRoundPill: $("tv-blitz-round-pill"),
+        blitzStreak: $("tv-blitz-streak"),
+        blitzScore: $("tv-blitz-score"),
+        blitzTimer: $("tv-blitz-timer"),
+        blitzProgress: $("tv-blitz-progress"),
+        blitzStage: $("tv-blitz-stage"),
+        blitzReadyBox: $("tv-blitz-ready-box"),
+        blitzReadyTitle: $("tv-blitz-ready-title"),
+        blitzReadySub: $("tv-blitz-ready-sub"),
+        blitzStandings: $("tv-blitz-standings"),
+        blitzPlayBox: $("tv-blitz-play-box"),
+        blitzCat: $("tv-blitz-cat"),
+        blitzQText: $("tv-blitz-q-text"),
+        blitzSummaryBox: $("tv-blitz-summary-box"),
+        blitzSummaryList: $("tv-blitz-summary-list"),
+
+        csoloScreen: $("tv-screen-charades-solo"),
+        csoloTeamName: $("tv-csolo-team-name"),
+        csoloRoundPill: $("tv-csolo-round-pill"),
+        csoloScore: $("tv-csolo-score"),
+        csoloTimer: $("tv-csolo-timer"),
+        csoloProgress: $("tv-csolo-progress"),
+        csoloStage: $("tv-csolo-stage"),
+        csoloReadyBox: $("tv-csolo-ready-box"),
+        csoloReadyTitle: $("tv-csolo-ready-title"),
+        csoloReadySub: $("tv-csolo-ready-sub"),
+        csoloStandings: $("tv-csolo-standings"),
+        csoloPlayBox: $("tv-csolo-play-box"),
+        csoloEyebrow: $("tv-csolo-eyebrow"),
+        csoloTopic: $("tv-csolo-topic"),
+        csoloWords: $("tv-csolo-words"),
+        csoloHint: $("tv-csolo-hint"),
+        csoloSummaryBox: $("tv-csolo-summary-box"),
+        csoloSummaryList: $("tv-csolo-summary-list"),
+
+        intermissionOverlay: $("tv-intermission-overlay"),
+        intermissionTitle: $("tv-intermission-title"),
+        intermissionTimer: $("tv-intermission-timer"),
+        intermissionStandings: $("tv-intermission-standings"),
+
+        buzzerBanner: $("tv-buzzer-banner"),
+        buzzerText: $("tv-buzzer-text"),
+        buzzerDelta: $("tv-buzzer-delta"),
+        playerQrCard: $("tv-player-qr-card"),
+        playerQrSvg: $("tv-player-qr-svg"),
+        playerQrCode: $("tv-player-qr-code"),
 
         floatingControls: $("tv-floating-controls"),
         audioUnlockBtn: $("tv-audio-unlock-btn"),
@@ -465,6 +700,12 @@
       if (msg.type === "STATE_SYNC" && msg.payload) {
         this.disconnectedByHost = false;
         this.applySnapshot(msg.payload);
+      } else if (msg.type === "SYNC_AUDIO_SETTINGS" && msg.payload) {
+        if (window.SeenJeemAudio && typeof window.SeenJeemAudio.applySyncedSettings === "function") {
+          window.SeenJeemAudio.applySyncedSettings(msg.payload);
+        }
+      } else if (msg.type === "SYNC_DISPLAY_PREFS" && msg.payload) {
+        this._applyDisplayPrefs(msg.payload);
       } else if (msg.type === "PLAY_SFX" && msg.payload) {
         const { method, args } = msg.payload;
         if (window.SeenJeemAudio && typeof window.SeenJeemAudio[method] === "function") {
@@ -499,16 +740,134 @@
       this.dom.standbyScreen.hidden = screenName !== "setup";
       this.dom.boardScreen.hidden = screenName !== "board";
       this.dom.questionScreen.hidden = screenName !== "question";
+      if (this.dom.finalScreen) this.dom.finalScreen.hidden = screenName !== "final";
       this.dom.winnerScreen.hidden = screenName !== "winner";
+      if (this.dom.blitzScreen) this.dom.blitzScreen.hidden = screenName !== "blitz";
+      if (this.dom.csoloScreen) this.dom.csoloScreen.hidden = screenName !== "charades-solo";
+    }
+
+    _applyDisplayPrefs(prefs) {
+      if (!prefs || typeof prefs !== "object") return;
+      const validThemes = new Set(["dark-glass", "royal-gold", "high-contrast"]);
+      if (typeof prefs.theme === "string" && validThemes.has(prefs.theme)) {
+        document.documentElement.dataset.theme = prefs.theme;
+      }
+      if (prefs.tvScale !== undefined) {
+        const num = Number(prefs.tvScale);
+        if (Number.isFinite(num)) {
+          const clamped = Math.min(130, Math.max(90, Math.round(num / 5) * 5));
+          const ratio = clamped / 100;
+          document.documentElement.style.setProperty("--tv-scale", String(ratio));
+          document.documentElement.style.fontSize = `${(16 * ratio).toFixed(2)}px`;
+        }
+      }
+    }
+
+    _renderIntermissionOverlay(snap) {
+      if (!this.dom.intermissionOverlay) return;
+      const im = snap && snap.intermission;
+      const isActive = Boolean(im && im.active);
+      this.dom.intermissionOverlay.hidden = !isActive;
+      if (!isActive) return;
+
+      this.dom.intermissionTitle.textContent =
+        im.message || "استراحة قصيرة — نعود بعد قليل";
+
+      if (im.totalSeconds > 0) {
+        this.dom.intermissionTimer.hidden = false;
+        this.dom.intermissionTimer.textContent = formatTime(im.remainingSeconds);
+        this.dom.intermissionTimer.classList.toggle("is-ended", im.remainingSeconds === 0);
+      } else {
+        this.dom.intermissionTimer.hidden = true;
+      }
+
+      const teams = Array.isArray(snap.teams) ? snap.teams : [];
+      const ranked = teams
+        .map((t, origIdx) => ({
+          origIdx,
+          name: t.name || `الفريق ${origIdx + 1}`,
+          score: Number(t.score) || 0
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      this.dom.intermissionStandings.dataset.teamCount = String(ranked.length);
+      this.dom.intermissionStandings.innerHTML = ranked
+        .map(
+          (team, rankIdx) => `
+          <div class="tv-intermission-team team-${team.origIdx + 1}-card">
+            <span class="tv-intermission-rank">#${rankIdx + 1}</span>
+            <span class="team-badge-dot team-${team.origIdx + 1}-dot"></span>
+            <span class="tv-intermission-team-name">${escapeHtml(team.name)}</span>
+            <strong class="tv-intermission-team-score">${team.score}</strong>
+          </div>
+        `
+        )
+        .join("");
+    }
+
+    _renderWirelessOverlays(snap) {
+      const wl = snap && snap.wireless;
+
+      // 1) بطاقة QR الفرق الاختيارية على التلفزيون
+      if (this.dom.playerQrCard) {
+        const showQr = Boolean(wl && wl.active && wl.showQrOnTv && wl.playerUrl && wl.roomCode);
+        this.dom.playerQrCard.hidden = !showQr;
+        if (showQr) {
+          if (this.dom.playerQrCode) this.dom.playerQrCode.textContent = wl.roomCode;
+          if (this.dom.playerQrSvg && this._lastRenderedQrUrl !== wl.playerUrl && window.SeenJeemQR) {
+            this._lastRenderedQrUrl = wl.playerUrl;
+            try {
+              this.dom.playerQrSvg.innerHTML = window.SeenJeemQR.toSVG(wl.playerUrl, {
+                size: 156,
+                margin: 2,
+                ariaLabel: `رمز QR لانضمام الفرق للغرفة ${wl.roomCode}`
+              });
+            } catch (_err) {}
+          }
+        }
+      }
+
+      // 2) شريط فائز جرس السرعة
+      if (this.dom.buzzerBanner) {
+        const bz = wl && wl.buzzer;
+        const hasWinner = Boolean(wl && wl.active && bz && bz.state === "buzzed" && bz.winnerTeamName);
+        this.dom.buzzerBanner.hidden = !hasWinner;
+        if (hasWinner) {
+          const teamNum = Number.isInteger(bz.winnerTeamIdx) ? bz.winnerTeamIdx + 1 : 1;
+          this.dom.buzzerBanner.className = `tv-buzzer-banner team-${teamNum}`;
+          if (this.dom.buzzerText) {
+            this.dom.buzzerText.textContent = `الأسرع بالجرس: ${bz.winnerTeamName}!`;
+          }
+          if (this.dom.buzzerDelta) {
+            if (bz.runnerUpDeltaMs !== null && bz.runnerUpDeltaMs !== undefined) {
+              this.dom.buzzerDelta.textContent = `+${bz.runnerUpDeltaMs}ms`;
+              this.dom.buzzerDelta.hidden = false;
+            } else {
+              this.dom.buzzerDelta.hidden = true;
+            }
+          }
+        }
+      }
     }
 
     applySnapshot(snap) {
       if (!snap || typeof snap !== "object") return;
       this.snapshot = snap;
 
-      if (snap.screen !== "winner" && window.SeenJeemConfetti && snap.screen !== "board") {
-        // إيقاف احتفالات الفائز عند العودة للوحة أو الإعداد
+      if (snap.displayPrefs) {
+        this._applyDisplayPrefs(snap.displayPrefs);
       }
+
+      if (
+        snap.audioSettings &&
+        window.SeenJeemAudio &&
+        typeof window.SeenJeemAudio.applySyncedSettings === "function"
+      ) {
+        window.SeenJeemAudio.applySyncedSettings(snap.audioSettings);
+      }
+
+      this._renderIntermissionOverlay(snap);
+      this._renderWirelessOverlays(snap);
 
       if (snap.screen === "setup") {
         this.lastQuestionRenderKey = "";
@@ -518,9 +877,18 @@
         this._renderBoard(snap);
       } else if (snap.screen === "question" && snap.questionView) {
         this._renderQuestion(snap);
+      } else if (snap.screen === "final" && snap.finalRoundView) {
+        this.lastQuestionRenderKey = "";
+        this._renderFinalRound(snap);
       } else if (snap.screen === "winner" && snap.winnerView) {
         this.lastQuestionRenderKey = "";
         this._renderWinner(snap);
+      } else if (snap.screen === "blitz" && snap.blitzView) {
+        this.lastQuestionRenderKey = "";
+        this._renderBlitz(snap);
+      } else if (snap.screen === "charades-solo" && snap.charadesSoloView) {
+        this.lastQuestionRenderKey = "";
+        this._renderCharadesSolo(snap);
       } else {
         this._renderStandby(snap.setupInfo);
       }
@@ -543,13 +911,23 @@
       this.dom.standbySubtitle.textContent =
         "يتم الآن إعداد الجولة على جهاز المقدّم — استعدوا للتحدي!";
 
-      if (info && info.team1Name && info.team2Name) {
+      const teamNames =
+        info && Array.isArray(info.teamNames) && info.teamNames.length >= 2
+          ? info.teamNames
+          : info && info.team1Name && info.team2Name
+            ? [info.team1Name, info.team2Name]
+            : [];
+
+      if (teamNames.length >= 2) {
         this.dom.standbyTeams.hidden = false;
-        this.dom.standbyTeams.innerHTML = `
-          <div class="tv-standby-team team-1">${escapeHtml(info.team1Name)}</div>
-          <div class="tv-standby-vs">VS</div>
-          <div class="tv-standby-team team-2">${escapeHtml(info.team2Name)}</div>
-        `;
+        this.dom.standbyTeams.innerHTML = teamNames
+          .map(
+            (name, idx) =>
+              `<div class="tv-standby-team team-${idx + 1}">${escapeHtml(name)}</div>${
+                idx < teamNames.length - 1 ? `<div class="tv-standby-vs">VS</div>` : ""
+              }`
+          )
+          .join("");
       } else {
         this.dom.standbyTeams.hidden = true;
       }
@@ -565,33 +943,44 @@
     _renderBoard(snap) {
       this._showOnlyScreen("board");
 
-      const teams = Array.isArray(snap.teams) ? snap.teams : [];
-      const t0 = teams[0] || { name: "الفريق الأول", score: 0, powerups: { doubleLeft: 0, swapLeft: 0 } };
-      const t1 = teams[1] || { name: "الفريق الثاني", score: 0, powerups: { doubleLeft: 0, swapLeft: 0 } };
+      const teams =
+        Array.isArray(snap.teams) && snap.teams.length >= 2
+          ? snap.teams
+          : [
+              { name: "الفريق الأول", score: 0, powerups: { doubleLeft: 0, swapLeft: 0 } },
+              { name: "الفريق الثاني", score: 0, powerups: { doubleLeft: 0, swapLeft: 0 } }
+            ];
 
-      this.dom.teamName0.textContent = t0.name;
-      this.dom.teamName1.textContent = t1.name;
-      this.dom.teamScore0.textContent = String(t0.score);
-      this.dom.teamScore1.textContent = String(t1.score);
+      if (this.dom.scoreboardTeamsGrid) {
+        this.dom.scoreboardTeamsGrid.dataset.teamCount = String(teams.length);
+        this.dom.scoreboardTeamsGrid.innerHTML = "";
 
-      if (t0.score !== this.lastRenderedScores[0]) {
-        this.dom.teamScore0.classList.remove("score-pop");
-        void this.dom.teamScore0.offsetWidth;
-        this.dom.teamScore0.classList.add("score-pop");
-        this.lastRenderedScores[0] = t0.score;
+        teams.forEach((team, idx) => {
+          const isTurn = snap.activeTurn === idx;
+          const prevScore = this.lastRenderedScores[idx];
+          const didScoreChange = prevScore !== undefined && prevScore !== team.score;
+          this.lastRenderedScores[idx] = team.score;
+
+          const card = document.createElement("div");
+          card.className = `tv-team-card team-${idx + 1}-card${isTurn ? " active-turn" : ""}`;
+          card.innerHTML = `
+            <div class="tv-team-top">
+              <div class="tv-team-id">
+                <span class="team-badge-dot team-${idx + 1}-dot"></span>
+                <h2 class="tv-team-name">${escapeHtml(team.name)}</h2>
+              </div>
+              <span class="tv-turn-pill">الدور الآن</span>
+            </div>
+            <div class="tv-team-bottom">
+              <div class="tv-team-score${didScoreChange ? " score-pop" : ""}">${team.score}</div>
+              <div class="tv-powerups-row"></div>
+            </div>
+          `;
+          const powerupsRow = card.querySelector(".tv-powerups-row");
+          this._renderTVTeamPowerups(powerupsRow, team, isTurn, snap.doubleArmed);
+          this.dom.scoreboardTeamsGrid.appendChild(card);
+        });
       }
-      if (t1.score !== this.lastRenderedScores[1]) {
-        this.dom.teamScore1.classList.remove("score-pop");
-        void this.dom.teamScore1.offsetWidth;
-        this.dom.teamScore1.classList.add("score-pop");
-        this.lastRenderedScores[1] = t1.score;
-      }
-
-      this.dom.teamCard0.classList.toggle("active-turn", snap.activeTurn === 0);
-      this.dom.teamCard1.classList.toggle("active-turn", snap.activeTurn === 1);
-
-      this._renderTVTeamPowerups(this.dom.teamPowerups0, t0, snap.activeTurn === 0, snap.doubleArmed);
-      this._renderTVTeamPowerups(this.dom.teamPowerups1, t1, snap.activeTurn === 1, snap.doubleArmed);
 
       this.dom.remainingPill.textContent = `متبقي ${snap.remainingPlayable} / ${snap.totalSlots}`;
 
@@ -610,7 +999,7 @@
             [bc.rightColumn[i], bc.leftColumn[i]].forEach((slot) => {
               if (!slot) return;
               const winCls =
-                slot.played && (slot.winnerTeam === 0 || slot.winnerTeam === 1)
+                slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 4
                   ? ` won-team-${slot.winnerTeam}`
                   : "";
               const cls = `tv-point-tile pts-${slot.points}${slot.played ? " played" : ""}${winCls}`;
@@ -666,7 +1055,13 @@
       );
 
       const hasDiscount = qv.hintRevealed && qv.hintPenaltyPct > 0;
-      if (qv.phase === "steal-active") {
+      if (qv.isDailyDouble && qv.dailyDoublePhase === "wager") {
+        this.dom.qPointsPill.classList.add("doubled");
+        this.dom.qPointsPill.textContent = `🌟 مربع ذهبي (${qv.basePoints})`;
+      } else if (qv.isDailyDouble) {
+        this.dom.qPointsPill.classList.add("doubled");
+        this.dom.qPointsPill.textContent = `🌟 رهان: ${qv.dailyDoubleWager} نقطة`;
+      } else if (qv.phase === "steal-active") {
         this.dom.qPointsPill.classList.add("steal-pill");
         this.dom.qPointsPill.innerHTML = `<span>🔥 سرقة: +${qv.stealPoints} نقطة</span>`;
       } else if (qv.doubleActive && hasDiscount) {
@@ -705,18 +1100,58 @@
       // شارة الدور وشريط السرقة
       this.dom.qTurnBadge.className = "tv-q-turn-badge";
       if (qv.phase === "steal-active") {
-        this.dom.qTurnBadge.classList.add(qv.stealingTeamIdx === 0 ? "steal-turn-0" : "steal-turn-1");
+        this.dom.qTurnBadge.classList.add(`steal-turn-${qv.stealingTeamIdx}`);
         this.dom.qTurnBadge.textContent = `🔥 سرقة: ${stealingTeam.name}`;
         this.dom.qStealBanner.hidden = false;
-        this.dom.qStealBanner.className = `tv-q-steal-banner ${
-          qv.stealingTeamIdx === 0 ? "steal-team-0" : "steal-team-1"
-        }`;
+        this.dom.qStealBanner.className = `tv-q-steal-banner steal-team-${qv.stealingTeamIdx}`;
         this.dom.qStealText.textContent = `فرصة سرقة لـ ${stealingTeam.name}`;
         this.dom.qStealPts.textContent = `+${qv.stealPoints} نقطة`;
       } else {
-        this.dom.qTurnBadge.classList.add(qv.activeTeamAtOpen === 0 ? "team-1-turn" : "team-2-turn");
+        this.dom.qTurnBadge.classList.add(`team-${(qv.activeTeamAtOpen || 0) + 1}-turn`);
         this.dom.qTurnBadge.textContent = `دور: ${ownerTeam.name}`;
         this.dom.qStealBanner.hidden = true;
+      }
+
+      // شريط المربع الذهبي المخفي (Hidden Daily Double)
+      const isDdWager = Boolean(qv.isDailyDouble && qv.dailyDoublePhase === "wager");
+      if (this.dom.qDdBanner) {
+        this.dom.qDdBanner.hidden = !qv.isDailyDouble;
+        if (qv.isDailyDouble) {
+          this.dom.qDdTitle.textContent = isDdWager
+            ? "🌟 مربع ذهبي مخفي! — بانتظار تثبيت الرهان"
+            : `🌟 مربع ذهبي مخفي! — رهان ${ownerTeam.name}`;
+          if (!isDdWager && qv.dailyDoubleWager > 0) {
+            this.dom.qDdWagerPill.textContent = `±${qv.dailyDoubleWager} نقطة`;
+            this.dom.qDdWagerPill.hidden = false;
+          } else {
+            this.dom.qDdWagerPill.hidden = true;
+          }
+        }
+      }
+
+      if (isDdWager) {
+        this.dom.qTimerWrap.hidden = true;
+        this.dom.qBanners.hidden = true;
+        this.dom.charadesStage.hidden = true;
+        this.dom.memoryReady.hidden = true;
+        this.dom.memoryBar.hidden = true;
+        this.dom.qText.textContent = "";
+        this.dom.qText.hidden = true;
+        this.dom.qSingleMedia.hidden = true;
+        this.dom.spotDiffWrap.hidden = true;
+        this.dom.multiImages.hidden = true;
+        this.dom.qHint.hidden = true;
+        this.dom.qAnswerCard.hidden = true;
+        if (this.dom.ddWagerStage) {
+          this.dom.ddWagerStage.hidden = false;
+          this.dom.ddStageTeam.textContent = `خاص بالفريق: ${ownerTeam.name} • الفئة: ${qv.categoryName || ""}`;
+          this.dom.ddStageBounds.textContent = `الرهان المتاح: من 100 حتى ${qv.dailyDoubleMaxWager || qv.basePoints * 2} نقطة (صح +رهان / خطأ -رهان)`;
+        }
+        return;
+      }
+
+      if (this.dom.ddWagerStage) {
+        this.dom.ddWagerStage.hidden = true;
       }
 
       // شرائط التنبيه (2x / تلميح)
@@ -755,7 +1190,7 @@
       this.dom.qTimerDisplay.textContent = isUnlimited ? "∞" : formatTime(qv.timerRemaining);
       this.dom.qTimerProgress.style.width = `${pct}%`;
 
-      const isDanger = !isUnlimited && qv.timerRemaining <= 5 && qv.timerMode !== "waiting-memory";
+      const isDanger = !isUnlimited && qv.timerRemaining <= 10 && qv.timerMode !== "waiting-memory";
       const isWarning = !isUnlimited && !isDanger && !inSteal && qv.timerRemaining <= 15 && qv.timerMode !== "waiting-memory";
       this.dom.qTimerDisplay.classList.toggle("danger", isDanger);
       this.dom.qTimerDisplay.classList.toggle("warning", isWarning);
@@ -974,38 +1409,152 @@
       });
     }
 
+    _renderFinalRound(snap) {
+      this._showOnlyScreen("final");
+      const fv = snap.finalRoundView;
+      if (!fv) return;
+
+      const isTieBreaker = fv.triggerReason === "tie-breaker" || fv.triggerReason === "manual";
+      this.dom.finalEyebrow.textContent = isTieBreaker
+        ? `⚔️ كسر التعادل — الجولة ${fv.roundNumber}`
+        : "⚔️ سؤال الحسم الختامي";
+      this.dom.finalTitle.textContent =
+        fv.phase === "wager"
+          ? "تثبيت الرهانات السرية"
+          : fv.phase === "question"
+            ? "سؤال الرهان النهائي"
+            : "كشف الإجابة والنتائج!";
+
+      this.dom.finalCatIcon.textContent = (fv.category && fv.category.icon) || "🏆";
+      this.dom.finalCatName.textContent = (fv.category && fv.category.name) || "";
+
+      // المرحلة 2: المؤقت + نص السؤال فقط (بدون إجابة وبدون مبالغ رهان)
+      const showQuestion = (fv.phase === "question" || fv.phase === "reveal") && Boolean(fv.questionText);
+      this.dom.finalQuestionCard.hidden = !showQuestion;
+      if (showQuestion) {
+        this.dom.finalQuestionText.textContent = fv.questionText;
+      } else {
+        this.dom.finalQuestionText.textContent = "";
+      }
+
+      const showTimer = fv.phase === "question";
+      this.dom.finalTimerWrap.hidden = !showTimer;
+      if (showTimer) {
+        const pct = fv.timerMax > 0 ? Math.min(100, (fv.timerRemaining / fv.timerMax) * 100) : 0;
+        const isDanger = fv.timerRemaining <= 10;
+        this.dom.finalTimerDisplay.textContent = formatTime(fv.timerRemaining);
+        this.dom.finalTimerProgress.style.width = `${pct}%`;
+        this.dom.finalTimerDisplay.classList.toggle("danger", isDanger);
+        this.dom.finalTimerProgress.classList.toggle("danger", isDanger);
+        this.dom.finalTimerLabel.textContent =
+          fv.timerRemaining === 0
+            ? "⏰ انتهى وقت الحسم!"
+            : fv.timerRunning
+              ? "مؤقت سؤال الحسم جارٍ"
+              : "المؤقت متوقف";
+      }
+
+      // المرحلة 3 فقط: كشف الإجابة والشرح
+      const showAnswer = fv.phase === "reveal" && Boolean(fv.answerText);
+      this.dom.finalAnswerCard.hidden = !showAnswer;
+      if (showAnswer) {
+        this.dom.finalAnswerText.textContent = fv.answerText;
+        if (fv.explanationText) {
+          this.dom.finalAnswerExp.textContent = `📌 التوضيح: ${fv.explanationText}`;
+          this.dom.finalAnswerExp.hidden = false;
+        } else {
+          this.dom.finalAnswerExp.textContent = "";
+          this.dom.finalAnswerExp.hidden = true;
+        }
+      } else {
+        this.dom.finalAnswerText.textContent = "";
+        this.dom.finalAnswerExp.textContent = "";
+        this.dom.finalAnswerExp.hidden = true;
+      }
+
+      // بطاقات الفرق المشاركة (بدون مبالغ رهان حتى مرحلة reveal)
+      const participants = Array.isArray(fv.participants) ? fv.participants : [];
+      this.dom.finalParticipantsGrid.dataset.teamCount = String(participants.length);
+      this.dom.finalParticipantsGrid.innerHTML = participants
+        .map((p) => {
+          const teamNum = (Number(p.teamIdx) || 0) + 1;
+          if (fv.phase === "reveal") {
+            const deltaText =
+              p.effectiveDelta > 0
+                ? `+${p.effectiveDelta}`
+                : p.effectiveDelta < 0
+                  ? `${p.effectiveDelta}`
+                  : "0";
+            return `
+              <div class="tv-final-team-card team-${teamNum}-card ${p.correct ? "is-correct" : "is-wrong"}">
+                <div class="tv-final-team-head">
+                  <span class="team-badge-dot team-${teamNum}-dot"></span>
+                  <strong>${escapeHtml(p.name)}</strong>
+                  <span class="tv-final-verdict-badge ${p.correct ? "ok" : "bad"}">
+                    ${p.correct ? "✅ إجابة صحيحة" : "❌ إجابة خاطئة"}
+                  </span>
+                </div>
+                <div class="tv-final-wager-reveal">الرهان: <strong>${p.wager}</strong> نقطة</div>
+                <div class="tv-final-delta ${p.correct ? "pos" : "neg"}">${deltaText}</div>
+                <div class="tv-final-score-shift">${p.prevScore} ← <strong>${p.nextScore}</strong></div>
+              </div>
+            `;
+          }
+          return `
+            <div class="tv-final-team-card team-${teamNum}-card ${p.locked ? "is-locked" : "is-waiting"}">
+              <div class="tv-final-team-head">
+                <span class="team-badge-dot team-${teamNum}-dot"></span>
+                <strong>${escapeHtml(p.name)}</strong>
+              </div>
+              <div class="tv-final-cur-score">الرصيد الحالي: <strong>${p.score}</strong></div>
+              <div class="tv-final-lock-pill ${p.locked ? "locked" : "waiting"}">
+                ${p.locked ? "✅ تم تثبيت الرهان" : "⏳ بانتظار الرهان"}
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      this.dom.finalTieBanner.hidden = !(fv.phase === "reveal" && fv.stillTiedAfterReveal);
+    }
+
     _renderWinner(snap) {
       this._showOnlyScreen("winner");
       const wv = snap.winnerView;
-      const t0 = wv.teams[0] || { name: "الفريق الأول", score: 0 };
-      const t1 = wv.teams[1] || { name: "الفريق الثاني", score: 0 };
+      const teams = Array.isArray(wv.teams) ? wv.teams : [];
+      const leaderIndices = Array.isArray(wv.leaderIndices)
+        ? wv.leaderIndices
+        : Number.isInteger(wv.winnerIdx)
+          ? [wv.winnerIdx]
+          : [];
+      const isDraw = leaderIndices.length !== 1;
+      const winnerIdx = !isDraw ? leaderIndices[0] : null;
 
       this.dom.winnerCard.className = `tv-winner-card ${
-        wv.winnerIdx === 0 ? "winner-team-1" : wv.winnerIdx === 1 ? "winner-team-2" : "winner-draw"
+        winnerIdx !== null ? `winner-team-${winnerIdx + 1}` : "winner-draw"
       }`;
-      this.dom.winnerTrophy.textContent = wv.winnerIdx === null ? "🤝" : "🏆";
+      this.dom.winnerTrophy.textContent = isDraw ? "🤝" : "🏆";
       this.dom.winnerEyebrow.textContent = wv.eyebrow || "نهاية الجولة";
       this.dom.winnerTitle.textContent = wv.title || "نهاية المباراة";
 
-      this.dom.winnerScores.innerHTML = `
-        <div class="tv-winner-team-box team-1-box${wv.winnerIdx === 0 ? " is-winner" : ""}">
-          ${wv.winnerIdx === 0 ? `<div class="winner-crown">👑 الفائز</div>` : ""}
-          <div class="tv-winner-team-name">${escapeHtml(t0.name)}</div>
-          <div class="tv-winner-team-score">${t0.score}</div>
-          <div class="winner-score-unit">نقطة</div>
-        </div>
-        <div class="tv-winner-team-box team-2-box${wv.winnerIdx === 1 ? " is-winner" : ""}">
-          ${wv.winnerIdx === 1 ? `<div class="winner-crown">👑 الفائز</div>` : ""}
-          <div class="tv-winner-team-name">${escapeHtml(t1.name)}</div>
-          <div class="tv-winner-team-score">${t1.score}</div>
-          <div class="winner-score-unit">نقطة</div>
-        </div>
-      `;
+      this.dom.winnerScores.dataset.teamCount = String(teams.length);
+      this.dom.winnerScores.innerHTML = teams
+        .map((t, idx) => {
+          const isLeader = leaderIndices.includes(idx);
+          const crownLabel = isDraw ? "🤝 متعادل في الصدارة" : "👑 الفائز";
+          return `
+            <div class="tv-winner-team-box team-${idx + 1}-box${isLeader ? " is-winner" : ""}">
+              ${isLeader ? `<div class="winner-crown">${crownLabel}</div>` : ""}
+              <div class="tv-winner-team-name">${escapeHtml(t.name)}</div>
+              <div class="tv-winner-team-score">${t.score}</div>
+              <div class="winner-score-unit">نقطة</div>
+            </div>
+          `;
+        })
+        .join("");
 
       const an = wv.analytics;
       if (an && an.totalQuestions > 0) {
-        const ts0 = an.teamStats[0];
-        const ts1 = an.teamStats[1];
         this.dom.winnerAnalytics.innerHTML = `
           <div class="tv-analytics-kpis">
             <div class="tv-kpi-card">
@@ -1025,29 +1574,181 @@
               <div class="tv-kpi-lbl">مضاعفات 2x ناجحة</div>
             </div>
           </div>
-          <div class="tv-analytics-compare">
-            <div class="tv-compare-col team-1">
-              <div class="tv-compare-title">${escapeHtml(t0.name)}</div>
-              <div class="tv-compare-metrics">
-                <span>✅ ${ts0.correct} صحيحة (${ts0.accuracy}%)</span>
-                <span>🔥 ${ts0.stealsWon} سرقة</span>
-                <span>⚡ ${ts0.doubleWins} مضاعفة</span>
-                <span>💡 ${ts0.hintsUsed} تلميح</span>
+          <div class="tv-analytics-compare" data-team-count="${an.teamStats.length}">
+            ${an.teamStats
+              .map(
+                (ts, idx) => `
+              <div class="tv-compare-col team-${idx + 1}">
+                <div class="tv-compare-title">${escapeHtml(ts.name)}</div>
+                <div class="tv-compare-metrics">
+                  <span>✅ ${ts.correct} صحيحة (${ts.accuracy}%)</span>
+                  <span>🔥 ${ts.stealsWon} سرقة</span>
+                  <span>⚡ ${ts.doubleWins} مضاعفة</span>
+                  <span>💡 ${ts.hintsUsed} تلميح</span>
+                </div>
               </div>
-            </div>
-            <div class="tv-compare-col team-2">
-              <div class="tv-compare-title">${escapeHtml(t1.name)}</div>
-              <div class="tv-compare-metrics">
-                <span>✅ ${ts1.correct} صحيحة (${ts1.accuracy}%)</span>
-                <span>🔥 ${ts1.stealsWon} سرقة</span>
-                <span>⚡ ${ts1.doubleWins} مضاعفة</span>
-                <span>💡 ${ts1.hintsUsed} تلميح</span>
-              </div>
-            </div>
+            `
+              )
+              .join("")}
           </div>
         `;
       } else {
         this.dom.winnerAnalytics.innerHTML = "";
+      }
+    }
+
+    _renderBlitz(snap) {
+      this._showOnlyScreen("blitz");
+      const bv = snap.blitzView;
+      if (!bv) return;
+
+      this.dom.blitzTeamName.textContent = bv.activeTeamName || "اللاعب";
+      this.dom.blitzRoundPill.textContent = `الجولة ${bv.currentRoundForTeam || 1} / ${bv.roundsPerTeam || 1}`;
+      this.dom.blitzScore.textContent = String(bv.activeTeamScore || 0);
+
+      const streak = Number(bv.currentStreak) || 0;
+      if (streak >= 2) {
+        this.dom.blitzStreak.textContent = `🔥 سلسلة ×${streak}`;
+        this.dom.blitzStreak.hidden = false;
+      } else {
+        this.dom.blitzStreak.hidden = true;
+      }
+
+      const maxT = Math.max(1, Number(bv.timerMax) || 60);
+      const remT = Math.max(0, Number(bv.timerRemaining) || 0);
+      const pct = Math.min(100, (remT / maxT) * 100);
+      const isDanger = bv.phase === "playing" && remT > 0 && remT <= 10;
+      this.dom.blitzTimer.textContent = formatTime(remT);
+      this.dom.blitzTimer.classList.toggle("danger", isDanger);
+      this.dom.blitzProgress.style.width = `${pct}%`;
+      this.dom.blitzProgress.classList.toggle("danger", isDanger);
+
+      // وميض ناعم أخضر / أحمر عند آخر إجابة دون أي تسريب
+      if (this.dom.blitzStage) {
+        this.dom.blitzStage.classList.remove("flash-correct", "flash-wrong");
+        if (bv.lastFeedback && bv.lastFeedback.ts && bv.lastFeedback.ts !== this._lastBlitzFeedbackTs) {
+          this._lastBlitzFeedbackTs = bv.lastFeedback.ts;
+          if (bv.lastFeedback.type === "correct") {
+            void this.dom.blitzStage.offsetWidth;
+            this.dom.blitzStage.classList.add("flash-correct");
+          } else if (bv.lastFeedback.type === "wrong") {
+            void this.dom.blitzStage.offsetWidth;
+            this.dom.blitzStage.classList.add("flash-wrong");
+          }
+        }
+      }
+
+      this.dom.blitzReadyBox.hidden = bv.phase !== "ready";
+      this.dom.blitzPlayBox.hidden = bv.phase !== "playing";
+      this.dom.blitzSummaryBox.hidden = bv.phase !== "turn-summary";
+
+      if (bv.phase === "ready") {
+        this.dom.blitzReadyTitle.textContent = `استعد: ${bv.activeTeamName || ""}`;
+        this.dom.blitzReadySub.textContent = `أمامك ${bv.durationSeconds || 60} ثانية للإجابة على أكبر عدد ممكن من الأسئلة (+100 لكل صح)`;
+        this.dom.blitzStandings.innerHTML = (bv.teams || [])
+          .map(
+            (t, idx) =>
+              `<div class="tv-side-standing-pill team-${idx + 1}-card"><span>${escapeHtml(t.name)}</span><strong>${t.score}</strong></div>`
+          )
+          .join("");
+      } else if (bv.phase === "playing") {
+        this.dom.blitzCat.textContent = `${bv.categoryIcon || "⚡"} ${bv.categoryName || "سؤال سريع"}`;
+        this.dom.blitzQText.textContent = bv.questionText || "";
+      } else if (bv.phase === "turn-summary") {
+        this.dom.blitzSummaryList.innerHTML = (bv.turnSummary || [])
+          .slice(-8)
+          .map((item) => {
+            const badge =
+              item.outcome === "correct"
+                ? `<span class="tv-sum-badge ok">✅ +100</span>`
+                : item.outcome === "wrong"
+                  ? `<span class="tv-sum-badge bad">❌ خطأ</span>`
+                  : `<span class="tv-sum-badge skip">⏭️ تخطي</span>`;
+            return `
+              <div class="tv-side-summary-item">
+                <div class="tv-side-summary-q">${escapeHtml(item.question)}</div>
+                <div class="tv-side-summary-meta">
+                  <span class="tv-side-summary-ans">الإجابة: <strong>${escapeHtml(item.answer)}</strong></span>
+                  ${badge}
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+    }
+
+    _renderCharadesSolo(snap) {
+      this._showOnlyScreen("charades-solo");
+      const cv = snap.charadesSoloView;
+      if (!cv) return;
+
+      this.dom.csoloTeamName.textContent = cv.activeTeamName || "الفريق";
+      this.dom.csoloRoundPill.textContent = `الجولة ${cv.currentRoundForTeam || 1} / ${cv.roundsPerTeam || 3}`;
+      this.dom.csoloScore.textContent = String(cv.activeTeamScore || 0);
+
+      const maxT = Math.max(1, Number(cv.timerMax) || 90);
+      const remT = Math.max(0, Number(cv.timerRemaining) || 0);
+      const pct = Math.min(100, (remT / maxT) * 100);
+      const isDanger = cv.phase === "playing" && remT > 0 && remT <= 10;
+      this.dom.csoloTimer.textContent = formatTime(remT);
+      this.dom.csoloTimer.classList.toggle("danger", isDanger);
+      this.dom.csoloProgress.style.width = `${pct}%`;
+      this.dom.csoloProgress.classList.toggle("danger", isDanger);
+
+      if (this.dom.csoloStage && cv.lastFeedback && cv.lastFeedback.ts && cv.lastFeedback.ts !== this._lastCsoloFeedbackTs) {
+        this._lastCsoloFeedbackTs = cv.lastFeedback.ts;
+        this.dom.csoloStage.classList.remove("flash-correct");
+        if (cv.lastFeedback.type === "guessed") {
+          void this.dom.csoloStage.offsetWidth;
+          this.dom.csoloStage.classList.add("flash-correct");
+        }
+      }
+
+      this.dom.csoloReadyBox.hidden = cv.phase !== "ready";
+      this.dom.csoloPlayBox.hidden = cv.phase !== "playing";
+      this.dom.csoloSummaryBox.hidden = cv.phase !== "turn-summary";
+
+      if (cv.phase === "ready") {
+        this.dom.csoloReadyTitle.textContent = `دور التمثيل: ${cv.activeTeamName || ""}`;
+        this.dom.csoloReadySub.textContent = `مدة الدور ${cv.durationSeconds || 90} ثانية — يظهر هنا التصنيف وعدد الكلمات فقط!`;
+        this.dom.csoloStandings.innerHTML = (cv.teams || [])
+          .map(
+            (t, idx) =>
+              `<div class="tv-side-standing-pill team-${idx + 1}-card"><span>${escapeHtml(t.name)}</span><strong>${t.score}</strong></div>`
+          )
+          .join("");
+      } else if (cv.phase === "playing") {
+        const hdr = cv.header || { eyebrow: "🎭 من غير كلام", topic: cv.categoryName || "", wordCount: "" };
+        this.dom.csoloEyebrow.textContent = hdr.eyebrow || "🎭 من غير كلام";
+        this.dom.csoloTopic.textContent = hdr.topic || cv.categoryName || "";
+        this.dom.csoloWords.textContent = `🔢 عدد الكلمات: ${hdr.wordCount || ""}`;
+        if (cv.hintText) {
+          this.dom.csoloHint.textContent = `💡 تلميح للجمهور: ${cv.hintText}`;
+          this.dom.csoloHint.hidden = false;
+        } else {
+          this.dom.csoloHint.textContent = "";
+          this.dom.csoloHint.hidden = true;
+        }
+      } else if (cv.phase === "turn-summary") {
+        this.dom.csoloSummaryList.innerHTML = (cv.turnSummary || [])
+          .slice(-8)
+          .map((item) => {
+            const badge =
+              item.outcome === "guessed"
+                ? `<span class="tv-sum-badge ok">✅ +100</span>`
+                : `<span class="tv-sum-badge skip">⏭️ تخطي</span>`;
+            return `
+              <div class="tv-side-summary-item">
+                <div class="tv-side-summary-q">${escapeHtml(item.answer || item.word || "")}</div>
+                <div class="tv-side-summary-meta">
+                  <span class="tv-side-summary-ans">${escapeHtml(item.topic || item.categoryName || "")}</span>
+                  ${badge}
+                </div>
+              </div>
+            `;
+          })
+          .join("");
       }
     }
   }

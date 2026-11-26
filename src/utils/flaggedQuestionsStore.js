@@ -22,11 +22,11 @@
   const VALID_POINTS = new Set([200, 400, 600]);
 
   const FLAG_REASONS = Object.freeze([
-    { id: "typo", label: "خطأ إملائي", icon: "✏️" },
+    { id: "typo", label: "خطأ مطبعي", icon: "✏️" },
     { id: "unclear", label: "صياغة غير واضحة", icon: "❓" },
-    { id: "broken-image", label: "صورة معطّلة", icon: "🖼️" },
-    { id: "wrong-info", label: "معلومة غير دقيقة", icon: "⚠️" },
-    { id: "difficulty", label: "صعوبة غير مناسبة", icon: "⚖️" },
+    { id: "broken-image", label: "صورة لا تعمل", icon: "🖼️" },
+    { id: "wrong-info", label: "معلومة تحتاج مراجعة", icon: "⚠️" },
+    { id: "difficulty", label: "مستوى الصعوبة غير مناسب", icon: "⚖️" },
     { id: "other", label: "أخرى", icon: "📝" }
   ]);
 
@@ -214,6 +214,44 @@
 
     exportJSON() {
       return JSON.stringify(this._items, null, 2);
+    }
+
+    /**
+     * تقرير منظم للنسخ السريع بصيغة:
+     * id | categoryId | points | السبب | الملاحظة | مختصر السؤال
+     */
+    exportReportText() {
+      const sanitizePipe = (val) =>
+        String(val === undefined || val === null ? "" : val)
+          .replace(/\|/g, "/")
+          .replace(/\s+/g, " ")
+          .trim();
+
+      return this._items
+        .map((item) => {
+          const meta = this.getReasonMeta(item.reason);
+          const qShort = sanitizePipe(item.questionText).slice(0, 75);
+          const noteText = item.note ? sanitizePipe(item.note) : "—";
+          return `${sanitizePipe(item.questionId)} | ${sanitizePipe(item.categoryId)} | ${item.points} | ${meta.label} | ${noteText} | ${qShort}`;
+        })
+        .join("\n");
+    }
+
+    downloadJSON() {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `seen-jeem-flagged-${dateStr}.json`;
+      const blob = new Blob([this.exportJSON()], {
+        type: "application/json;charset=utf-8"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      return filename;
     }
 
     exportCSV() {

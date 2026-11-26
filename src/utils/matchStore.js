@@ -10,11 +10,19 @@
 
   const MATCH_STORAGE_KEY = "seen_jeem_active_match_v1";
   const TACTICAL_SETTINGS_KEY = "seen_jeem_tactical_settings_v1";
+  const THEME_STORAGE_KEY = "seen_jeem_theme_v1";
+  const TV_SCALE_STORAGE_KEY = "seen_jeem_tv_scale_v1";
   const SCHEMA_VERSION = 1;
   const MAX_UNDO_STEPS = 15;
 
+  const VALID_THEMES = new Set(["dark-glass", "royal-gold", "high-contrast"]);
+  const DEFAULT_INTERMISSION_MESSAGE = "استراحة قصيرة — نعود بعد قليل";
+
   const DEFAULT_MATCH_SETTINGS = Object.freeze({
-    mainTimerSeconds: 60, // 0 (بدون مؤقت) | 30 | 45 | 60 | 90
+    teamCount: 2, // 2 | 3 | 4
+    finalRoundMode: "tie-only", // "tie-only" | "always" | "off"
+    dailyDoubleCount: 1, // 0 | 1 | 2
+    mainTimerSeconds: 0, // 0 (معطّل افتراضياً) | 30 | 45 | 60 | 90
     hintEnabled: true,
     hintPenalty: 0.25, // 0 | 0.25 | 0.5
     doubleEnabled: true,
@@ -26,6 +34,9 @@
     stealTimerSeconds: 15 // 10 | 15 | 20
   });
 
+  const VALID_TEAM_COUNTS = new Set([2, 3, 4]);
+  const VALID_FINAL_ROUND_MODES = new Set(["tie-only", "always", "off"]);
+  const VALID_DAILY_DOUBLE_COUNTS = new Set([0, 1, 2]);
   const VALID_MAIN_TIMERS = new Set([0, 30, 45, 60, 90]);
   const VALID_HINT_PENALTIES = new Set([0, 0.25, 0.5]);
   const VALID_STEAL_MULTIPLIERS = new Set([0.5, 1]);
@@ -82,6 +93,21 @@
       return { ...DEFAULT_MATCH_SETTINGS };
     }
 
+    const rawTeamCount = Number(raw.teamCount);
+    const teamCount = VALID_TEAM_COUNTS.has(rawTeamCount)
+      ? rawTeamCount
+      : DEFAULT_MATCH_SETTINGS.teamCount;
+
+    const finalRoundMode = VALID_FINAL_ROUND_MODES.has(raw.finalRoundMode)
+      ? raw.finalRoundMode
+      : DEFAULT_MATCH_SETTINGS.finalRoundMode;
+
+    const rawDdCount = Number(raw.dailyDoubleCount);
+    const dailyDoubleCount =
+      raw.dailyDoubleCount !== undefined && VALID_DAILY_DOUBLE_COUNTS.has(rawDdCount)
+        ? rawDdCount
+        : DEFAULT_MATCH_SETTINGS.dailyDoubleCount;
+
     const rawMainTimer = Number(raw.mainTimerSeconds);
     const mainTimerSeconds =
       raw.mainTimerSeconds !== undefined && VALID_MAIN_TIMERS.has(rawMainTimer)
@@ -116,6 +142,9 @@
       : DEFAULT_MATCH_SETTINGS.stealTimerSeconds;
 
     return {
+      teamCount,
+      finalRoundMode,
+      dailyDoubleCount,
       mainTimerSeconds,
       hintEnabled,
       hintPenalty,
@@ -244,8 +273,43 @@
     if (typeof raw.explanation === "string" && raw.explanation.trim()) {
       clean.explanation = raw.explanation.trim();
     }
+    if (raw.isFinalRound) {
+      clean.isFinalRound = true;
+      if (raw.finalSummary && typeof raw.finalSummary === "string") {
+        clean.finalSummary = raw.finalSummary.trim();
+      }
+    }
+    if (raw.wasDailyDouble) {
+      clean.wasDailyDouble = true;
+      const w = Number(raw.dailyDoubleWager);
+      if (Number.isFinite(w) && w >= 0) {
+        clean.dailyDoubleWager = Math.round(w);
+      }
+    }
 
     return clean;
+  }
+
+  function sanitizeRefereeAdjustment(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const teamId = typeof raw.teamId === "string" && raw.teamId.trim() ? raw.teamId.trim() : "";
+    if (!teamId) return null;
+    const delta = Number(raw.delta);
+    if (!Number.isFinite(delta) || delta === 0) return null;
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : `ref_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      teamId,
+      teamName: typeof raw.teamName === "string" ? raw.teamName.trim() : teamId,
+      type: raw.type === "powerup" ? "powerup" : "score",
+      delta: Math.round(delta),
+      detail: typeof raw.detail === "string" ? raw.detail.trim() : "",
+      timestamp: Number.isFinite(Number(raw.timestamp)) ? Math.floor(Number(raw.timestamp)) : Date.now()
+    };
+  }
+
+  function sanitizeRefereeAdjustmentsList(rawList) {
+    if (!Array.isArray(rawList)) return [];
+    return rawList.map(sanitizeRefereeAdjustment).filter(Boolean);
   }
 
   function sanitizeMatchEventsList(rawList) {
@@ -324,6 +388,15 @@
       ? sanitizeMatchEventsList(raw.matchEvents)
       : null;
 
+    const refereeAdjustments = Array.isArray(raw.refereeAdjustments)
+      ? sanitizeRefereeAdjustmentsList(raw.refereeAdjustments)
+      : null;
+
+    const finalRound =
+      raw.finalRound && typeof raw.finalRound === "object"
+        ? deepClone(raw.finalRound)
+        : null;
+
     return deepFreeze({
       id:
         typeof raw.id === "string" && raw.id
@@ -337,6 +410,8 @@
       doubleArmed,
       answeredThisRound,
       matchEvents,
+      refereeAdjustments,
+      finalRound,
       cellState,
       questionHistorySnapshot
     });
@@ -476,6 +551,7 @@
             played: Boolean(slot.played),
             previouslyPlayed: Boolean(slot.previouslyPlayed),
             recycled: Boolean(slot.recycled),
+            isDailyDouble: Boolean(slot.isDailyDouble),
             winnerTeam
           };
         };
@@ -496,6 +572,10 @@
         const payload = {
           schemaVersion: SCHEMA_VERSION,
           savedAt: Date.now(),
+          matchId:
+            typeof matchState.matchId === "string" && matchState.matchId.trim()
+              ? matchState.matchId.trim()
+              : `classic_${Date.now().toString(36)}`,
           activeProfileId:
             typeof matchState.activeProfileId === "string" && matchState.activeProfileId
               ? matchState.activeProfileId
@@ -509,6 +589,11 @@
           doubleArmed: Boolean(matchState.doubleArmed),
           answeredThisRound: Math.max(0, Math.floor(Number(matchState.answeredThisRound) || 0)),
           matchEvents: sanitizeMatchEventsList(matchState.matchEvents),
+          refereeAdjustments: sanitizeRefereeAdjustmentsList(matchState.refereeAdjustments),
+          finalRound:
+            matchState.finalRound && typeof matchState.finalRound === "object"
+              ? deepClone(matchState.finalRound)
+              : null,
           boardCategories: serializedBoard,
           openQuestion: matchState.openQuestion ? deepClone(matchState.openQuestion) : null,
           undoStack: deepClone(this._undoStack)
@@ -556,8 +641,8 @@
           });
         });
 
-        // إذا كانت اللوحة مكتملة تماماً ولا يوجد سؤال مفتوح، فهي منتهية
-        if (playableRemaining === 0 && !parsed.openQuestion) {
+        // إذا كانت اللوحة مكتملة تماماً ولا يوجد سؤال مفتوح ولا جولة نهائية نشطة، فهي منتهية
+        if (playableRemaining === 0 && !parsed.openQuestion && !parsed.finalRound) {
           this.clearSavedMatch();
           return null;
         }
@@ -571,6 +656,10 @@
         return {
           schemaVersion: SCHEMA_VERSION,
           savedAt: Number(parsed.savedAt) || Date.now(),
+          matchId:
+            typeof parsed.matchId === "string" && parsed.matchId.trim()
+              ? parsed.matchId.trim()
+              : `classic_${Date.now().toString(36)}`,
           activeProfileId:
             typeof parsed.activeProfileId === "string" && parsed.activeProfileId
               ? parsed.activeProfileId
@@ -584,6 +673,11 @@
           doubleArmed: Boolean(parsed.doubleArmed),
           answeredThisRound: Math.max(0, Math.floor(Number(parsed.answeredThisRound) || 0)),
           matchEvents: sanitizeMatchEventsList(parsed.matchEvents),
+          refereeAdjustments: sanitizeRefereeAdjustmentsList(parsed.refereeAdjustments),
+          finalRound:
+            parsed.finalRound && typeof parsed.finalRound === "object"
+              ? deepClone(parsed.finalRound)
+              : null,
           boardCategories: parsed.boardCategories,
           openQuestion:
             parsed.openQuestion && typeof parsed.openQuestion === "object"
@@ -604,6 +698,73 @@
       } catch (_err) {
         // تجاهل
       }
+    }
+
+    getDefaultIntermission() {
+      return {
+        active: false,
+        message: DEFAULT_INTERMISSION_MESSAGE,
+        durationMinutes: 0,
+        totalSeconds: 0,
+        remainingSeconds: 0
+      };
+    }
+
+    sanitizeIntermission(raw) {
+      const def = this.getDefaultIntermission();
+      if (!raw || typeof raw !== "object") return def;
+      const msg =
+        typeof raw.message === "string" && raw.message.trim()
+          ? raw.message.trim().slice(0, 120)
+          : DEFAULT_INTERMISSION_MESSAGE;
+      const totalSeconds = Math.max(0, Math.floor(Number(raw.totalSeconds) || 0));
+      const remainingSeconds = Math.max(0, Math.min(totalSeconds || 3600, Math.floor(Number(raw.remainingSeconds) || 0)));
+      return {
+        active: Boolean(raw.active),
+        message: msg,
+        durationMinutes: Math.max(0, Math.floor(Number(raw.durationMinutes) || 0)),
+        totalSeconds,
+        remainingSeconds
+      };
+    }
+
+    loadTheme() {
+      try {
+        const raw = localStorage.getItem(THEME_STORAGE_KEY);
+        return VALID_THEMES.has(raw) ? raw : "dark-glass";
+      } catch (_err) {
+        return "dark-glass";
+      }
+    }
+
+    saveTheme(theme) {
+      const clean = VALID_THEMES.has(theme) ? theme : "dark-glass";
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, clean);
+      } catch (_err) {}
+      return clean;
+    }
+
+    loadTvScale() {
+      try {
+        const raw = Number(localStorage.getItem(TV_SCALE_STORAGE_KEY));
+        if (Number.isFinite(raw) && raw >= 90 && raw <= 130) {
+          return Math.round(raw / 5) * 5;
+        }
+        return 100;
+      } catch (_err) {
+        return 100;
+      }
+    }
+
+    saveTvScale(scale) {
+      const num = Number(scale);
+      const clean =
+        Number.isFinite(num) ? Math.min(130, Math.max(90, Math.round(num / 5) * 5)) : 100;
+      try {
+        localStorage.setItem(TV_SCALE_STORAGE_KEY, String(clean));
+      } catch (_err) {}
+      return clean;
     }
   }
 

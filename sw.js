@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.4.0";
+const CACHE_VERSION = "seen-jeem-v4.9.2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -16,21 +16,31 @@ const APP_SHELL_URLS = [
   "./index.html",
   "./manifest.webmanifest",
   "./sheets-config.js",
+  "./firebaseConfig.js",
   "./src/css/styles.css",
   "./src/data/questions.js",
   "./src/data/extra-questions.js",
   "./src/utils/historyStore.js",
   "./src/utils/sheetSanitizer.js",
   "./src/utils/matchStore.js",
+  "./src/utils/finalRound.js",
   "./src/utils/imagePreloader.js",
   "./src/utils/liveSync.js",
   "./src/utils/wakeLock.js",
   "./src/utils/flaggedQuestionsStore.js",
+  "./src/utils/matchArchiveStore.js",
+  "./src/utils/blitzMode.js",
+  "./src/utils/charadesMode.js",
+  "./src/utils/qrGenerator.js",
+  "./src/utils/realtimeSync.js",
   "./src/utils/backupManager.js",
+  "./src/utils/resultCardGenerator.js",
   "./src/utils/pwaManager.js",
   "./src/js/audio.js",
   "./src/js/confetti.js",
   "./src/js/displayView.js",
+  "./src/js/remoteHostView.js",
+  "./src/js/playerView.js",
   "./src/js/app.js",
   "./src/assets/icons/icon.svg",
   "./src/assets/icons/icon-192.png",
@@ -139,13 +149,30 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || (await networkPromise);
 }
 
+function isFirebaseRealtimeOrAuthRequest(url) {
+  return (
+    url.hostname.endsWith(".firebaseio.com") ||
+    url.hostname.endsWith(".firebasedatabase.app") ||
+    url.hostname === "identitytoolkit.googleapis.com" ||
+    url.hostname === "securetoken.googleapis.com" ||
+    url.hostname === "firebase.googleapis.com" ||
+    url.hostname === "firebaseinstallations.googleapis.com" ||
+    (url.hostname === "www.gstatic.com" && url.pathname.startsWith("/firebasejs/"))
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
 
-  // 1) تنقلات الصفحات (مع الحفاظ التام على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين)
+  // 0) تمرير مباشر لطلبات Firebase RTDB وAuth دون أي اعتراض أو تخزين مؤقت
+  if (isFirebaseRealtimeOrAuthRequest(url)) {
+    return;
+  }
+
+  // 1) تنقلات الصفحات (مع الحفاظ التام على معاملات الاستعلام مثل ?mode=display و?mode=remote و?mode=player في وضع الأوفلاين)
   if (request.mode === "navigate") {
     event.respondWith(
       (async () => {

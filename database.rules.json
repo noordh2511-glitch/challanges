@@ -1,0 +1,61 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomCode": {
+        ".write": "auth != null && data.child('meta/ownerUid').val() === auth.uid && !newData.exists()",
+        "meta": {
+          ".read": "auth != null && data.child('ownerUid').val() === auth.uid",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && newData.child('hostToken').isString() && newData.child('hostToken').val().length >= 16) || (data.exists() && data.child('ownerUid').val() === auth.uid))"
+        },
+        "publicState": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+        },
+        "hostPrivate": {
+          "$token": {
+            ".read": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('rooms').child($roomCode).child('meta/hostToken').exists() && root.child('rooms').child($roomCode).child('meta/hostToken').val() === $token))",
+            ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
+        "hostCommands": {
+          "$token": {
+            ".read": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('rooms').child($roomCode).child('meta/hostToken').exists() && root.child('rooms').child($roomCode).child('meta/hostToken').val() === $token))",
+            ".write": "auth != null && (root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('rooms').child($roomCode).child('meta/hostToken').exists() && root.child('rooms').child($roomCode).child('meta/hostToken').val() === $token))",
+            "$cmdId": {
+              ".validate": "!newData.exists() || (newData.hasChildren(['type', 'sentAt']) && newData.child('type').isString())"
+            }
+          }
+        },
+        "buzzes": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$buzzRoundId": {
+            "$teamKey": {
+              ".write": "auth != null && (!data.exists() || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'teamName', 'ts']) && newData.child('teamIdx').isNumber() && newData.child('teamName').isString() && newData.child('teamName').val().length <= 40)"
+            }
+          }
+        },
+        "wagers": {
+          ".read": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$roundId": {
+            "$teamId": {
+              ".write": "auth != null && root.child('rooms').child($roomCode).child('meta').exists()",
+              ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'amount', 'locked', 'updatedAt']) && newData.child('teamIdx').isNumber() && newData.child('amount').isNumber() && newData.child('amount').val() >= 0 && (!newData.child('answerText').exists() || (newData.child('answerText').isString() && newData.child('answerText').val().length <= 160)))"
+            }
+          }
+        },
+        "players": {
+          ".read": "auth != null",
+          "$deviceId": {
+            ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid || root.child('rooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['teamIdx', 'teamName', 'uid']) && newData.child('teamIdx').isNumber() && newData.child('teamName').isString() && newData.child('uid').val() === auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}

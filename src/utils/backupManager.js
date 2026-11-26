@@ -18,7 +18,10 @@
     AUDIO_VOLUME: "seen_jeem_volume_v1",
     AUDIO_PREFS: "seen_jeem_audio_prefs_v1",
     WAKELOCK: "seen_jeem_wakelock_enabled_v1",
-    AUDIO_ROUTE: "seen_jeem_dual_audio_route_v1"
+    AUDIO_ROUTE: "seen_jeem_dual_audio_route_v1",
+    THEME: "seen_jeem_theme_v1",
+    TV_SCALE: "seen_jeem_tv_scale_v1",
+    ARCHIVE: "seen-jeem-archive-v1"
   });
 
   function safeReadJSON(key, fallback) {
@@ -46,6 +49,9 @@
       ? window.SeenJeemFlaggedStore.getAll()
       : safeReadJSON(KEYS.FLAGGED, []);
     const customCategories = safeReadJSON(KEYS.CUSTOM_CATS, []);
+    const matchArchive = window.SeenJeemArchiveStore
+      ? window.SeenJeemArchiveStore.getAll()
+      : safeReadJSON(KEYS.ARCHIVE, []);
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
       : safeReadJSON(KEYS.SETTINGS, null);
@@ -77,6 +83,14 @@
       : localStorage.getItem(KEYS.WAKELOCK) !== "false";
 
     const audioRoute = localStorage.getItem(KEYS.AUDIO_ROUTE) === "host" ? "host" : "display";
+    const validThemes = new Set(["dark-glass", "royal-gold", "high-contrast"]);
+    const rawTheme = localStorage.getItem(KEYS.THEME);
+    const theme = validThemes.has(rawTheme) ? rawTheme : "dark-glass";
+    const rawTvScale = Number(localStorage.getItem(KEYS.TV_SCALE));
+    const tvScale =
+      Number.isFinite(rawTvScale) && rawTvScale >= 90 && rawTvScale <= 130
+        ? Math.round(rawTvScale / 5) * 5
+        : 100;
 
     const profileCount =
       historyData && Array.isArray(historyData.profiles) ? historyData.profiles.length : 1;
@@ -90,6 +104,7 @@
 
     return {
       format: BACKUP_FORMAT,
+      schemaVersion: BACKUP_VERSION,
       version: BACKUP_VERSION,
       exportedAt: Date.now(),
       exportedAtISO: new Date().toISOString(),
@@ -97,17 +112,21 @@
         profilesCount: profileCount,
         playedRecordsCount: totalPlayed,
         flaggedCount: Array.isArray(flaggedItems) ? flaggedItems.length : 0,
-        customCategoriesCount: Array.isArray(customCategories) ? customCategories.length : 0
+        customCategoriesCount: Array.isArray(customCategories) ? customCategories.length : 0,
+        archiveMatchesCount: Array.isArray(matchArchive) ? matchArchive.length : 0
       },
       data: {
         historyStore: historyData,
         flaggedQuestions: Array.isArray(flaggedItems) ? flaggedItems : [],
         customCategories: Array.isArray(customCategories) ? customCategories : [],
+        matchArchive: Array.isArray(matchArchive) ? matchArchive : [],
         matchSettings,
         preferences: {
           audio,
           wakeLockEnabled,
-          audioRoute
+          audioRoute,
+          theme,
+          tvScale
         }
       }
     };
@@ -117,7 +136,12 @@
     if (!raw || typeof raw !== "object") {
       return { ok: false, error: "الملف لا يحتوي على كائن JSON صالح." };
     }
-    if (raw.format !== BACKUP_FORMAT || !raw.data || typeof raw.data !== "object") {
+    if (
+      raw.format !== BACKUP_FORMAT ||
+      !raw.data ||
+      typeof raw.data !== "object" ||
+      (raw.schemaVersion !== undefined && Number(raw.schemaVersion) !== BACKUP_VERSION)
+    ) {
       return {
         ok: false,
         error: "هذا الملف ليس نسخة احتياطية صالحة لتطبيق «سين جيم»."
@@ -133,6 +157,7 @@
     );
     const flagged = Array.isArray(d.flaggedQuestions) ? d.flaggedQuestions : [];
     const customCats = Array.isArray(d.customCategories) ? d.customCategories : [];
+    const archiveList = Array.isArray(d.matchArchive) ? d.matchArchive : [];
 
     return {
       ok: true,
@@ -143,6 +168,7 @@
         playedRecordsCount: playedTotal,
         flaggedCount: flagged.length,
         customCategoriesCount: customCats.length,
+        archiveMatchesCount: archiveList.length,
         hasSettings: Boolean(d.matchSettings && typeof d.matchSettings === "object"),
         hasPreferences: Boolean(d.preferences && typeof d.preferences === "object")
       }
@@ -272,6 +298,15 @@
       }
     }
 
+    // 3.5) أرشيف المباريات وقاعة المشاهير (بتوافق رجعي آمن مع النسخ القديمة)
+    if (Array.isArray(d.matchArchive)) {
+      if (window.SeenJeemArchiveStore) {
+        window.SeenJeemArchiveStore.importRecords(d.matchArchive, isReplace ? "replace" : "merge");
+      } else {
+        safeWriteJSON(KEYS.ARCHIVE, d.matchArchive);
+      }
+    }
+
     // 4) إعدادات المباراة التكتيكية والمؤقت العام
     if (d.matchSettings && typeof d.matchSettings === "object") {
       if (window.SeenJeemMatchStore) {
@@ -306,6 +341,22 @@
       }
       if (prefs.audioRoute && window.SeenJeemLiveSync) {
         window.SeenJeemLiveSync.setAudioRoute(prefs.audioRoute);
+      }
+      if (typeof prefs.theme === "string") {
+        const validThemes = new Set(["dark-glass", "royal-gold", "high-contrast"]);
+        if (validThemes.has(prefs.theme)) {
+          try {
+            localStorage.setItem(KEYS.THEME, prefs.theme);
+          } catch (_e) {}
+        }
+      }
+      if (prefs.tvScale !== undefined) {
+        const sc = Number(prefs.tvScale);
+        if (Number.isFinite(sc) && sc >= 90 && sc <= 130) {
+          try {
+            localStorage.setItem(KEYS.TV_SCALE, String(Math.round(sc / 5) * 5));
+          } catch (_e) {}
+        }
       }
     }
 

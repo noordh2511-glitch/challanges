@@ -35,6 +35,10 @@
 
   <!-- جذر شاشة العرض التلفزيوني للجمهور (?mode=display - Phase 4 Pack 3) -->
   <div id="tv-display-root" class="tv-display-root" hidden aria-hidden="true"></div>
+  <!-- جذر ريموت المقدّم على الهاتف (?mode=remote - Phase 4 Pack 9) -->
+  <div id="remote-host-root" class="remote-host-root" hidden aria-hidden="true"></div>
+  <!-- جذر جرس الفرق والرهان السري على الهاتف (?mode=player - Phase 4 Pack 9) -->
+  <div id="player-view-root" class="player-view-root" hidden aria-hidden="true"></div>
 
   <!-- =========================================================
        الشاشة الأولى: شاشة إعداد الجولة (Setup Screen)
@@ -63,25 +67,47 @@
               <span>📲</span>
               <span>تثبيت التطبيق</span>
             </button>
+            <div class="inline-volume-control" title="التحكم بمستوى الصوت">
+              <button
+                type="button"
+                id="btn-toggle-sound-setup"
+                class="btn btn-icon-only btn-sm hero-sound-btn"
+                title="كتم / تشغيل الصوت"
+                aria-label="كتم أو تشغيل الصوت"
+                aria-pressed="false"
+              >
+                🔊
+              </button>
+              <input
+                type="range"
+                id="setup-volume-slider"
+                class="inline-volume-slider"
+                min="0"
+                max="100"
+                step="5"
+                value="75"
+                aria-label="مستوى الصوت في شاشة الإعداد"
+              />
+              <span id="setup-volume-pct" class="inline-volume-pct">75%</span>
+            </div>
+            <button
+              type="button"
+              id="btn-open-wireless-setup"
+              class="btn btn-secondary btn-xs"
+              title="الغرفة اللاسلكية عبر QR Code (ريموت المقدّم وجرس السرعة)"
+            >
+              <span>📡</span>
+              <span>الغرفة اللاسلكية</span>
+            </button>
             <button
               type="button"
               id="btn-audio-mixer-setup"
               class="btn btn-icon-only btn-sm hero-sound-btn"
-              title="إعدادات الصوت ومستوى المؤثرات"
+              title="تخصيص فئات المؤثرات الصوتية"
               aria-label="فتح إعدادات الصوت"
               aria-expanded="false"
             >
               🎚️
-            </button>
-            <button
-              type="button"
-              id="btn-toggle-sound-setup"
-              class="btn btn-icon-only btn-sm hero-sound-btn"
-              title="كتم / تشغيل الصوت"
-              aria-label="كتم أو تشغيل الصوت"
-              aria-pressed="false"
-            >
-              🔊
             </button>
           </div>
         </div>
@@ -93,16 +119,46 @@
         </p>
       </header>
 
-      <!-- إدخال أسماء الفريقين -->
-      <section class="panel teams-setup-panel" aria-label="إعداد أسماء الفريقين">
-        <div class="panel-header">
+      <!-- شريط إطلاق الأطوار السريعة وقاعة المشاهير (Phase 4 Pack 7) -->
+      <section id="mode-launcher-bar" class="mode-launcher-bar" aria-label="أطوار اللعب السريعة وقاعة المشاهير">
+        <button type="button" id="btn-launch-blitz-mode" class="mode-launch-card mode-blitz">
+          <span class="mode-launch-icon" aria-hidden="true">⚡</span>
+          <div class="mode-launch-text">
+            <strong>جولة البرق السريعة (60ث)</strong>
+            <span>تحدي سرعة وسلسلة إجابات لـ 1–4 فرق</span>
+          </div>
+        </button>
+        <button type="button" id="btn-launch-charades-mode" class="mode-launch-card mode-charades">
+          <span class="mode-launch-icon" aria-hidden="true">🎭</span>
+          <div class="mode-launch-text">
+            <strong>طور «من غير كلام» المستقل</strong>
+            <span>تمثيل صامت مباشر بـ 13 فئة ومؤقت حيّ</span>
+          </div>
+        </button>
+        <button type="button" id="btn-open-hall-of-fame" class="mode-launch-card mode-hof">
+          <span class="mode-launch-icon" aria-hidden="true">🏆</span>
+          <div class="mode-launch-text">
+            <strong>قاعة المشاهير والأرشيف</strong>
+            <span>الأرقام القياسية، المتصدرون، وآخر 50 مباراة</span>
+          </div>
+        </button>
+      </section>
+
+      <!-- إدخال عدد وأسماء الفرق (2 إلى 4 فرق - Phase 4 Pack 5) -->
+      <section class="panel teams-setup-panel" aria-label="إعداد الفرق">
+        <div class="panel-header teams-panel-header">
           <h2 class="panel-title">
             <span class="panel-icon">👥</span>
-            أسماء الفريقين
+            الفرق المتنافسة
           </h2>
+          <div id="team-count-selector" class="team-count-selector" role="group" aria-label="اختيار عدد الفرق">
+            <button type="button" class="team-count-pill active" data-team-count="2" aria-pressed="true">2 فرق</button>
+            <button type="button" class="team-count-pill" data-team-count="3" aria-pressed="false">3 فرق</button>
+            <button type="button" class="team-count-pill" data-team-count="4" aria-pressed="false">4 فرق</button>
+          </div>
         </div>
-        <div class="teams-inputs-grid">
-          <div class="team-input-card team-1-accent">
+        <div id="teams-inputs-grid" class="teams-inputs-grid" data-team-count="2">
+          <div class="team-input-card team-1-accent" data-team-slot="0">
             <label for="team1-input" class="input-label">
               <span class="team-color-dot team-1-dot"></span>
               اسم الفريق الأول
@@ -110,7 +166,8 @@
             <input
               type="text"
               id="team1-input"
-              class="text-input"
+              class="text-input team-name-input"
+              data-team-idx="0"
               placeholder="مثال: فريق الصقور"
               value="الفريق الأول"
               maxlength="24"
@@ -118,9 +175,9 @@
             />
           </div>
 
-          <div class="vs-divider" aria-hidden="true">VS</div>
+          <div id="teams-vs-divider" class="vs-divider" aria-hidden="true">VS</div>
 
-          <div class="team-input-card team-2-accent">
+          <div class="team-input-card team-2-accent" data-team-slot="1">
             <label for="team2-input" class="input-label">
               <span class="team-color-dot team-2-dot"></span>
               اسم الفريق الثاني
@@ -128,9 +185,44 @@
             <input
               type="text"
               id="team2-input"
-              class="text-input"
+              class="text-input team-name-input"
+              data-team-idx="1"
               placeholder="مثال: فريق النجوم"
               value="الفريق الثاني"
+              maxlength="24"
+              autocomplete="off"
+            />
+          </div>
+
+          <div id="team-input-card-3" class="team-input-card team-3-accent" data-team-slot="2" hidden>
+            <label for="team3-input" class="input-label">
+              <span class="team-color-dot team-3-dot"></span>
+              اسم الفريق الثالث
+            </label>
+            <input
+              type="text"
+              id="team3-input"
+              class="text-input team-name-input"
+              data-team-idx="2"
+              placeholder="مثال: فريق الزمرد"
+              value="الفريق الثالث"
+              maxlength="24"
+              autocomplete="off"
+            />
+          </div>
+
+          <div id="team-input-card-4" class="team-input-card team-4-accent" data-team-slot="3" hidden>
+            <label for="team4-input" class="input-label">
+              <span class="team-color-dot team-4-dot"></span>
+              اسم الفريق الرابع
+            </label>
+            <input
+              type="text"
+              id="team4-input"
+              class="text-input team-name-input"
+              data-team-idx="3"
+              placeholder="مثال: فريق الملوك"
+              value="الفريق الرابع"
               maxlength="24"
               autocomplete="off"
             />
@@ -310,11 +402,10 @@
               <div class="tactical-options-group" id="main-timer-options-group">
                 <span class="tactical-opt-label">المدة الافتراضية لكل سؤال:</span>
                 <div class="tactical-pills-row" role="group" aria-label="مدة المؤقت العام للأسئلة">
+                  <button type="button" class="tactical-opt-btn active" data-setting="mainTimerSeconds" data-value="0">معطّل (افتراضي)</button>
                   <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="30">30ث</button>
                   <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="45">45ث</button>
-                  <button type="button" class="tactical-opt-btn active" data-setting="mainTimerSeconds" data-value="60">60ث (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="90">90ث</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="0">∞ بدون مؤقت</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="60">60ث</button>
                 </div>
               </div>
             </div>
@@ -342,6 +433,89 @@
               </div>
               <div class="tactical-options-group">
                 <span id="wakelock-status-note" class="tactical-opt-label">مفعّل تلقائياً أثناء لوحة اللعب وشاشة التلفزيون</span>
+              </div>
+            </div>
+
+            <!-- ز) جولة الرهان النهائي وكسر التعادل (Phase 4 Pack 5) -->
+            <div id="tactical-card-final-round" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">⚔️</span>
+                  <div>
+                    <h3 class="tactical-card-title">جولة الرهان النهائي</h3>
+                    <p class="tactical-card-sub">سؤال حسم ختامي برهان سري من 0 حتى الحد الأقصى العادل لكل فريق</p>
+                  </div>
+                </div>
+              </div>
+              <div class="tactical-options-group" id="final-round-options-group">
+                <span class="tactical-opt-label">توقيت تفعيل الجولة النهائية:</span>
+                <div class="tactical-pills-row" role="group" aria-label="إعداد جولة الرهان النهائي">
+                  <button type="button" class="tactical-opt-btn active" data-setting="finalRoundMode" data-value="tie-only">تلقائياً عند التعادل (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="always">دائماً بعد اللوحة</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="off">معطّل</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ز2) المربعات الذهبية المخفية (Hidden Daily Double - Phase 4 Pack 7) -->
+            <div id="tactical-card-daily-double" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">🌟</span>
+                  <div>
+                    <h3 class="tactical-card-title">المربعات الذهبية المخفية</h3>
+                    <p class="tactical-card-sub">تُخفى عشوائياً ضمن خلايا 400 و600 وتتيح للفريق الرهان قبل كشف السؤال</p>
+                  </div>
+                </div>
+              </div>
+              <div class="tactical-options-group">
+                <span class="tactical-opt-label">عدد المربعات الذهبية في اللوحة:</span>
+                <div class="tactical-pills-row" role="group" aria-label="عدد المربعات الذهبية المخفية">
+                  <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="0">معطّل</button>
+                  <button type="button" class="tactical-opt-btn active" data-setting="dailyDoubleCount" data-value="1">مربع واحد (افتراضي)</button>
+                  <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="2">مربعان (2)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ح) الثيمات الجاهزة ومقياس شاشة التلفزيون (Phase 4 Pack 6) -->
+            <div id="tactical-card-appearance" class="tactical-config-card">
+              <div class="tactical-card-head">
+                <div class="tactical-card-title-wrap">
+                  <span class="tactical-card-icon">🎨</span>
+                  <div>
+                    <h3 class="tactical-card-title">الثيمات ومقياس التلفزيون</h3>
+                    <p class="tactical-card-sub">تُحفظ تلقائياً وتُزامَن فورياً مع شاشة العرض (?mode=display)</p>
+                  </div>
+                </div>
+              </div>
+              <div class="tactical-options-group">
+                <div class="tactical-subrow">
+                  <span class="tactical-opt-label">ثيم المظهر العام:</span>
+                  <div class="tactical-pills-row theme-pills-group" role="group" aria-label="اختيار الثيم">
+                    <button type="button" class="theme-choice-btn active" data-theme-choice="dark-glass" aria-pressed="true">🌌 زجاجي داكن</button>
+                    <button type="button" class="theme-choice-btn" data-theme-choice="royal-gold" aria-pressed="false">👑 ملكي ذهبي</button>
+                    <button type="button" class="theme-choice-btn" data-theme-choice="high-contrast" aria-pressed="false">🔆 تباين عالٍ</button>
+                  </div>
+                </div>
+                <div class="tactical-subrow tv-scale-setup-row">
+                  <span class="tactical-opt-label">حجم خط شاشة التلفزيون: <strong id="setup-tv-scale-val">100%</strong></span>
+                  <div class="tv-scale-slider-wrap">
+                    <input
+                      type="range"
+                      id="setup-tv-scale-slider"
+                      class="tv-scale-slider"
+                      min="90"
+                      max="130"
+                      step="5"
+                      value="100"
+                      aria-label="حجم خط شاشة التلفزيون"
+                    />
+                    <button type="button" id="btn-reset-tv-scale-setup" class="btn btn-ghost btn-xxs" title="إعادة ضبط مقياس التلفزيون إلى 100%">
+                      ↺ 100%
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -491,8 +665,8 @@
             class="quick-balanced-btn"
             title="اختيار 6 فئات متنوعة تلقائياً من مجالات مختلفة بأكبر عدد من الأسئلة الجديدة"
           >
-            <span aria-hidden="true">✨</span>
-            <span>تشكيلة متوازنة</span>
+            <span aria-hidden="true">🎲</span>
+            <span>تشكيلة سريعة متوازنة</span>
           </button>
 
           <button
@@ -541,38 +715,11 @@
        الشاشة الثانية: لوحة اللعب الرئيسية (Game Board Screen)
        ========================================================= -->
   <section id="game-screen" class="screen game-screen" aria-hidden="true">
-    <!-- الشريط العلوي للنقاط (Scoreboard) -->
+    <!-- الشريط العلوي للنقاط (Scoreboard — يدعم 2 إلى 4 فرق + التحكم التحكيمي السريع) -->
     <header class="scoreboard-bar">
-      <div class="scoreboard-inner">
-        <!-- بطاقة الفريق الأول -->
-        <div id="scoreboard-team-1" class="score-team-card team-1-card active-turn">
-          <div class="score-team-top">
-            <div class="score-team-identity">
-              <span class="team-badge-dot team-1-dot"></span>
-              <h2 id="board-team1-name" class="score-team-name">الفريق الأول</h2>
-            </div>
-            <span id="team1-turn-pill" class="turn-pill">الدور الآن</span>
-          </div>
-
-          <div class="score-team-bottom">
-            <div class="score-value-row">
-              <button type="button" class="score-adjust-btn minus" data-team="0" data-delta="-100" title="خصم 100 نقطة" aria-label="خصم 100 نقطة للفريق الأول">
-                -100
-              </button>
-              <div id="board-team1-score" class="score-number">0</div>
-              <button type="button" class="score-adjust-btn plus" data-team="0" data-delta="100" title="إضافة 100 نقطة" aria-label="إضافة 100 نقطة للفريق الأول">
-                +100
-              </button>
-            </div>
-
-            <div id="team1-lifelines-status" class="lifelines-status-row" aria-label="وسائل المساعدة للفريق الأول">
-              <!-- يتم تحديثها ديناميكياً -->
-            </div>
-          </div>
-        </div>
-
-        <!-- أدوات التحكم الوسطى -->
-        <div class="scoreboard-center">
+      <div class="scoreboard-shell">
+        <!-- أدوات التحكم المركزية للمقدّم -->
+        <div class="scoreboard-center scoreboard-top-controls">
           <div class="mini-brand">
             <span class="mini-brand-title"><span>سين</span> جيم</span>
             <span id="board-remaining-pill" class="remaining-pill">متبقي 36 / 36</span>
@@ -593,7 +740,7 @@
               <span>تراجع</span>
               <span id="undo-steps-badge" class="undo-steps-badge" hidden>0</span>
             </button>
-            <button type="button" id="btn-switch-turn" class="btn btn-secondary btn-xs" title="تبديل الدور يدوياً">
+            <button type="button" id="btn-switch-turn" class="btn btn-secondary btn-xs" title="تبديل الدور للدور التالي">
               <span class="btn-icon">🔁</span>
               <span>تبديل الدور</span>
             </button>
@@ -605,14 +752,43 @@
               <span class="btn-icon">↩️</span>
               <span>الفئات</span>
             </button>
-            <button type="button" id="btn-audio-mixer-game" class="btn btn-icon-only btn-xs" title="إعدادات الصوت ومستوى المؤثرات" aria-label="فتح إعدادات الصوت" aria-expanded="false">
+            <div class="inline-volume-control inline-volume-compact" title="التحكم بمستوى الصوت (يُزامَن مع شاشة التلفزيون)">
+              <button type="button" id="btn-toggle-sound" class="btn btn-icon-only btn-xs" title="كتم / تشغيل الصوت" aria-label="كتم أو تشغيل الصوت" aria-pressed="false">
+                🔊
+              </button>
+              <input
+                type="range"
+                id="game-volume-slider"
+                class="inline-volume-slider inline-volume-slider-sm"
+                min="0"
+                max="100"
+                step="5"
+                value="75"
+                aria-label="مستوى الصوت في لوحة اللعب"
+              />
+              <span id="game-volume-pct" class="inline-volume-pct">75%</span>
+            </div>
+            <button type="button" id="btn-audio-mixer-game" class="btn btn-icon-only btn-xs" title="تخصيص فئات المؤثرات الصوتية" aria-label="فتح إعدادات الصوت" aria-expanded="false">
               🎚️
-            </button>
-            <button type="button" id="btn-toggle-sound" class="btn btn-icon-only btn-xs" title="كتم / تشغيل الصوت" aria-label="كتم أو تشغيل الصوت" aria-pressed="false">
-              🔊
             </button>
             <button type="button" id="btn-toggle-fullscreen" class="btn btn-icon-only btn-xs" title="ملء الشاشة" aria-label="تبديل وضع ملء الشاشة" aria-pressed="false">
               ⛶
+            </button>
+            <button type="button" id="btn-open-soundboard" class="btn btn-secondary btn-xs" title="لوحة المؤثرات الصوتية للمقدّم (Alt+1..5)" aria-expanded="false">
+              <span class="btn-icon">🎛️</span>
+              <span>مؤثرات</span>
+            </button>
+            <button type="button" id="btn-open-intermission" class="btn btn-secondary btn-xs" title="تفعيل شاشة الاستراحة التلفزيونية مع إيقاف المؤقت" aria-expanded="false">
+              <span class="btn-icon">☕</span>
+              <span>استراحة</span>
+            </button>
+            <button type="button" id="btn-open-display-prefs" class="btn btn-ghost btn-xs" title="تبديل الثيم وحجم خط شاشة التلفزيون" aria-expanded="false">
+              <span class="btn-icon">🎨</span>
+              <span>مظهر</span>
+            </button>
+            <button type="button" id="btn-open-wireless-game" class="btn btn-secondary btn-xs" title="الغرفة اللاسلكية (QR ريموت المقدّم وجرس الفرق)">
+              <span class="btn-icon">📡</span>
+              <span id="btn-open-wireless-game-label">لاسلكي</span>
             </button>
             <button type="button" id="btn-open-tv-display" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني للجمهور في نافذة مستقلة">
               <span class="btn-icon">📺</span>
@@ -650,34 +826,20 @@
             >
               ✕ إغلاق العرض
             </button>
+            <div id="host-intermission-active-bar" class="host-intermission-active-bar" hidden>
+              <span class="host-intermission-pill">
+                ☕ الاستراحة نشطة <strong id="host-intermission-countdown"></strong>
+              </span>
+              <button type="button" id="btn-resume-from-intermission" class="btn btn-primary btn-xxs">
+                ▶️ استئناف اللعب
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- بطاقة الفريق الثاني -->
-        <div id="scoreboard-team-2" class="score-team-card team-2-card">
-          <div class="score-team-top">
-            <div class="score-team-identity">
-              <span class="team-badge-dot team-2-dot"></span>
-              <h2 id="board-team2-name" class="score-team-name">الفريق الثاني</h2>
-            </div>
-            <span id="team2-turn-pill" class="turn-pill">الدور الآن</span>
-          </div>
-
-          <div class="score-team-bottom">
-            <div class="score-value-row">
-              <button type="button" class="score-adjust-btn minus" data-team="1" data-delta="-100" title="خصم 100 نقطة" aria-label="خصم 100 نقطة للفريق الثاني">
-                -100
-              </button>
-              <div id="board-team2-score" class="score-number">0</div>
-              <button type="button" class="score-adjust-btn plus" data-team="1" data-delta="100" title="إضافة 100 نقطة" aria-label="إضافة 100 نقطة للفريق الثاني">
-                +100
-              </button>
-            </div>
-
-            <div id="team2-lifelines-status" class="lifelines-status-row" aria-label="وسائل المساعدة للفريق الثاني">
-              <!-- يتم تحديثها ديناميكياً -->
-            </div>
-          </div>
+        <!-- شبكة بطاقات الفرق المرنة (2 إلى 4 فرق ديناميكياً) -->
+        <div id="scoreboard-teams-grid" class="scoreboard-teams-grid" data-team-count="2" aria-label="لوحة نقاط الفرق">
+          <!-- يتم توليد بطاقات الفرق (2-4) ديناميكياً من app.js -->
         </div>
       </div>
     </header>
@@ -712,6 +874,24 @@
           </div>
           <button
             type="button"
+            id="btn-soundboard-in-question"
+            class="q-flag-btn q-mini-tool-btn"
+            title="لوحة المؤثرات الصوتية (Alt+1..5)"
+            aria-label="فتح لوحة المؤثرات الصوتية"
+          >
+            🎛️
+          </button>
+          <button
+            type="button"
+            id="btn-intermission-in-question"
+            class="q-flag-btn q-mini-tool-btn"
+            title="تفعيل شاشة الاستراحة (توقف المؤقت مؤقتاً دون إغلاق السؤال)"
+            aria-label="تفعيل شاشة الاستراحة"
+          >
+            ☕
+          </button>
+          <button
+            type="button"
             id="btn-flag-question"
             class="q-flag-btn"
             title="تحديد هذا السؤال للمراجعة لاحقاً (دون مقاطعة اللعب)"
@@ -740,11 +920,11 @@
           <button type="button" id="btn-close-flag-drawer" class="btn btn-ghost btn-xxs" aria-label="إغلاق درج المراجعة">✕</button>
         </div>
         <div id="flag-reason-chips" class="flag-reason-chips" role="radiogroup" aria-label="سبب المراجعة">
-          <button type="button" class="flag-reason-chip active" data-flag-reason="typo">✏️ خطأ إملائي</button>
+          <button type="button" class="flag-reason-chip active" data-flag-reason="typo">✏️ خطأ مطبعي</button>
           <button type="button" class="flag-reason-chip" data-flag-reason="unclear">❓ صياغة غير واضحة</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="broken-image">🖼️ صورة معطّلة</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="wrong-info">⚠️ معلومة غير دقيقة</button>
-          <button type="button" class="flag-reason-chip" data-flag-reason="difficulty">⚖️ صعوبة غير مناسبة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="broken-image">🖼️ صورة لا تعمل</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="wrong-info">⚠️ معلومة تحتاج مراجعة</button>
+          <button type="button" class="flag-reason-chip" data-flag-reason="difficulty">⚖️ مستوى الصعوبة غير مناسب</button>
           <button type="button" class="flag-reason-chip" data-flag-reason="other">📝 أخرى</button>
         </div>
         <div class="flag-drawer-bottom">
@@ -796,6 +976,19 @@
         </button>
       </div>
 
+      <!-- شريط جرس السرعة اللاسلكي للمقدّم داخل نافذة السؤال (يظهر عند تفعيل الغرفة اللاسلكية فقط) -->
+      <div id="wireless-buzzer-host-bar" class="wireless-buzzer-host-bar" hidden aria-live="polite">
+        <div class="wb-status-group">
+          <span class="wb-badge">🔔 جرس السرعة:</span>
+          <strong id="wb-status-text" class="wb-status-text">مقفل</strong>
+        </div>
+        <div class="wb-actions">
+          <button type="button" id="btn-wb-open" class="btn btn-steal-win btn-xxs">🔔 فتح الجرس</button>
+          <button type="button" id="btn-wb-lock" class="btn btn-secondary btn-xxs">🔒 إقفال</button>
+          <button type="button" id="btn-wb-reset" class="btn btn-gold-outline btn-xxs">🔄 تصفير</button>
+        </div>
+      </div>
+
       <!-- المؤقت وأدواته (ثابت أعلى النافذة للأسئلة القياسية ووضع السرقة) -->
       <div id="timer-section" class="timer-section">
         <div class="timer-top-row">
@@ -826,6 +1019,45 @@
       <div id="q-modal-scroll-body" class="q-modal-scroll-body">
         <!-- شريط مؤشرات وسائل المساعدة المفعّلة في هذا السؤال (مثل ⚡ مضاعفة 2x نشطة) -->
         <div id="active-lifelines-banners" class="active-lifelines-banners" hidden></div>
+
+        <!-- لافتة ومرحلة الرهان السريع للمربع الذهبي المخفي (Hidden Daily Double - Phase 4 Pack 7) -->
+        <div id="daily-double-banner" class="daily-double-banner" hidden>
+          <span class="dd-star" aria-hidden="true">🌟</span>
+          <div>
+            <strong>مربع ذهبي مخفي!</strong>
+            <span id="daily-double-banner-sub">خاص بالفريق صاحب الدور — الصح (+رهان) والخطأ (-رهان) بدون سرقة</span>
+          </div>
+        </div>
+
+        <section id="daily-double-wager-panel" class="daily-double-wager-panel" hidden aria-label="تحديد رهان المربع الذهبي">
+          <div class="dd-wager-meta">
+            <span id="dd-wager-team-label" class="dd-wager-team-label">رهان الفريق الأول</span>
+            <span id="dd-wager-bounds-label" class="dd-wager-bounds-label">من 100 حتى 800 نقطة</span>
+          </div>
+          <div class="dd-wager-input-row">
+            <input
+              type="number"
+              id="dd-wager-input"
+              class="final-wager-input"
+              min="100"
+              max="800"
+              step="50"
+              value="400"
+              aria-label="مبلغ الرهان للمربع الذهبي"
+            />
+            <button type="button" id="btn-dd-lock-wager" class="btn btn-amber btn-md">
+              🔒 تثبيت الرهان وعرض السؤال
+            </button>
+          </div>
+          <div class="dd-wager-presets">
+            <button type="button" id="btn-dd-preset-base" class="wager-preset-chip">القيمة الأصلية</button>
+            <button type="button" id="btn-dd-preset-double" class="wager-preset-chip">ضعف القيمة</button>
+            <button type="button" id="btn-dd-preset-allin" class="wager-preset-chip is-allin">الكل (All-In)</button>
+          </div>
+          <p class="dd-wager-rule-note">
+            ⚖️ الإجابة الصحيحة تضيف <strong>+الرهان</strong>، والإجابة الخاطئة تخصم <strong>-الرهان</strong> (لا توجد فرصة سرقة في المربع الذهبي).
+          </p>
+        </section>
 
         <!-- لوحة تحكم المقدّم السرية (Host Cockpit — مرئية للمقدّم فقط عند اتصال شاشة العرض TV) -->
         <div id="host-cockpit-card" class="host-cockpit-card" hidden>
@@ -1148,6 +1380,19 @@
             </button>
           </div>
         </div>
+
+        <!-- 6) أزرار حسم المربع الذهبي المخفي (+رهان / -رهان) -->
+        <div id="dd-resolve-actions" class="dd-resolve-actions" hidden>
+          <div id="dd-resolve-prompt" class="award-prompt">🌟 حسم المربع الذهبي:</div>
+          <div class="dd-resolve-grid">
+            <button type="button" id="btn-dd-correct" class="btn btn-steal-win">
+              <span id="btn-dd-correct-label">✅ إجابة صحيحة (+400)</span>
+            </button>
+            <button type="button" id="btn-dd-wrong" class="btn btn-danger-outline">
+              <span id="btn-dd-wrong-label">❌ إجابة خاطئة (-400)</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1162,23 +1407,12 @@
       <div id="winner-subtitle" class="winner-eyebrow">نهاية الجولة</div>
       <h2 id="winner-title" class="winner-title">فاز الفريق الأول!</h2>
 
-      <div class="winner-scores-grid">
-        <div id="winner-card-team1" class="winner-team-box team-1-box">
-          <div class="winner-crown" hidden>👑 الفائز</div>
-          <div id="winner-team1-name" class="winner-team-name">الفريق الأول</div>
-          <div id="winner-team1-score" class="winner-team-score">0</div>
-          <div class="winner-score-unit">نقطة</div>
-        </div>
-
-        <div id="winner-card-team2" class="winner-team-box team-2-box">
-          <div class="winner-crown" hidden>👑 الفائز</div>
-          <div id="winner-team2-name" class="winner-team-name">الفريق الثاني</div>
-          <div id="winner-team2-score" class="winner-team-score">0</div>
-          <div class="winner-score-unit">نقطة</div>
-        </div>
+      <div id="winner-scores-grid" class="winner-scores-grid" data-team-count="2">
+        <!-- يتم توليد بطاقات نتائج الفرق (2-4) ديناميكياً -->
       </div>
 
       <p id="winner-stats-note" class="winner-stats-note"></p>
+      <div id="winner-referee-note" class="winner-referee-note" hidden></div>
 
       <!-- لوحة إحصائيات نهاية المباراة وسجل الأسئلة (Match Analytics Dashboard - Phase 4 Pack 3) -->
       <section id="winner-analytics-dashboard" class="winner-analytics-dashboard" hidden aria-label="إحصائيات نهاية المباراة">
@@ -1220,6 +1454,15 @@
       </section>
 
       <div class="winner-actions">
+        <button type="button" id="btn-start-tiebreaker-from-winner" class="btn btn-amber btn-lg winner-tiebreaker-btn" hidden>
+          ⚔️ خوض جولة كسر تعادل
+        </button>
+        <button type="button" id="btn-open-result-card" class="btn btn-gold-outline btn-lg winner-result-card-btn">
+          📸 حفظ / مشاركة بطاقة النتيجة
+        </button>
+        <button type="button" id="btn-winner-open-hall-of-fame" class="btn btn-secondary btn-sm winner-hof-btn">
+          🏆 قاعة المشاهير والأرشيف
+        </button>
         <div class="winner-primary-actions">
           <button type="button" id="btn-rematch-round" class="btn btn-primary btn-lg">
             🎉 جولة جديدة
@@ -1385,21 +1628,24 @@
         </section>
 
         <!-- القسم د: الأسئلة المحدّدة للمراجعة (Flagged Questions - Phase 4 Pack 4) -->
-        <section id="bank-flagged-section" class="bank-section bank-flagged-section" aria-label="الأسئلة المحدّدة للمراجعة">
+        <section id="bank-flagged-section" class="bank-section bank-flagged-section" aria-label="أسئلة للمراجعة">
           <div class="bank-section-header">
-            <h3 class="bank-section-title">🚩 د) الأسئلة المحدّدة للمراجعة</h3>
-            <span id="bank-flagged-count" class="bank-count-pill">0 أسئلة</span>
+            <h3 class="bank-section-title">🚩 أسئلة للمراجعة (<span id="bank-flagged-count">0</span>)</h3>
+            <span class="bank-section-hint">تُحفظ محلياً للمراجعة في الشيت لاحقاً</span>
           </div>
 
           <div class="bank-flagged-actions">
-            <button type="button" id="btn-export-flagged-csv" class="btn btn-secondary btn-xs" disabled>
-              📄 تصدير CSV (للشيت)
+            <button type="button" id="btn-copy-flagged-report" class="btn btn-primary btn-xs" disabled>
+              📋 نسخ التقرير
             </button>
-            <button type="button" id="btn-copy-flagged-json" class="btn btn-ghost btn-xs" disabled>
-              📋 نسخ JSON
+            <button type="button" id="btn-export-flagged-json" class="btn btn-secondary btn-xs" disabled>
+              ⬇️ تصدير JSON
+            </button>
+            <button type="button" id="btn-export-flagged-csv" class="btn btn-ghost btn-xs" disabled>
+              📄 تصدير CSV
             </button>
             <button type="button" id="btn-clear-all-flagged" class="btn btn-danger-outline btn-xs" disabled>
-              🗑️ مسح قائمة المراجعة
+              🗑️ مسح الكل
             </button>
           </div>
 
@@ -1430,7 +1676,7 @@
             <div class="backup-restore-controls">
               <div class="backup-mode-pills" role="radiogroup" aria-label="وضع الاستعادة">
                 <button type="button" class="backup-mode-pill active" data-backup-mode="merge">
-                  🔀 دمج آمن مع البيانات الحالية
+                  🔀 دمج ذكي (موصى به)
                 </button>
                 <button type="button" class="backup-mode-pill" data-backup-mode="replace">
                   ♻️ استبدال كامل
@@ -1520,6 +1766,856 @@
   </div>
 
   <!-- =========================================================
+       نافذة جولة الرهان النهائي وكسر التعادل (Final Wager Modal - Phase 4 Pack 5)
+       ========================================================= -->
+  <div id="final-round-modal" class="modal-overlay final-round-overlay" role="dialog" aria-modal="true" aria-labelledby="final-round-title" aria-hidden="true">
+    <div class="modal-card final-round-card">
+      <div class="final-round-header">
+        <div class="final-header-title-wrap">
+          <span id="final-round-eyebrow" class="final-eyebrow">⚔️ جولة الحسم الختامية</span>
+          <h2 id="final-round-title" class="final-title">جولة الرهان النهائي</h2>
+        </div>
+        <div class="final-header-end">
+          <span id="final-tv-status-pill" class="host-tv-vis-pill state-hidden" hidden>📺 التلفزيون: الفئة فقط</span>
+          <button type="button" id="btn-final-cancel" class="q-modal-close-btn" title="إلغاء الجولة النهائية والعودة" aria-label="إغلاق الجولة النهائية">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- شريط مراحل الجولة الثلاث -->
+      <div class="final-stepper" aria-label="مراحل الجولة النهائية">
+        <span id="final-step-wager" class="final-step active">1. الفئة والرهان السري</span>
+        <span class="final-step-sep">←</span>
+        <span id="final-step-question" class="final-step">2. السؤال والمؤقت</span>
+        <span class="final-step-sep">←</span>
+        <span id="final-step-reveal" class="final-step">3. كشف النتائج</span>
+      </div>
+
+      <div class="final-round-scroll-body">
+        <!-- بطاقة الفئة المختارة -->
+        <div id="final-category-banner" class="final-category-banner">
+          <div class="final-cat-identity">
+            <span id="final-cat-icon" class="final-cat-icon">🏆</span>
+            <div>
+              <div class="final-cat-label">فئة سؤال الحسم</div>
+              <div id="final-cat-name" class="final-cat-name">تاريخ وحضارات</div>
+            </div>
+          </div>
+          <div class="final-cat-actions">
+            <span id="final-q-tier-pill" class="q-points-pill pts-600">600 نقطة</span>
+            <button type="button" id="btn-final-reroll" class="btn btn-secondary btn-xs" title="اختيار سؤال حسم بديل من فئة أخرى قبل العرض">
+              🔄 تغيير سؤال الحسم
+            </button>
+          </div>
+        </div>
+
+        <!-- المرحلة 1: تثبيت الرهانات السرية -->
+        <section id="final-phase-wager" class="final-phase-section">
+          <p class="final-phase-hint">
+            أدخل الرهان السري لكل فريق مشارك (من 0 حتى الحد الأقصى العادل <code>max(رصيد الفريق, 400)</code>). تبقى مبالغ الرهان مخفية تماماً عن شاشة التلفزيون حتى مرحلة الكشف.
+          </p>
+          <div id="final-wagers-grid" class="final-wagers-grid">
+            <!-- يتم توليد بطاقات رهان الفرق المشاركة ديناميكياً -->
+          </div>
+        </section>
+
+        <!-- المرحلة 2: عرض السؤال + المؤقت + تحكيم الفرق -->
+        <section id="final-phase-question" class="final-phase-section" hidden>
+          <div class="final-timer-bar">
+            <div class="timer-display-group">
+              <div id="final-timer-display" class="timer-display">01:00</div>
+              <span id="final-timer-label" class="timer-mode-label">مؤقت سؤال الحسم</span>
+            </div>
+            <div class="timer-controls">
+              <button type="button" id="btn-final-timer-toggle" class="btn btn-secondary btn-xs">
+                <span id="final-timer-toggle-icon">▶️</span>
+                <span id="final-timer-toggle-text">ابدأ</span>
+              </button>
+              <button type="button" id="btn-final-timer-reset" class="btn btn-ghost btn-xs">
+                🔄 إعادة ضبط
+              </button>
+            </div>
+          </div>
+          <div class="timer-progress-track" aria-hidden="true">
+            <div id="final-timer-progress" class="timer-progress-bar"></div>
+          </div>
+
+          <div class="final-question-card">
+            <div id="final-question-text" class="final-question-text"></div>
+          </div>
+
+          <!-- بطاقة الإجابة السرية للمقدّم فقط -->
+          <div id="final-host-answer-box" class="host-cockpit-card final-host-cockpit">
+            <div class="host-cockpit-header">
+              <span class="host-cockpit-badge">🎙️ للمقدّم فقط (مخفية عن الجمهور على التلفزيون)</span>
+            </div>
+            <div class="host-cockpit-answer-box">
+              <span class="host-cockpit-field-label">✅ الإجابة الصحيحة:</span>
+              <div id="final-host-answer-text" class="host-cockpit-answer-text"></div>
+            </div>
+            <div id="final-host-exp-row" class="host-cockpit-detail-row" hidden>
+              <div class="host-cockpit-detail-content">
+                <span class="host-cockpit-field-label">📌 الشرح:</span>
+                <span id="final-host-exp-text" class="host-cockpit-detail-text"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="final-judge-heading">⚖️ حدّد نتيجة إجابة كل فريق مشارك:</div>
+          <div id="final-judgments-grid" class="final-judgments-grid">
+            <!-- يتم توليد أزرار التحكيم (✅ / ❌) لكل فريق مشارك -->
+          </div>
+        </section>
+
+        <!-- المرحلة 3: كشف الإجابة والرهانات والنتائج -->
+        <section id="final-phase-reveal" class="final-phase-section" hidden>
+          <div class="answer-card final-reveal-answer-card">
+            <div class="answer-label">✅ الإجابة الصحيحة لسؤال الحسم</div>
+            <div id="final-reveal-answer-text" class="answer-text"></div>
+            <div id="final-reveal-exp-text" class="answer-explanation" hidden></div>
+          </div>
+
+          <div id="final-results-grid" class="final-results-grid">
+            <!-- يتم توليد بطاقات كشف الرهان وتعديل النقاط لكل فريق -->
+          </div>
+        </section>
+      </div>
+
+      <!-- تذييل الجولة النهائية -->
+      <div class="final-round-footer">
+        <button type="button" id="btn-final-show-question" class="btn btn-primary btn-lg" disabled>
+          👁️ عرض سؤال الحسم
+        </button>
+        <button type="button" id="btn-final-reveal-results" class="btn btn-amber btn-lg" hidden disabled>
+          🏆 إظهار الإجابة وكشف الرهانات
+        </button>
+        <div id="final-reveal-footer-actions" class="final-reveal-footer-actions" hidden>
+          <button type="button" id="btn-final-extra-tiebreaker" class="btn btn-amber btn-lg" hidden>
+            ⚔️ سؤال كسر تعادل إضافي
+          </button>
+          <button type="button" id="btn-final-go-winner" class="btn btn-primary btn-lg">
+            🏆 الانتقال لشاشة الفائز والإحصائيات
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       قائمة التحكم التحكيمي السريع للمقدّم (Host Referee Popover - Phase 4 Pack 5)
+       ========================================================= -->
+  <div id="referee-popover" class="referee-popover" role="dialog" aria-label="التحكم التحكيمي السريع" hidden>
+    <div class="referee-popover-header">
+      <span id="referee-team-title" class="referee-team-title">⚖️ تحكيم: الفريق الأول</span>
+      <button type="button" id="btn-close-referee-popover" class="btn btn-ghost btn-xxs" aria-label="إغلاق قائمة التحكيم">✕</button>
+    </div>
+
+    <div class="referee-section">
+      <label for="referee-custom-delta-input" class="referee-section-label">تعديل مخصّص للنقاط (+ أو -):</label>
+      <div class="referee-custom-row">
+        <input
+          type="number"
+          id="referee-custom-delta-input"
+          class="referee-number-input"
+          placeholder="مثال: 150 أو -50"
+          step="10"
+        />
+        <button type="button" id="btn-referee-apply-delta" class="btn btn-primary btn-xs">
+          تطبيق
+        </button>
+      </div>
+      <div class="referee-quick-deltas">
+        <button type="button" class="ref-delta-chip" data-ref-delta="50">+50</button>
+        <button type="button" class="ref-delta-chip" data-ref-delta="200">+200</button>
+        <button type="button" class="ref-delta-chip is-neg" data-ref-delta="-50">-50</button>
+        <button type="button" class="ref-delta-chip is-neg" data-ref-delta="-200">-200</button>
+      </div>
+    </div>
+
+    <div class="referee-section">
+      <span class="referee-section-label">تعديل رصيد وسائل المساعدة:</span>
+      <div class="referee-powerup-row">
+        <span>⚡ مضاعفة 2x</span>
+        <div class="referee-stepper">
+          <button type="button" id="btn-ref-double-minus" class="btn btn-ghost btn-xxs" aria-label="إنقاص بطاقة 2x">−1</button>
+          <strong id="ref-double-val">1</strong>
+          <button type="button" id="btn-ref-double-plus" class="btn btn-ghost btn-xxs" aria-label="زيادة بطاقة 2x">+1</button>
+        </div>
+      </div>
+      <div class="referee-powerup-row">
+        <span>🔄 تبديل السؤال</span>
+        <div class="referee-stepper">
+          <button type="button" id="btn-ref-swap-minus" class="btn btn-ghost btn-xxs" aria-label="إنقاص بطاقة تبديل">−1</button>
+          <strong id="ref-swap-val">1</strong>
+          <button type="button" id="btn-ref-swap-plus" class="btn btn-ghost btn-xxs" aria-label="زيادة بطاقة تبديل">+1</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="referee-footer">
+      <button type="button" id="btn-ref-set-turn" class="btn btn-secondary btn-xs btn-full">
+        🎯 تعيين الدور لهذا الفريق الآن
+      </button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة طور «جولة البرق السريعة» (60-Second Blitz Mode - Phase 4 Pack 7)
+       ========================================================= -->
+  <div id="blitz-modal" class="modal-overlay side-mode-overlay" role="dialog" aria-modal="true" aria-labelledby="blitz-modal-title" aria-hidden="true">
+    <div class="modal-card side-mode-card blitz-modal-card">
+      <div class="side-mode-header">
+        <div>
+          <span class="final-eyebrow">⚡ تحدي السرعة والحماس</span>
+          <h2 id="blitz-modal-title" class="final-title">جولة البرق السريعة</h2>
+        </div>
+        <div class="side-mode-header-actions">
+          <button type="button" id="btn-blitz-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 TV</button>
+          <button type="button" id="btn-close-blitz" class="q-modal-close-btn" aria-label="إغلاق جولة البرق">✕</button>
+        </div>
+      </div>
+
+      <div class="side-mode-scroll-body">
+        <!-- 1) إعداد البرق السريع -->
+        <section id="blitz-setup-view" class="side-mode-view">
+          <div class="side-config-grid">
+            <div class="side-config-box">
+              <span class="tactical-opt-label">عدد الفرق / اللاعبين:</span>
+              <div id="blitz-team-count-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn active" data-blitz-teams="1">1 (فردي)</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-teams="2">2 فرق</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-teams="3">3 فرق</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-teams="4">4 فرق</button>
+              </div>
+              <div id="blitz-team-names-inputs" class="side-team-names-inputs"></div>
+            </div>
+
+            <div class="side-config-box">
+              <span class="tactical-opt-label">مدة كل دور:</span>
+              <div id="blitz-duration-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn active" data-blitz-dur="60">60ث (افتراضي)</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-dur="90">90ث</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-dur="120">120ث</button>
+              </div>
+
+              <span class="tactical-opt-label" style="margin-top:0.6rem">عدد الجولات لكل فريق:</span>
+              <div id="blitz-rounds-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn active" data-blitz-rounds="1">1 جولة</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-rounds="2">2 جولتان</button>
+                <button type="button" class="tactical-opt-btn" data-blitz-rounds="3">3 جولات</button>
+              </div>
+
+              <label for="blitz-source-group" class="tactical-opt-label" style="margin-top:0.6rem">مصدر الأسئلة (نصي عادي فقط):</label>
+              <select id="blitz-source-group" class="side-select-input">
+                <option value="all">✨ كل الفئات النصية المتاحة</option>
+              </select>
+            </div>
+          </div>
+          <div class="side-mode-footer">
+            <button type="button" id="btn-blitz-start-session" class="btn btn-primary btn-lg">⚡ ابدأ جولة البرق</button>
+          </div>
+        </section>
+
+        <!-- 2) شاشة الاستعداد قبل انطلاق الدور -->
+        <section id="blitz-ready-view" class="side-mode-view side-ready-box" hidden>
+          <div id="blitz-ready-badge" class="final-eyebrow">الجولة 1</div>
+          <h3 id="blitz-ready-team-title" class="side-ready-title">استعد: اللاعب الأول</h3>
+          <p id="blitz-ready-desc" class="side-ready-desc">
+            أجب على أكبر عدد ممكن من الأسئلة خلال 60 ثانية (+100 نقطة لكل إجابة صحيحة)!
+          </p>
+          <div id="blitz-ready-scoreboard" class="side-mini-scores"></div>
+          <button type="button" id="btn-blitz-begin-turn" class="btn btn-amber btn-lg">🚀 ابدأ المؤقت الآن!</button>
+        </section>
+
+        <!-- 3) شاشة اللعب السريع للمقدّم -->
+        <section id="blitz-play-view" class="side-mode-view" hidden>
+          <div class="blitz-hud-bar">
+            <div class="blitz-hud-team">
+              <strong id="blitz-play-team-name">اللاعب الأول</strong>
+              <span id="blitz-play-team-score" class="blitz-score-pill">0 نقطة</span>
+              <span id="blitz-streak-pill" class="blitz-streak-pill" hidden>🔥 سلسلة ×0</span>
+            </div>
+            <div class="blitz-hud-timer">
+              <div id="blitz-timer-display" class="timer-display">01:00</div>
+              <button type="button" id="btn-blitz-pause" class="btn btn-secondary btn-xs">⏸️ إيقاف <kbd class="kbd-hint">Space</kbd></button>
+            </div>
+          </div>
+          <div class="timer-progress-track" aria-hidden="true">
+            <div id="blitz-timer-progress" class="timer-progress-bar"></div>
+          </div>
+
+          <div class="blitz-question-stage">
+            <span id="blitz-q-cat-pill" class="q-category-pill">⚡ فئة</span>
+            <p id="blitz-q-text" class="blitz-q-text"></p>
+            <div class="host-cockpit-card blitz-answer-cockpit">
+              <span class="host-cockpit-field-label">✅ الإجابة الصحيحة (للمقدّم فقط — مخفية عن التلفزيون):</span>
+              <div id="blitz-q-answer" class="host-cockpit-answer-text"></div>
+            </div>
+          </div>
+
+          <div class="blitz-judge-actions">
+            <button type="button" id="btn-blitz-correct" class="btn btn-steal-win blitz-big-btn">
+              <span>✅ صح (+100)</span>
+              <kbd class="kbd-hint kbd-hint-light">Enter / →</kbd>
+            </button>
+            <button type="button" id="btn-blitz-skip" class="btn btn-secondary blitz-big-btn">
+              <span>⏭️ تخطي (0)</span>
+              <kbd class="kbd-hint">←</kbd>
+            </button>
+            <button type="button" id="btn-blitz-wrong" class="btn btn-danger-outline blitz-big-btn">
+              <span>❌ خطأ (0)</span>
+              <kbd class="kbd-hint">↓</kbd>
+            </button>
+          </div>
+        </section>
+
+        <!-- 4) ملخص نهاية الدور -->
+        <section id="blitz-summary-view" class="side-mode-view" hidden>
+          <h3 id="blitz-summary-title" class="side-summary-title">انتهى دور اللاعب الأول!</h3>
+          <div id="blitz-summary-stats" class="side-summary-stats"></div>
+          <div id="blitz-summary-list" class="side-summary-list"></div>
+          <div class="side-mode-footer">
+            <button type="button" id="btn-blitz-next-turn" class="btn btn-primary btn-lg">الدور التالي ←</button>
+          </div>
+        </section>
+
+        <!-- 5) شاشة الفائز في جولة البرق -->
+        <section id="blitz-finish-view" class="side-mode-view side-finish-box" hidden>
+          <div class="winner-trophy">🏆</div>
+          <h3 id="blitz-finish-title" class="winner-title">نهاية جولة البرق!</h3>
+          <div id="blitz-finish-scores" class="winner-scores-grid"></div>
+          <div class="side-finish-actions">
+            <button type="button" id="btn-blitz-result-card" class="btn btn-gold-outline btn-md">📸 حفظ بطاقة النتيجة</button>
+            <button type="button" id="btn-blitz-open-hof" class="btn btn-secondary btn-md">🏆 قاعة المشاهير</button>
+            <button type="button" id="btn-blitz-play-again" class="btn btn-primary btn-md">🔄 جولة برق جديدة</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة طور «من غير كلام» المستقل (Standalone Charades Mode - Phase 4 Pack 7)
+       ========================================================= -->
+  <div id="charades-solo-modal" class="modal-overlay side-mode-overlay" role="dialog" aria-modal="true" aria-labelledby="charades-solo-title" aria-hidden="true">
+    <div class="modal-card side-mode-card charades-solo-card">
+      <div class="side-mode-header">
+        <div>
+          <span class="final-eyebrow">🎭 التمثيل الصامت السريع</span>
+          <h2 id="charades-solo-title" class="final-title">طور «من غير كلام» المستقل</h2>
+        </div>
+        <div class="side-mode-header-actions">
+          <button type="button" id="btn-charades-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 TV</button>
+          <button type="button" id="btn-close-charades-solo" class="q-modal-close-btn" aria-label="إغلاق طور من غير كلام">✕</button>
+        </div>
+      </div>
+
+      <div class="side-mode-scroll-body">
+        <!-- 1) إعداد من غير كلام المستقل -->
+        <section id="csolo-setup-view" class="side-mode-view">
+          <div class="side-config-grid">
+            <div class="side-config-box">
+              <span class="tactical-opt-label">عدد الفرق:</span>
+              <div id="csolo-team-count-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn active" data-csolo-teams="2">2 فرق</button>
+                <button type="button" class="tactical-opt-btn" data-csolo-teams="3">3 فرق</button>
+                <button type="button" class="tactical-opt-btn" data-csolo-teams="4">4 فرق</button>
+              </div>
+              <div id="csolo-team-names-inputs" class="side-team-names-inputs"></div>
+
+              <span class="tactical-opt-label" style="margin-top:0.6rem">مدة الدور:</span>
+              <div id="csolo-duration-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn" data-csolo-dur="60">60ث</button>
+                <button type="button" class="tactical-opt-btn active" data-csolo-dur="90">90ث (افتراضي)</button>
+                <button type="button" class="tactical-opt-btn" data-csolo-dur="120">120ث</button>
+              </div>
+            </div>
+
+            <div class="side-config-box">
+              <span class="tactical-opt-label">عدد الجولات لكل فريق:</span>
+              <div id="csolo-rounds-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn" data-csolo-rounds="2">2 جولتان</button>
+                <button type="button" class="tactical-opt-btn active" data-csolo-rounds="3">3 جولات</button>
+                <button type="button" class="tactical-opt-btn" data-csolo-rounds="5">5 جولات</button>
+              </div>
+
+              <span class="tactical-opt-label" style="margin-top:0.6rem">حد التخطي في الدور الواحد:</span>
+              <div id="csolo-skip-pills" class="tactical-pills-row">
+                <button type="button" class="tactical-opt-btn" data-csolo-skip="0">غير محدود</button>
+                <button type="button" class="tactical-opt-btn active" data-csolo-skip="2">2 تخطيان</button>
+                <button type="button" class="tactical-opt-btn" data-csolo-skip="3">3 تخطيات</button>
+              </div>
+
+              <span class="tactical-opt-label" style="margin-top:0.6rem">فئات «من غير كلام» (اختر أو اترك الكل لتشكيلة منوعة):</span>
+              <div id="csolo-categories-chips" class="csolo-categories-chips"></div>
+            </div>
+          </div>
+          <div class="side-mode-footer">
+            <button type="button" id="btn-csolo-start-session" class="btn btn-primary btn-lg">🎭 ابدأ اللعب الآن</button>
+          </div>
+        </section>
+
+        <!-- 2) شاشة الاستعداد للدور -->
+        <section id="csolo-ready-view" class="side-mode-view side-ready-box" hidden>
+          <div id="csolo-ready-badge" class="final-eyebrow">الجولة 1</div>
+          <h3 id="csolo-ready-team-title" class="side-ready-title">دور: الفريق الأول</h3>
+          <p id="csolo-ready-desc" class="side-ready-desc">
+            يستعد الممثّل أمام الشاشة بينما يدير الفريق ظهره للشاشة، ثم ابدأ المؤقت!
+          </p>
+          <div id="csolo-ready-scoreboard" class="side-mini-scores"></div>
+          <button type="button" id="btn-csolo-begin-turn" class="btn btn-amber btn-lg">🎬 ابدأ جولة التمثيل!</button>
+        </section>
+
+        <!-- 3) شاشة اللعب (Hold-to-Reveal في شاشة واحدة / لوحة مقدّم فورية في شاشتين) -->
+        <section id="csolo-play-view" class="side-mode-view" hidden>
+          <div class="blitz-hud-bar">
+            <div class="blitz-hud-team">
+              <strong id="csolo-play-team-name">الفريق الأول</strong>
+              <span id="csolo-play-team-score" class="blitz-score-pill">0 نقطة</span>
+              <span id="csolo-skips-pill" class="remaining-pill">تخطي متبقي: 2</span>
+            </div>
+            <div class="blitz-hud-timer">
+              <div id="csolo-timer-display" class="timer-display">01:30</div>
+              <button type="button" id="btn-csolo-pause" class="btn btn-secondary btn-xs">⏸️ إيقاف</button>
+            </div>
+          </div>
+          <div class="timer-progress-track" aria-hidden="true">
+            <div id="csolo-timer-progress" class="timer-progress-bar"></div>
+          </div>
+
+          <div class="charades-header-card csolo-header-card">
+            <div id="csolo-eyebrow" class="charades-header-eyebrow">🎭 من غير كلام</div>
+            <h3 id="csolo-topic" class="charades-topic-title">التصنيف الفرعي</h3>
+            <span id="csolo-word-count" class="charades-word-count-pill">🔢 عدد الكلمات</span>
+          </div>
+
+          <!-- لوحة المقدّم الفورية عند اتصال التلفزيون -->
+          <div id="csolo-host-secret-box" class="host-cockpit-card" hidden>
+            <div class="host-cockpit-header">
+              <span class="host-cockpit-badge">🎙️ للمقدّم والممثّل فقط (مخفية تماماً عن التلفزيون)</span>
+            </div>
+            <div class="host-cockpit-answer-box">
+              <span class="host-cockpit-field-label">🎭 الكلمة المطلوب تمثيلها:</span>
+              <div id="csolo-host-word" class="host-cockpit-answer-text"></div>
+            </div>
+            <div id="csolo-host-exp-row" class="host-cockpit-detail-row" hidden>
+              <div class="host-cockpit-detail-content">
+                <span class="host-cockpit-field-label">🎬 فكرة التمثيل:</span>
+                <span id="csolo-host-exp" class="host-cockpit-detail-text"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- آلية Hold-to-Reveal في وضع الشاشة الواحدة -->
+          <div id="csolo-hold-stage" class="charades-actor-stage select-none">
+            <div class="charades-card-viewport">
+              <div id="csolo-decoy-card" class="charades-decoy-card">
+                <div class="charades-decoy-icon" aria-hidden="true">🙈</div>
+                <div class="charades-decoy-title">شاشة التمويه الآمنة</div>
+                <p class="charades-decoy-desc">اضغط مطوّلاً بالأسفل لكشف الكلمة وفكرة التمثيل سراً للممثّل.</p>
+              </div>
+              <div id="csolo-secret-card" class="charades-secret-card" hidden>
+                <div class="charades-secret-badge">🤫 للممثّل فقط!</div>
+                <div id="csolo-secret-word" class="charades-secret-answer"></div>
+                <div id="csolo-secret-exp" class="charades-secret-explanation" hidden></div>
+              </div>
+            </div>
+            <button type="button" id="btn-csolo-hold-reveal" class="btn charades-hold-btn select-none">
+              <span aria-hidden="true">👆</span>
+              <span>اضغط مع الاستمرار لكشف الكلمة سراً</span>
+            </button>
+          </div>
+
+          <div id="csolo-hint-box" class="question-hint-box" hidden></div>
+
+          <div class="blitz-judge-actions csolo-actions">
+            <button type="button" id="btn-csolo-guessed" class="btn btn-steal-win blitz-big-btn">
+              ✅ تمّ التخمين (+100)
+            </button>
+            <button type="button" id="btn-csolo-skip" class="btn btn-secondary blitz-big-btn">
+              ⏭️ تخطي الكلمة
+            </button>
+            <button type="button" id="btn-csolo-hint" class="btn btn-gold-outline blitz-big-btn">
+              💡 تلميح للجمهور
+            </button>
+          </div>
+        </section>
+
+        <!-- 4) ملخص نهاية الدور -->
+        <section id="csolo-summary-view" class="side-mode-view" hidden>
+          <h3 id="csolo-summary-title" class="side-summary-title">انتهى دور الفريق!</h3>
+          <div id="csolo-summary-stats" class="side-summary-stats"></div>
+          <div id="csolo-summary-list" class="side-summary-list"></div>
+          <div class="side-mode-footer">
+            <button type="button" id="btn-csolo-next-turn" class="btn btn-primary btn-lg">الدور التالي ←</button>
+          </div>
+        </section>
+
+        <!-- 5) شاشة التتويج -->
+        <section id="csolo-finish-view" class="side-mode-view side-finish-box" hidden>
+          <div class="winner-trophy">🏆</div>
+          <h3 id="csolo-finish-title" class="winner-title">نهاية تحدي «من غير كلام»!</h3>
+          <div id="csolo-finish-scores" class="winner-scores-grid"></div>
+          <div class="side-finish-actions">
+            <button type="button" id="btn-csolo-result-card" class="btn btn-gold-outline btn-md">📸 حفظ بطاقة النتيجة</button>
+            <button type="button" id="btn-csolo-open-hof" class="btn btn-secondary btn-md">🏆 قاعة المشاهير</button>
+            <button type="button" id="btn-csolo-play-again" class="btn btn-primary btn-md">🔄 جولة جديدة</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة قاعة المشاهير وأرشيف المباريات (Hall of Fame & Archive - Phase 4 Pack 7)
+       ========================================================= -->
+  <div id="hall-of-fame-modal" class="modal-overlay hof-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="hof-modal-title" aria-hidden="true">
+    <div class="modal-card hof-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="hof-modal-title" class="bank-modal-title">
+            <span>🏆</span>
+            قاعة المشاهير وأرشيف المباريات
+          </h2>
+          <p id="hof-profile-subtitle" class="bank-sources-summary">المجموعة النشطة: عام</p>
+        </div>
+        <button type="button" id="btn-close-hof" class="q-modal-close-btn" aria-label="إغلاق قاعة المشاهير">✕</button>
+      </div>
+
+      <div class="bank-modal-scroll-body">
+        <!-- 1) الأرقام القياسية -->
+        <section class="bank-section">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🥇 الأرقام القياسية للمجموعة</h3>
+            <span id="hof-total-matches-pill" class="bank-count-pill">0 مباريات</span>
+          </div>
+          <div id="hof-records-grid" class="hof-records-grid"></div>
+        </section>
+
+        <!-- 2) جدول المتصدرين التراكمي -->
+        <section class="bank-section">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">📊 جدول المتصدرين التراكمي</h3>
+          </div>
+          <div id="hof-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
+        </section>
+
+        <!-- 3) أرشيف المباريات السابقة -->
+        <section class="bank-section">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🗂️ أرشيف المباريات (آخر 50 مباراة)</h3>
+            <div id="hof-mode-filters" class="hof-mode-filters" role="tablist">
+              <button type="button" class="hof-filter-pill active" data-hof-mode="all">الكل</button>
+              <button type="button" class="hof-filter-pill" data-hof-mode="classic">كلاسيكي</button>
+              <button type="button" class="hof-filter-pill" data-hof-mode="blitz">⚡ البرق</button>
+              <button type="button" class="hof-filter-pill" data-hof-mode="charades">🎭 من غير كلام</button>
+            </div>
+          </div>
+          <div id="hof-archive-list" class="hof-archive-list"></div>
+        </section>
+      </div>
+
+      <div class="bank-modal-footer">
+        <button type="button" id="btn-hof-clear-archive" class="btn btn-danger-outline btn-sm" disabled>
+          🗑️ تصفير أرشيف المجموعة النشطة
+        </button>
+        <button type="button" id="btn-hof-footer-close" class="btn btn-secondary btn-sm">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة الغرفة اللاسلكية وإعدادات Firebase + رموز QR المحلية (Phase 4 Pack 9)
+       ========================================================= -->
+  <div id="wireless-room-modal" class="modal-overlay wireless-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="wireless-modal-title" aria-hidden="true">
+    <div class="modal-card wireless-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="wireless-modal-title" class="bank-modal-title">
+            <span>📡</span>
+            الغرفة اللاسلكية (QR Code + جرس السرعة)
+          </h2>
+          <p id="wireless-room-subtitle" class="bank-sources-summary">
+            تحكّم باللعبة من هاتفك وامسح QR لجرس الفرق والرهان السري — يعمل التطبيق محلياً وأوفلاين بالكامل دون الحاجة إليها.
+          </p>
+        </div>
+        <button type="button" id="btn-close-wireless-modal" class="q-modal-close-btn" aria-label="إغلاق نافذة الغرفة اللاسلكية">✕</button>
+      </div>
+
+      <div class="bank-modal-scroll-body wireless-modal-body">
+        <!-- 1) شريط الحالة والتحكم بالغرفة -->
+        <section class="bank-section wireless-status-section">
+          <div class="wireless-status-top">
+            <div class="wireless-status-badges">
+              <span id="wireless-conn-badge" class="dual-status-pill is-single">⚪ الوضع المحلي (الغرفة غير مفعّلة)</span>
+              <span id="wireless-room-code-pill" class="wireless-code-pill" hidden>
+                رمز الغرفة: <strong id="wireless-room-code-text">------</strong>
+              </span>
+            </div>
+            <div class="wireless-top-actions">
+              <button type="button" id="btn-create-wireless-room" class="btn btn-primary btn-sm">
+                📡 إنشاء غرفة لاسلكية
+              </button>
+              <button type="button" id="btn-close-wireless-room" class="btn btn-danger-outline btn-sm" hidden>
+                🔴 إغلاق الغرفة اللاسلكية
+              </button>
+              <button type="button" id="btn-toggle-wireless-settings" class="btn btn-secondary btn-sm" aria-expanded="false">
+                ⚙️ إعدادات الاتصال اللاسلكي
+              </button>
+            </div>
+          </div>
+
+          <div id="wireless-room-feedback" class="wireless-feedback-box" hidden aria-live="polite"></div>
+
+          <!-- لوحة إعدادات Firebase القابلة للطي -->
+          <div id="wireless-settings-panel" class="wireless-settings-panel" hidden>
+            <div class="wireless-settings-head">
+              <strong>⚙️ إعدادات مشروع Firebase Realtime Database</strong>
+              <span class="wireless-settings-hint">تُحفظ محلياً في المتصفح فقط (أو في ملف firebaseConfig.js)</span>
+            </div>
+            <label for="fb-paste-snippet" class="input-label">لصق سريع لإعدادات Firebase (JSON أو كود JS من Firebase Console):</label>
+            <div class="wireless-paste-row">
+              <textarea id="fb-paste-snippet" class="text-input wireless-snippet-input" rows="2" placeholder='الصق هنا: const firebaseConfig = { apiKey: "...", databaseURL: "...", ... }'></textarea>
+              <button type="button" id="btn-fb-parse-snippet" class="btn btn-secondary btn-xs">✨ استخراج تلقائي</button>
+            </div>
+            <div class="wireless-cfg-grid">
+              <div>
+                <label for="fb-api-key" class="input-label">apiKey</label>
+                <input type="text" id="fb-api-key" class="text-input" placeholder="AIza..." autocomplete="off" />
+              </div>
+              <div>
+                <label for="fb-auth-domain" class="input-label">authDomain</label>
+                <input type="text" id="fb-auth-domain" class="text-input" placeholder="project.firebaseapp.com" autocomplete="off" />
+              </div>
+              <div>
+                <label for="fb-database-url" class="input-label">databaseURL (إلزامي)</label>
+                <input type="url" id="fb-database-url" class="text-input" placeholder="https://project-default-rtdb.firebaseio.com" autocomplete="off" />
+              </div>
+              <div>
+                <label for="fb-project-id" class="input-label">projectId</label>
+                <input type="text" id="fb-project-id" class="text-input" placeholder="my-seen-jeem" autocomplete="off" />
+              </div>
+              <div class="wireless-cfg-span-2">
+                <label for="fb-app-id" class="input-label">appId</label>
+                <input type="text" id="fb-app-id" class="text-input" placeholder="1:123456:web:abcdef" autocomplete="off" />
+              </div>
+            </div>
+            <div class="wireless-settings-actions">
+              <button type="button" id="btn-fb-save-config" class="btn btn-primary btn-xs">💾 حفظ الإعدادات</button>
+              <button type="button" id="btn-fb-test-conn" class="btn btn-gold-outline btn-xs">🔌 اختبار الاتصال</button>
+              <button type="button" id="btn-fb-clear-config" class="btn btn-ghost btn-xs">🗑️ مسح الإعدادات المحفوظة</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2) رموز QR المحلية (ريموت المقدّم + هواتف الفرق) -->
+        <section id="wireless-qr-grid" class="wireless-qr-grid" hidden>
+          <!-- بطاقة QR ريموت المقدّم السري -->
+          <article class="wireless-qr-card is-host-qr">
+            <div class="wireless-qr-head">
+              <div>
+                <h3>📱 ريموت المقدّم (سري)</h3>
+                <p class="wireless-qr-sub">يعرض الإجابات ويتحكّم باللعبة — لا تُظهره للاعبين!</p>
+              </div>
+              <button type="button" id="btn-toggle-host-qr-privacy" class="btn btn-secondary btn-xxs">
+                🙈 إخفاء QR المقدّم
+              </button>
+            </div>
+            <div id="wireless-host-qr-box" class="wireless-qr-svg-wrap"></div>
+            <div id="wireless-host-qr-masked" class="wireless-qr-masked" hidden>
+              <span>🔒 تم إخفاء QR المقدّم حمايةً لـ hostToken</span>
+            </div>
+            <div class="wireless-qr-actions">
+              <button type="button" id="btn-copy-remote-url" class="btn btn-ghost btn-xxs">📋 نسخ رابط الريموت</button>
+              <a id="link-open-remote-tab" href="#" target="_blank" rel="noopener" class="btn btn-secondary btn-xxs">↗️ فتح الريموت</a>
+            </div>
+          </article>
+
+          <!-- بطاقة QR الفرق (جرس السرعة والرهان السري) -->
+          <article class="wireless-qr-card is-player-qr">
+            <div class="wireless-qr-head">
+              <div>
+                <h3>🔔 هواتف الفرق (الجرس والرهان)</h3>
+                <p class="wireless-qr-sub">يمسحه اللاعبون للانضمام لفرقهم واستخدام جرس السرعة.</p>
+              </div>
+              <button type="button" id="btn-toggle-tv-qr" class="btn btn-gold-outline btn-xxs">
+                📺 إظهار QR على التلفزيون
+              </button>
+            </div>
+            <div id="wireless-player-qr-box" class="wireless-qr-svg-wrap"></div>
+            <div class="wireless-player-code-display">
+              رمز الغرفة: <strong id="wireless-player-code-big">------</strong>
+            </div>
+            <div id="wireless-connected-teams" class="wireless-connected-teams"></div>
+            <div class="wireless-qr-actions">
+              <button type="button" id="btn-copy-player-url" class="btn btn-ghost btn-xxs">📋 نسخ رابط الفرق</button>
+              <a id="link-open-player-tab" href="#" target="_blank" rel="noopener" class="btn btn-secondary btn-xxs">↗️ فتح شاشة لاعب</a>
+            </div>
+          </article>
+        </section>
+
+        <!-- 3) لوحة تحكم جرس السرعة المباشرة -->
+        <section id="wireless-buzzer-panel" class="bank-section wireless-buzzer-panel" hidden>
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">🔔 جرس السرعة المباشر للفرق</h3>
+            <span id="wireless-buzzer-state-pill" class="bank-count-pill">🔒 مقفل</span>
+          </div>
+          <div id="wireless-buzzer-result-box" class="wireless-buzzer-result-box">
+            اضغط «🔔 فتح الجرس» لتمكين هواتف الفرق من التسابق بالميلي ثانية.
+          </div>
+          <div class="wireless-buzzer-controls">
+            <button type="button" id="btn-modal-wb-open" class="btn btn-steal-win btn-sm">🔔 فتح الجرس للفرق</button>
+            <button type="button" id="btn-modal-wb-lock" class="btn btn-secondary btn-sm">🔒 إقفال الجرس</button>
+            <button type="button" id="btn-modal-wb-reset" class="btn btn-gold-outline btn-sm">🔄 تصفير الجرس</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة معاينة وحفظ بطاقة النتيجة (Shareable Result Card Modal - Phase 4 Pack 6)
+       ========================================================= -->
+  <div id="result-card-modal" class="modal-overlay result-card-overlay" role="dialog" aria-modal="true" aria-labelledby="result-card-title" aria-hidden="true">
+    <div class="modal-card result-card-modal-card">
+      <div class="result-card-header">
+        <h3 id="result-card-title" class="result-card-title">📸 بطاقة نتيجة المباراة (1080×1350)</h3>
+        <button type="button" id="btn-close-result-card" class="q-modal-close-btn" aria-label="إغلاق معاينة بطاقة النتيجة" title="إغلاق (Esc)">✕</button>
+      </div>
+
+      <div class="result-card-preview-wrap">
+        <div id="result-card-loading" class="result-card-loading">⏳ جاري رسم بطاقة النتيجة عالية الدقة...</div>
+        <img id="result-card-preview-img" class="result-card-preview-img" alt="معاينة بطاقة نتيجة المباراة" hidden />
+      </div>
+
+      <div class="result-card-actions">
+        <button type="button" id="btn-download-result-card" class="btn btn-primary btn-sm" disabled>
+          ⬇️ تنزيل الصورة (PNG)
+        </button>
+        <button type="button" id="btn-share-result-card" class="btn btn-amber btn-sm" hidden disabled>
+          📤 مشاركة مباشرة
+        </button>
+        <button type="button" id="btn-copy-result-card" class="btn btn-secondary btn-sm" disabled>
+          📋 نسخ الصورة للحافظة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       لوحة المؤثرات الصوتية للمقدّم (Host Soundboard Popover - Phase 4 Pack 6)
+       ========================================================= -->
+  <div id="soundboard-popover" class="host-tool-popover soundboard-popover" role="dialog" aria-label="لوحة المؤثرات الصوتية للمقدّم" hidden>
+    <div class="audio-mixer-header">
+      <span class="audio-mixer-title">🎛️ لوحة المؤثرات الصوتية</span>
+      <button type="button" id="btn-close-soundboard" class="btn btn-ghost btn-xxs" aria-label="إغلاق لوحة المؤثرات">✕</button>
+    </div>
+    <div class="soundboard-grid">
+      <button type="button" class="soundboard-btn" data-sfx="drumroll">
+        <span class="sb-icon">🥁</span>
+        <span class="sb-label">قرع طبول التشويق</span>
+        <kbd class="kbd-hint">Alt+1</kbd>
+      </button>
+      <button type="button" class="soundboard-btn" data-sfx="applause">
+        <span class="sb-icon">👏</span>
+        <span class="sb-label">تصفيق واحتفال</span>
+        <kbd class="kbd-hint">Alt+2</kbd>
+      </button>
+      <button type="button" class="soundboard-btn" data-sfx="sad_trombone">
+        <span class="sb-icon">🎺</span>
+        <span class="sb-label">خطأ كوميدي درامي</span>
+        <kbd class="kbd-hint">Alt+3</kbd>
+      </button>
+      <button type="button" class="soundboard-btn" data-sfx="attention_chime">
+        <span class="sb-icon">🔔</span>
+        <span class="sb-label">تنبيه هدوء / انتباه</span>
+        <kbd class="kbd-hint">Alt+4</kbd>
+      </button>
+      <button type="button" class="soundboard-btn" data-sfx="fanfare">
+        <span class="sb-icon">🎉</span>
+        <span class="sb-label">افتتاحية حماسية</span>
+        <kbd class="kbd-hint">Alt+5</kbd>
+      </button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة إعداد شاشة الاستراحة التلفزيونية (Intermission Popover - Phase 4 Pack 6)
+       ========================================================= -->
+  <div id="intermission-popover" class="host-tool-popover intermission-popover" role="dialog" aria-label="تفعيل شاشة الاستراحة التلفزيونية" hidden>
+    <div class="audio-mixer-header">
+      <span class="audio-mixer-title">☕ شاشة الاستراحة التلفزيونية</span>
+      <button type="button" id="btn-close-intermission-popover" class="btn btn-ghost btn-xxs" aria-label="إغلاق إعداد الاستراحة">✕</button>
+    </div>
+    <div class="intermission-form-body">
+      <label for="intermission-message-input" class="referee-section-label">عنوان الاستراحة على شاشة التلفزيون:</label>
+      <input
+        type="text"
+        id="intermission-message-input"
+        class="referee-number-input"
+        value="استراحة قصيرة — نعود بعد قليل"
+        maxlength="120"
+        autocomplete="off"
+      />
+      <span class="referee-section-label intermission-dur-label">عدّاد الاستراحة الاختياري:</span>
+      <div id="intermission-duration-pills" class="intermission-duration-pills" role="group" aria-label="مدة الاستراحة">
+        <button type="button" class="intermission-dur-pill active" data-intermission-min="0">بدون مؤقت</button>
+        <button type="button" class="intermission-dur-pill" data-intermission-min="5">5 دقائق</button>
+        <button type="button" class="intermission-dur-pill" data-intermission-min="10">10 دقائق</button>
+        <button type="button" class="intermission-dur-pill" data-intermission-min="15">15 دقيقة</button>
+      </div>
+      <div class="intermission-popover-actions">
+        <button type="button" id="btn-start-intermission" class="btn btn-amber btn-sm btn-full">
+          ☕ تفعيل شاشة الاستراحة الآن
+        </button>
+        <button type="button" id="btn-stop-intermission-popover" class="btn btn-primary btn-sm btn-full" hidden>
+          ▶️ استئناف اللعب وإغلاق الاستراحة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       قائمة المظهر ومقياس التلفزيون السريعة (Display Prefs Popover - Phase 4 Pack 6)
+       ========================================================= -->
+  <div id="display-prefs-popover" class="host-tool-popover display-prefs-popover" role="dialog" aria-label="الثيمات ومقياس شاشة التلفزيون" hidden>
+    <div class="audio-mixer-header">
+      <span class="audio-mixer-title">🎨 الثيم وحجم شاشة التلفزيون</span>
+      <button type="button" id="btn-close-display-prefs" class="btn btn-ghost btn-xxs" aria-label="إغلاق إعدادات العرض">✕</button>
+    </div>
+    <div class="referee-section">
+      <span class="referee-section-label">اختر ثيم المظهر (يتزامن مع التلفزيون):</span>
+      <div class="theme-pills-stack" role="group" aria-label="اختيار الثيم السريع">
+        <button type="button" class="theme-choice-btn active" data-theme-choice="dark-glass" aria-pressed="true">🌌 زجاجي داكن (افتراضي)</button>
+        <button type="button" class="theme-choice-btn" data-theme-choice="royal-gold" aria-pressed="false">👑 ملكي ذهبي (رمضاني)</button>
+        <button type="button" class="theme-choice-btn" data-theme-choice="high-contrast" aria-pressed="false">🔆 تباين عالٍ (غرف مضيئة)</button>
+      </div>
+    </div>
+    <div class="referee-section">
+      <div class="audio-volume-label-row">
+        <label for="game-tv-scale-slider">حجم خط شاشة التلفزيون</label>
+        <strong id="game-tv-scale-val">100%</strong>
+      </div>
+      <div class="tv-scale-slider-wrap">
+        <input
+          type="range"
+          id="game-tv-scale-slider"
+          class="tv-scale-slider"
+          min="90"
+          max="130"
+          step="5"
+          value="100"
+          aria-label="حجم خط شاشة التلفزيون من لوحة اللعب"
+        />
+        <button type="button" id="btn-reset-tv-scale-game" class="btn btn-ghost btn-xxs" title="إعادة ضبط مقياس التلفزيون إلى 100%">
+          ↺ 100%
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
        لوحة التحكم المتقدمة بالصوت (Audio Mixer Popover - Phase 4 Pack 4)
        ========================================================= -->
   <div id="audio-mixer-popover" class="audio-mixer-popover" role="dialog" aria-label="إعدادات الصوت والمؤثرات" hidden>
@@ -1531,7 +2627,7 @@
     <div class="audio-volume-row">
       <div class="audio-volume-label-row">
         <label for="audio-volume-slider">مستوى الصوت الرئيسي</label>
-        <strong id="audio-volume-value">80%</strong>
+        <strong id="audio-volume-value">75%</strong>
       </div>
       <input
         type="range"
@@ -1540,7 +2636,7 @@
         min="0"
         max="100"
         step="5"
-        value="80"
+        value="75"
         aria-label="مستوى الصوت الرئيسي"
       />
     </div>
@@ -1580,18 +2676,28 @@
   <script src="src/data/questions.js"></script>
   <script src="src/data/extra-questions.js"></script>
   <script src="sheets-config.js"></script>
+  <script src="firebaseConfig.js"></script>
   <script src="src/utils/historyStore.js"></script>
   <script src="src/utils/sheetSanitizer.js"></script>
   <script src="src/utils/matchStore.js"></script>
+  <script src="src/utils/finalRound.js"></script>
   <script src="src/utils/imagePreloader.js"></script>
   <script src="src/utils/liveSync.js"></script>
   <script src="src/utils/wakeLock.js"></script>
   <script src="src/utils/flaggedQuestionsStore.js"></script>
+  <script src="src/utils/matchArchiveStore.js"></script>
+  <script src="src/utils/blitzMode.js"></script>
+  <script src="src/utils/charadesMode.js"></script>
+  <script src="src/utils/qrGenerator.js"></script>
+  <script src="src/utils/realtimeSync.js"></script>
   <script src="src/utils/backupManager.js"></script>
+  <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/pwaManager.js"></script>
   <script src="src/js/audio.js"></script>
   <script src="src/js/confetti.js"></script>
   <script src="src/js/displayView.js"></script>
+  <script src="src/js/remoteHostView.js"></script>
+  <script src="src/js/playerView.js"></script>
   <script src="src/js/app.js"></script>
 </body>
 </html>

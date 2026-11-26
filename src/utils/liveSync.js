@@ -87,14 +87,34 @@
   /**
    * طبقة تنقية إضافية صارمة لمنع تسريب أي إجابة أو شرح أو تلميح غير مصرح به عبر القناة
    */
+  function sanitizeSetupInfo(rawSetup) {
+    if (!rawSetup || typeof rawSetup !== "object") return null;
+    const rawNames = Array.isArray(rawSetup.teamNames)
+      ? rawSetup.teamNames.filter((n) => typeof n === "string" && n.trim()).slice(0, 4)
+      : [];
+    const team1Name =
+      typeof rawSetup.team1Name === "string" ? rawSetup.team1Name : rawNames[0] || "الفريق الأول";
+    const team2Name =
+      typeof rawSetup.team2Name === "string" ? rawSetup.team2Name : rawNames[1] || "الفريق الثاني";
+    const teamNames = rawNames.length >= 2 ? rawNames : [team1Name, team2Name];
+    return {
+      team1Name,
+      team2Name,
+      teamNames,
+      teamCount: teamNames.length,
+      selectedCount: Number(rawSetup.selectedCount) || 0,
+      message: typeof rawSetup.message === "string" ? rawSetup.message : ""
+    };
+  }
+
   function enforceAntiSpoilerOnSnapshot(rawSnapshot) {
     if (!rawSnapshot || typeof rawSnapshot !== "object") return null;
 
     const clean = {
       version: 1,
       sentAt: Date.now(),
-      screen: rawSnapshot.screen || "setup", // "setup" | "board" | "question" | "winner"
-      setupInfo: rawSnapshot.setupInfo || null,
+      screen: rawSnapshot.screen || "setup", // "setup" | "board" | "question" | "final" | "winner"
+      setupInfo: sanitizeSetupInfo(rawSnapshot.setupInfo),
       teams: Array.isArray(rawSnapshot.teams)
         ? rawSnapshot.teams.map((t) => ({
             id: t.id,
@@ -141,13 +161,82 @@
           }))
         : [],
       questionView: null,
-      winnerView: rawSnapshot.winnerView || null
+      finalRoundView: null,
+      blitzView: null,
+      charadesSoloView: null,
+      winnerView: rawSnapshot.winnerView || null,
+      intermission:
+        rawSnapshot.intermission && typeof rawSnapshot.intermission === "object"
+          ? {
+              active: Boolean(rawSnapshot.intermission.active),
+              message:
+                typeof rawSnapshot.intermission.message === "string" &&
+                rawSnapshot.intermission.message.trim()
+                  ? rawSnapshot.intermission.message.trim().slice(0, 120)
+                  : "استراحة قصيرة — نعود بعد قليل",
+              totalSeconds: Math.max(0, Math.floor(Number(rawSnapshot.intermission.totalSeconds) || 0)),
+              remainingSeconds: Math.max(
+                0,
+                Math.floor(Number(rawSnapshot.intermission.remainingSeconds) || 0)
+              )
+            }
+          : { active: false, message: "استراحة قصيرة — نعود بعد قليل", totalSeconds: 0, remainingSeconds: 0 },
+      displayPrefs:
+        rawSnapshot.displayPrefs && typeof rawSnapshot.displayPrefs === "object"
+          ? {
+              theme:
+                rawSnapshot.displayPrefs.theme === "royal-gold" ||
+                rawSnapshot.displayPrefs.theme === "high-contrast"
+                  ? rawSnapshot.displayPrefs.theme
+                  : "dark-glass",
+              tvScale: Math.min(
+                130,
+                Math.max(90, Math.round((Number(rawSnapshot.displayPrefs.tvScale) || 100) / 5) * 5)
+              )
+            }
+          : null,
+      audioSettings:
+        rawSnapshot.audioSettings && typeof rawSnapshot.audioSettings === "object"
+          ? {
+              volume: Number(rawSnapshot.audioSettings.volume),
+              muted: Boolean(rawSnapshot.audioSettings.muted),
+              categoryPrefs: rawSnapshot.audioSettings.categoryPrefs || null
+            }
+          : null,
+      wireless:
+        rawSnapshot.wireless && typeof rawSnapshot.wireless === "object"
+          ? {
+              active: Boolean(rawSnapshot.wireless.active),
+              roomCode: typeof rawSnapshot.wireless.roomCode === "string" ? rawSnapshot.wireless.roomCode : "",
+              playerUrl: typeof rawSnapshot.wireless.playerUrl === "string" ? rawSnapshot.wireless.playerUrl : "",
+              showQrOnTv: Boolean(rawSnapshot.wireless.showQrOnTv),
+              buzzer:
+                rawSnapshot.wireless.buzzer && typeof rawSnapshot.wireless.buzzer === "object"
+                  ? {
+                      state: rawSnapshot.wireless.buzzer.state || "locked",
+                      roundId: rawSnapshot.wireless.buzzer.roundId || "",
+                      winnerTeamIdx: Number.isInteger(rawSnapshot.wireless.buzzer.winnerTeamIdx)
+                        ? rawSnapshot.wireless.buzzer.winnerTeamIdx
+                        : null,
+                      winnerTeamName: rawSnapshot.wireless.buzzer.winnerTeamName || "",
+                      runnerUpDeltaMs:
+                        rawSnapshot.wireless.buzzer.runnerUpDeltaMs !== null &&
+                        rawSnapshot.wireless.buzzer.runnerUpDeltaMs !== undefined
+                          ? Number(rawSnapshot.wireless.buzzer.runnerUpDeltaMs)
+                          : null
+                    }
+                  : null
+            }
+          : null
     };
 
     if (rawSnapshot.questionView && typeof rawSnapshot.questionView === "object") {
       const qv = rawSnapshot.questionView;
-      const allowAnswer = Boolean(qv.answerRevealed);
-      const allowHint = Boolean(qv.hintRevealed);
+      const isDailyDouble = Boolean(qv.isDailyDouble);
+      const dailyDoublePhase = isDailyDouble && qv.dailyDoublePhase === "wager" ? "wager" : "question";
+      const isDailyDoubleWagerLocked = isDailyDouble && dailyDoublePhase === "wager";
+      const allowAnswer = !isDailyDoubleWagerLocked && Boolean(qv.answerRevealed);
+      const allowHint = !isDailyDoubleWagerLocked && Boolean(qv.hintRevealed);
       const isMemoryLocked =
         qv.visualType === "memory" &&
         (qv.memoryPhase === "ready" || qv.memoryPhase === "loading" || qv.memoryPhase === "viewing");
@@ -162,9 +251,14 @@
         effectivePoints: Number(qv.effectivePoints) || Number(qv.basePoints) || 200,
         stealPoints: Number(qv.stealPoints) || 0,
         hintPenaltyPct: Number(qv.hintPenaltyPct) || 0,
+        isDailyDouble,
+        dailyDoublePhase,
+        dailyDoubleWager: isDailyDouble ? Math.max(0, Number(qv.dailyDoubleWager) || 0) : 0,
+        dailyDoubleMaxWager: isDailyDouble ? Math.max(0, Number(qv.dailyDoubleMaxWager) || 0) : 0,
         visualType: qv.visualType || "normal",
         isCharades: Boolean(qv.isCharades),
-        charadesHeader: qv.isCharades && qv.charadesHeader ? qv.charadesHeader : null,
+        charadesHeader:
+          !isDailyDoubleWagerLocked && qv.isCharades && qv.charadesHeader ? qv.charadesHeader : null,
         phase: qv.phase || "answering", // "answering" | "steal-offer" | "steal-active" | "revealed" | "closing-preview"
         activeTeamAtOpen: Number(qv.activeTeamAtOpen) || 0,
         stealingTeamIdx: Number.isInteger(qv.stealingTeamIdx) ? qv.stealingTeamIdx : 0,
@@ -172,14 +266,19 @@
         hintRevealed: allowHint,
         answerRevealed: allowAnswer,
 
-        // منع التسريب القطعي: لا يُمرَّر نص السؤال في وضع الذاكرة قبل انتهاء المعاينة ولا نص من غير كلام الخام
+        // منع التسريب القطعي: لا يُمرَّر نص السؤال في مرحلة رهان المربع الذهبي ولا في وضع الذاكرة قبل انتهاء المعاينة ولا نص من غير كلام الخام
         questionText:
-          qv.isCharades || isMemoryLocked ? null : typeof qv.questionText === "string" ? qv.questionText : "",
+          isDailyDoubleWagerLocked || qv.isCharades || isMemoryLocked
+            ? null
+            : typeof qv.questionText === "string"
+              ? qv.questionText
+              : "",
         questionImage:
-          qv.visualType === "memory" && (qv.memoryPhase === "ready" || qv.memoryPhase === "question")
+          isDailyDoubleWagerLocked ||
+          (qv.visualType === "memory" && (qv.memoryPhase === "ready" || qv.memoryPhase === "question"))
             ? null
             : qv.questionImage || null,
-        images: Array.isArray(qv.images) ? qv.images.slice() : null,
+        images: isDailyDoubleWagerLocked ? null : Array.isArray(qv.images) ? qv.images.slice() : null,
         showPlus: Boolean(qv.showPlus),
         differencesCount: qv.differencesCount || null,
         blurLevel: qv.blurLevel || 18,
@@ -209,6 +308,93 @@
         explanationText:
           allowAnswer && typeof qv.explanationText === "string" ? qv.explanationText : null,
         answerImage: allowAnswer && typeof qv.answerImage === "string" ? qv.answerImage : null
+      };
+    }
+
+    if (rawSnapshot.finalRoundView && typeof rawSnapshot.finalRoundView === "object") {
+      const fv = rawSnapshot.finalRoundView;
+      const phase =
+        fv.phase === "question" || fv.phase === "reveal" ? fv.phase : "wager";
+      const allowQuestion = phase === "question" || phase === "reveal";
+      const allowReveal = phase === "reveal";
+
+      clean.finalRoundView = {
+        phase,
+        triggerReason: fv.triggerReason || "tie-breaker",
+        roundNumber: Number(fv.roundNumber) || 1,
+        category: fv.category || { id: "", name: "", icon: "🏆", color: "#f59e0b" },
+        timerRemaining: Number(fv.timerRemaining) || 0,
+        timerMax: Number(fv.timerMax) || 60,
+        timerRunning: Boolean(fv.timerRunning),
+        stillTiedAfterReveal: allowReveal ? Boolean(fv.stillTiedAfterReveal) : false,
+        participants: Array.isArray(fv.participants)
+          ? fv.participants.map((p) => ({
+              teamIdx: Number(p.teamIdx) || 0,
+              teamId: p.teamId || "",
+              name: p.name || "",
+              score: Number(p.score) || 0,
+              locked: Boolean(p.locked),
+              wager: allowReveal && p.wager !== null ? Number(p.wager) || 0 : null,
+              correct: allowReveal && p.correct !== null ? Boolean(p.correct) : null,
+              rawDelta: allowReveal && p.rawDelta !== null ? Number(p.rawDelta) || 0 : null,
+              effectiveDelta:
+                allowReveal && p.effectiveDelta !== null ? Number(p.effectiveDelta) || 0 : null,
+              prevScore: allowReveal && p.prevScore !== null ? Number(p.prevScore) || 0 : null,
+              nextScore: allowReveal && p.nextScore !== null ? Number(p.nextScore) || 0 : null
+            }))
+          : [],
+        questionText: allowQuestion && typeof fv.questionText === "string" ? fv.questionText : null,
+        answerText: allowReveal && typeof fv.answerText === "string" ? fv.answerText : null,
+        explanationText:
+          allowReveal && typeof fv.explanationText === "string" ? fv.explanationText : null
+      };
+    }
+
+    if (rawSnapshot.blitzView && typeof rawSnapshot.blitzView === "object") {
+      const bv = rawSnapshot.blitzView;
+      clean.blitzView = {
+        mode: "blitz",
+        phase: bv.phase || "ready",
+        durationSeconds: Number(bv.durationSeconds) || 60,
+        roundsPerTeam: Number(bv.roundsPerTeam) || 1,
+        currentRoundForTeam: Number(bv.currentRoundForTeam) || 1,
+        activeTeamIdx: Number(bv.activeTeamIdx) || 0,
+        activeTeamName: bv.activeTeamName || "",
+        activeTeamScore: Number(bv.activeTeamScore) || 0,
+        teams: Array.isArray(bv.teams) ? bv.teams : [],
+        timerRemaining: Number(bv.timerRemaining) || 0,
+        timerMax: Number(bv.timerMax) || 60,
+        timerRunning: Boolean(bv.timerRunning),
+        currentStreak: Number(bv.currentStreak) || 0,
+        lastFeedback: bv.lastFeedback || null,
+        questionText: bv.phase === "playing" && typeof bv.questionText === "string" ? bv.questionText : null,
+        categoryName: bv.phase === "playing" && typeof bv.categoryName === "string" ? bv.categoryName : null,
+        categoryIcon: bv.categoryIcon || "⚡",
+        turnSummary: bv.phase === "turn-summary" && Array.isArray(bv.turnSummary) ? bv.turnSummary : []
+      };
+    }
+
+    if (rawSnapshot.charadesSoloView && typeof rawSnapshot.charadesSoloView === "object") {
+      const cv = rawSnapshot.charadesSoloView;
+      clean.charadesSoloView = {
+        mode: "charades",
+        phase: cv.phase || "ready",
+        durationSeconds: Number(cv.durationSeconds) || 90,
+        roundsPerTeam: Number(cv.roundsPerTeam) || 3,
+        currentRoundForTeam: Number(cv.currentRoundForTeam) || 1,
+        activeTeamIdx: Number(cv.activeTeamIdx) || 0,
+        activeTeamName: cv.activeTeamName || "",
+        activeTeamScore: Number(cv.activeTeamScore) || 0,
+        teams: Array.isArray(cv.teams) ? cv.teams : [],
+        timerRemaining: Number(cv.timerRemaining) || 0,
+        timerMax: Number(cv.timerMax) || 90,
+        timerRunning: Boolean(cv.timerRunning),
+        lastFeedback: cv.lastFeedback || null,
+        header: cv.phase === "playing" && cv.header ? cv.header : null,
+        categoryName: cv.phase === "playing" && typeof cv.categoryName === "string" ? cv.categoryName : null,
+        // منع تسريب الكلمة أو explanation نهائياً؛ التلميح فقط عند كشفه صراحةً
+        hintText: cv.phase === "playing" && typeof cv.hintText === "string" ? cv.hintText : null,
+        turnSummary: cv.phase === "turn-summary" && Array.isArray(cv.turnSummary) ? cv.turnSummary : []
       };
     }
 
@@ -433,6 +619,16 @@
     broadcastSfx(method, args = []) {
       if (this._role !== "host" || !this._channel) return false;
       return this.post("PLAY_SFX", { method, args });
+    }
+
+    broadcastAudioSettings(settings) {
+      if (this._role !== "host" || !this._channel) return false;
+      return this.post("SYNC_AUDIO_SETTINGS", settings);
+    }
+
+    broadcastDisplayPrefs(prefs) {
+      if (this._role !== "host" || !this._channel) return false;
+      return this.post("SYNC_DISPLAY_PREFS", prefs);
     }
 
     broadcastConfetti(kind = "victory", theme = "default") {
