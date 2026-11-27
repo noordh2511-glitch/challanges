@@ -43,6 +43,8 @@
   <div id="bara-player-root" class="player-view-root bara-player-root" hidden aria-hidden="true"></div>
   <!-- واجهة هاتف اللاعب للعبة «المافيا» (?mode=mafia-player) -->
   <div id="mafia-player-root" class="player-view-root mafia-player-root" hidden aria-hidden="true"></div>
+  <!-- واجهة هاتف اللاعب لطور «تحدي الكل» (?mode=quiz-race-player) -->
+  <div id="quiz-race-player-root" class="player-view-root quiz-race-player-root" hidden aria-hidden="true"></div>
 
   <!-- =========================================================
        الشاشة الأولى: بوابة الألعاب الرئيسية + شاشة إعداد «سين جيم» المنفصلة (Pack 16)
@@ -197,6 +199,13 @@
             <span class="hub-card-icon" aria-hidden="true">🕶️</span>
             <strong class="hub-card-title">المافيا</strong>
             <span class="hub-card-desc">لعبة الغموض والليل والنهار بالهواتف</span>
+          </button>
+
+          <button type="button" id="btn-launch-quiz-race" class="hub-game-card mode-quiz-race">
+            <span class="hub-card-badge">بالهواتف • سباق</span>
+            <span class="hub-card-icon" aria-hidden="true">🏁</span>
+            <strong class="hub-card-title">تحدي الكل</strong>
+            <span class="hub-card-desc">سباق إجابات اختيار من متعدد للجميع بهواتفهم في وقت واحد</span>
           </button>
 
           <button type="button" id="btn-launch-tournament" class="hub-game-card mode-tournament">
@@ -2523,7 +2532,7 @@
       </div>
 
       <div class="bank-modal-scroll-body">
-        <!-- تبويب التبديل بين إحصائيات «سين جيم» و«برا السالفة» و«المافيا» -->
+        <!-- تبويب التبديل بين إحصائيات «سين جيم» و«برا السالفة» و«المافيا» و«تحدي الكل» -->
         <div id="hof-view-tabs" class="hof-view-tabs" role="tablist" aria-label="اختر نوع الإحصائيات">
           <button type="button" class="hof-view-tab active" data-hof-view="seen-jeem" role="tab" aria-selected="true">
             🏆 إحصائيات سين جيم
@@ -2533,6 +2542,9 @@
           </button>
           <button type="button" class="hof-view-tab" data-hof-view="mafia" role="tab" aria-selected="false">
             🎭 إحصائيات المافيا
+          </button>
+          <button type="button" class="hof-view-tab" data-hof-view="quiz-race" role="tab" aria-selected="false">
+            🏁 إحصائيات تحدي الكل
           </button>
         </div>
 
@@ -2602,6 +2614,24 @@
               <h3 class="bank-section-title">📊 سجل لاعبي «المافيا» التراكمي</h3>
             </div>
             <div id="hof-mafia-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
+          </section>
+        </div>
+
+        <!-- قسم إحصائيات «تحدي الكل» (Pack 19) -->
+        <div id="hof-quiz-race-section" hidden>
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">🏁 أرقام سباق «تحدي الكل» القياسية</h3>
+              <span id="hof-quiz-race-total-pill" class="bank-count-pill">0 سباق</span>
+            </div>
+            <div id="hof-quiz-race-records-grid" class="hof-records-grid"></div>
+          </section>
+
+          <section class="bank-section">
+            <div class="bank-section-header">
+              <h3 class="bank-section-title">📊 جدول متصدري «تحدي الكل»</h3>
+            </div>
+            <div id="hof-quiz-race-leaderboard-wrap" class="hof-leaderboard-wrap"></div>
           </section>
         </div>
       </div>
@@ -3186,6 +3216,35 @@
     </div>
   </div>
 
+  <!-- =========================================================
+       نافذة طور «🏁 تحدي الكل» — سباق الاختيار من متعدد بالهواتف (Pack 19)
+       ========================================================= -->
+  <div id="quiz-race-modal" class="modal-overlay quiz-race-overlay" role="dialog" aria-modal="true" aria-labelledby="quiz-race-modal-title" aria-hidden="true">
+    <div class="modal-card quiz-race-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="quiz-race-modal-title" class="bank-modal-title">
+            <span>🏁</span>
+            طور «تحدي الكل» — سباق الاختيار من متعدد
+          </h2>
+          <p class="bank-sources-summary">
+            يمسح الجميع رمز QR بهواتفهم ويتسابقون في وقت واحد على 4 خيارات مع نقاط السرعة وبونص السلسلة ومنصة التتويج!
+          </p>
+        </div>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-qr-full-display" class="btn btn-gold-outline btn-xs" title="تحويل الشاشة الرئيسية إلى وضع العرض الكامل للجميع">
+            📺 وضع العرض الكامل
+          </button>
+          <button type="button" id="btn-close-quiz-race" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
+        </div>
+      </div>
+      <div id="quiz-race-body" class="bank-modal-scroll-body quiz-race-body"></div>
+    </div>
+    <button type="button" id="btn-qr-exit-full-display" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
+  </div>
+
   <!-- ربط ملفات البيانات والإعدادات والوحدات المستقلة والمنطق بالترتيب الصحيح -->
   <script src="src/data/questions.js"></script>
   <script src="src/data/extra-questions.js"></script>
@@ -3209,6 +3268,7 @@
   <script src="src/utils/baraSalfaSync.js"></script>
   <script src="src/utils/mafiaSync.js"></script>
   <script src="src/utils/quickGamesSync.js"></script>
+  <script src="src/utils/quizRaceSync.js"></script>
   <script src="src/utils/categoryBrowser.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
@@ -3228,6 +3288,8 @@
   <script src="src/js/mafiaMode.js"></script>
   <script src="src/js/mafiaPlayerView.js"></script>
   <script src="src/js/quickGamePlayerView.js"></script>
+  <script src="src/js/quizRaceMode.js"></script>
+  <script src="src/js/quizRacePlayerView.js"></script>
   <script src="src/js/audioChallengeMode.js"></script>
   <script src="src/js/tournamentMode.js"></script>
   <script src="src/js/customPackBuilder.js"></script>

@@ -341,6 +341,7 @@
       onPlayers = null,
       onNightActions = null,
       onDayVotes = null,
+      onMayorReveals = null,
       onVipCommand = null,
       onConnectionState = null
     } = {}) {
@@ -360,7 +361,7 @@
         vipEnabled: Boolean(vipEnabled),
         vipUid: null,
         hostOnline: true,
-        appVersion: "4.15.0"
+        appVersion: "4.20.0"
       });
 
       this._role = "master";
@@ -392,6 +393,12 @@
       this._unsubs.push(
         sdk.dbMod.onValue(sdk.dbMod.ref(db, `${roomPath}/dayVotes`), (snap) => {
           if (typeof onDayVotes === "function") onDayVotes(snap.val() || {});
+        })
+      );
+
+      this._unsubs.push(
+        sdk.dbMod.onValue(sdk.dbMod.ref(db, `${roomPath}/mayorReveals`), (snap) => {
+          if (typeof onMayorReveals === "function") onMayorReveals(snap.val() || {});
         })
       );
 
@@ -464,14 +471,15 @@
           privateRoles: cleanRoles,
           privateIntel: cleanIntel,
           nightActions: null,
-          dayVotes: null
+          dayVotes: null,
+          mayorReveals: null
         });
         this._maybeTouchActivity();
       } catch (_err) {}
     }
 
     /**
-     * تحديث المعلومات السرية للاعب واحد (مثل فحوصات المحقق، اختيارات شركاء المافيا، آخر حماية للطبيب)
+     * تحديث المعلومات السرية للاعب واحد (مثل فحوصات المحقق، اختيارات شركاء المافيا، آخر حماية للطبيب/الحارس)
      */
     async publishPrivateIntelForUid(uid, intelObj) {
       if (this._role !== "master" || !this.roomCode || !uid || !this._sdk || !this._db) return;
@@ -486,11 +494,12 @@
       } catch (_err) {}
     }
 
-    async clearRoundActions({ night = false, votes = false } = {}) {
+    async clearRoundActions({ night = false, votes = false, mayorReveals = false } = {}) {
       if (this._role !== "master" || !this.roomCode || !this._sdk || !this._db) return;
       const patch = {};
       if (night) patch.nightActions = null;
       if (votes) patch.dayVotes = null;
+      if (mayorReveals) patch.mayorReveals = null;
       if (Object.keys(patch).length === 0) return;
       const { dbMod } = this._sdk;
       try {
@@ -770,6 +779,28 @@
         return { ok: true };
       } catch (err) {
         return { ok: false, error: (err && err.message) || "تعذّر إرسال تصويتك" };
+      }
+    }
+
+    async submitMayorReveal({ gameId = "", roundNumber = 1 } = {}) {
+      if (this._role !== "player" || !this.roomCode || !this._uid || !this._sdk || !this._db || this._kicked) {
+        return { ok: false, error: "غير متصل بالغرفة" };
+      }
+      const { dbMod } = this._sdk;
+      const revRef = dbMod.ref(this._db, `mafiaRooms/${this.roomCode}/mayorReveals/${this._uid}`);
+      try {
+        await dbMod.set(
+          revRef,
+          stripUndefined({
+            uid: this._uid,
+            gameId: String(gameId || ""),
+            roundNumber: Number(roundNumber) || 1,
+            ts: dbMod.serverTimestamp()
+          })
+        );
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || "تعذّر إعلان صفتك كعمدة" };
       }
     }
 

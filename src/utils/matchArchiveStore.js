@@ -10,9 +10,11 @@
   const STORAGE_KEY = "seen-jeem-archive-v1";
   const BARA_STATS_STORAGE_KEY = "bara-salfa-stats-v1";
   const MAFIA_STATS_STORAGE_KEY = "mafia-stats-v1";
+  const QUIZ_RACE_STATS_STORAGE_KEY = "quiz-race-stats-v1";
   const MAX_PER_PROFILE = 50;
   const MAX_BARA_ROUNDS_PER_PROFILE = 200;
   const MAX_MAFIA_SESSIONS_PER_PROFILE = 200;
+  const MAX_QUIZ_RACE_PER_PROFILE = 200;
   const VALID_MODES = new Set(["classic", "blitz", "charades"]);
   const DEFAULT_TEAM_COLORS = ["#22d3ee", "#fbbf24", "#34d399", "#e879f9"];
 
@@ -98,9 +100,12 @@
       this._baraRounds = [];
       /** @type {Array<Object>} */
       this._mafiaSessions = [];
+      /** @type {Array<Object>} */
+      this._quizRaceSessions = [];
       this._load();
       this._loadBaraRounds();
       this._loadMafiaSessions();
+      this._loadQuizRaceSessions();
     }
 
     _load() {
@@ -593,7 +598,7 @@
         typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId.trim() : "default";
       const validFactions = new Set(["mafia", "citizens", "jester"]);
       const winnerFaction = validFactions.has(raw.winnerFaction) ? raw.winnerFaction : "citizens";
-      const validRoles = new Set(["mafia", "doctor", "detective", "jester", "citizen"]);
+      const validRoles = new Set(["mafia", "doctor", "detective", "jester", "bodyguard", "mayor", "citizen"]);
       const players = Array.isArray(raw.players)
         ? raw.players
             .filter((p) => p && typeof p.name === "string" && p.name.trim())
@@ -800,6 +805,203 @@
           detectiveChecks,
           detectiveAccuracy: detectiveChecks > 0 ? Math.round((detectiveHits / detectiveChecks) * 100) : 0
         },
+        leaderboard
+      };
+    }
+
+    /* =========================================================
+       إحصائيات «تحدي الكل» لقاعة المشاهير (quiz-race-stats-v1)
+       ========================================================= */
+    _sanitizeQuizRaceSession(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      const raceId = typeof raw.raceId === "string" ? raw.raceId.trim() : "";
+      if (!raceId) return null;
+      const profileId =
+        typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId.trim() : "default";
+      const players = Array.isArray(raw.players)
+        ? raw.players
+            .filter((p) => p && typeof p.name === "string" && p.name.trim())
+            .map((p) => ({
+              name: p.name.trim().slice(0, 28),
+              score: Math.max(0, Math.round(Number(p.score) || 0)),
+              correctCount: Math.max(0, Math.floor(Number(p.correctCount) || 0)),
+              accuracy: Math.max(0, Math.min(100, Math.round(Number(p.accuracy) || 0))),
+              bestStreak: Math.max(0, Math.floor(Number(p.bestStreak) || 0)),
+              fastestMs: Math.max(0, Math.round(Number(p.fastestMs) || 0)),
+              rank: Math.max(1, Math.floor(Number(p.rank) || 1)),
+              won: Boolean(p.won)
+            }))
+        : [];
+      if (players.length === 0) return null;
+      return {
+        raceId,
+        profileId,
+        playedAt:
+          Number.isFinite(Number(raw.playedAt)) && Number(raw.playedAt) > 0
+            ? Math.floor(Number(raw.playedAt))
+            : Date.now(),
+        categoryLabel: typeof raw.categoryLabel === "string" ? raw.categoryLabel.trim().slice(0, 56) : "منوّعات",
+        questionCount: Math.max(1, Math.floor(Number(raw.questionCount) || 1)),
+        players
+      };
+    }
+
+    _loadQuizRaceSessions() {
+      try {
+        const raw = localStorage.getItem(QUIZ_RACE_STATS_STORAGE_KEY);
+        if (!raw) {
+          this._quizRaceSessions = [];
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : [];
+        const seen = new Set();
+        this._quizRaceSessions = [];
+        arr.forEach((item) => {
+          const clean = this._sanitizeQuizRaceSession(item);
+          if (clean && !seen.has(clean.raceId)) {
+            seen.add(clean.raceId);
+            this._quizRaceSessions.push(clean);
+          }
+        });
+        this._quizRaceSessions.sort((a, b) => b.playedAt - a.playedAt);
+      } catch (_err) {
+        this._quizRaceSessions = [];
+      }
+    }
+
+    _saveQuizRaceSessions() {
+      try {
+        localStorage.setItem(QUIZ_RACE_STATS_STORAGE_KEY, JSON.stringify(this._quizRaceSessions));
+      } catch (_err) {}
+    }
+
+    recordQuizRaceSession(rawSession) {
+      const clean = this._sanitizeQuizRaceSession(rawSession);
+      if (!clean) return { ok: false, duplicate: false };
+      if (this._quizRaceSessions.some((s) => s.raceId === clean.raceId)) {
+        return { ok: true, duplicate: true };
+      }
+      this._quizRaceSessions.unshift(clean);
+      let countForProfile = 0;
+      this._quizRaceSessions = this._quizRaceSessions.filter((s) => {
+        if (s.profileId !== clean.profileId) return true;
+        countForProfile++;
+        return countForProfile <= MAX_QUIZ_RACE_PER_PROFILE;
+      });
+      this._saveQuizRaceSessions();
+      return { ok: true, duplicate: false };
+    }
+
+    getAllQuizRaceSessions() {
+      return this._quizRaceSessions.slice();
+    }
+
+    importQuizRaceSessions(rawList, mode = "merge") {
+      const incoming = (Array.isArray(rawList) ? rawList : [])
+        .map((s) => this._sanitizeQuizRaceSession(s))
+        .filter(Boolean);
+      if (mode === "replace") {
+        const seen = new Set();
+        this._quizRaceSessions = [];
+        incoming.forEach((s) => {
+          if (!seen.has(s.raceId)) {
+            seen.add(s.raceId);
+            this._quizRaceSessions.push(s);
+          }
+        });
+      } else {
+        const byId = new Map(this._quizRaceSessions.map((s) => [s.raceId, s]));
+        incoming.forEach((s) => {
+          if (!byId.has(s.raceId)) byId.set(s.raceId, s);
+        });
+        this._quizRaceSessions = Array.from(byId.values());
+      }
+      this._quizRaceSessions.sort((a, b) => b.playedAt - a.playedAt);
+      this._saveQuizRaceSessions();
+      return this._quizRaceSessions.length;
+    }
+
+    clearQuizRaceProfileStats(profileId) {
+      const pid = profileId || "default";
+      const prev = this._quizRaceSessions.length;
+      this._quizRaceSessions = this._quizRaceSessions.filter((s) => s.profileId !== pid);
+      if (this._quizRaceSessions.length !== prev) this._saveQuizRaceSessions();
+      return prev - this._quizRaceSessions.length;
+    }
+
+    computeQuizRaceHallOfFame(profileId) {
+      const pid = profileId || "default";
+      const sessions = this._quizRaceSessions.filter((s) => s.profileId === pid);
+      if (sessions.length === 0) {
+        return {
+          totalRaces: 0,
+          records: { highestScore: null, fastestAnswer: null, bestStreak: null },
+          leaderboard: []
+        };
+      }
+
+      let highestScore = null;
+      let fastestAnswer = null;
+      let bestStreak = null;
+      const agg = new Map();
+
+      sessions.forEach((s) => {
+        s.players.forEach((p) => {
+          if (!highestScore || p.score > highestScore.score) {
+            highestScore = { name: p.name, score: p.score, playedAt: s.playedAt };
+          }
+          if (p.fastestMs > 0 && (!fastestAnswer || p.fastestMs < fastestAnswer.fastestMs)) {
+            fastestAnswer = { name: p.name, fastestMs: p.fastestMs };
+          }
+          if (p.bestStreak > 0 && (!bestStreak || p.bestStreak > bestStreak.streak)) {
+            bestStreak = { name: p.name, streak: p.bestStreak };
+          }
+
+          const key = normalizeTeamKey(p.name);
+          if (!key) return;
+          if (!agg.has(key)) {
+            agg.set(key, {
+              key,
+              displayName: p.name,
+              races: 0,
+              wins: 0,
+              totalScore: 0,
+              bestScore: 0,
+              totalAccuracy: 0,
+              bestStreak: 0,
+              fastestMs: 0
+            });
+          }
+          const rec = agg.get(key);
+          rec.displayName = p.name;
+          rec.races += 1;
+          if (p.won) rec.wins += 1;
+          rec.totalScore += p.score;
+          if (p.score > rec.bestScore) rec.bestScore = p.score;
+          rec.totalAccuracy += p.accuracy;
+          if (p.bestStreak > rec.bestStreak) rec.bestStreak = p.bestStreak;
+          if (p.fastestMs > 0 && (rec.fastestMs === 0 || p.fastestMs < rec.fastestMs)) {
+            rec.fastestMs = p.fastestMs;
+          }
+        });
+      });
+
+      const leaderboard = Array.from(agg.values())
+        .map((r) => ({
+          ...r,
+          avgAccuracy: r.races > 0 ? Math.round(r.totalAccuracy / r.races) : 0,
+          avgScore: r.races > 0 ? Math.round(r.totalScore / r.races) : 0
+        }))
+        .sort((a, b) => {
+          if (b.wins !== a.wins) return b.wins - a.wins;
+          if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+          return b.totalScore - a.totalScore;
+        });
+
+      return {
+        totalRaces: sessions.length,
+        records: { highestScore, fastestAnswer, bestStreak },
         leaderboard
       };
     }

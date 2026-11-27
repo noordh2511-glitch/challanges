@@ -1204,6 +1204,207 @@
     return canvas;
   }
 
+  /**
+   * توليد بطاقة نتيجة سباق «تحدي الكل» بدقة 1080×1350 (4:5) — منصة تتويج 1/2/3 + الترتيب الكامل
+   */
+  async function generateQuizRaceResultCard(sessionData = {}, theme = "dark-glass") {
+    await ensureArabicFontReady();
+    const palette = THEME_PALETTES[theme] || THEME_PALETTES["dark-glass"];
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    ctx.direction = "rtl";
+    ctx.textBaseline = "middle";
+
+    const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    bgGrad.addColorStop(0, palette.bgTop);
+    bgGrad.addColorStop(0.5, palette.bgMid);
+    bgGrad.addColorStop(1, palette.bgBot);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const orb1 = ctx.createRadialGradient(WIDTH * 0.82, HEIGHT * 0.14, 10, WIDTH * 0.82, HEIGHT * 0.14, 440);
+    orb1.addColorStop(0, "rgba(245, 158, 11, 0.28)");
+    orb1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb1;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const orb2 = ctx.createRadialGradient(WIDTH * 0.18, HEIGHT * 0.86, 10, WIDTH * 0.18, HEIGHT * 0.86, 420);
+    orb2.addColorStop(0, "rgba(16, 185, 129, 0.22)");
+    orb2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb2;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    drawRoundedRect(ctx, 32, 32, WIDTH - 64, HEIGHT - 64, 38);
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // 1) الترويسة
+    const headerY = 104;
+    drawRoundedRect(ctx, WIDTH - 350, headerY - 34, 282, 68, 20);
+    const brandGrad = ctx.createLinearGradient(WIDTH - 350, headerY - 34, WIDTH - 68, headerY + 34);
+    brandGrad.addColorStop(0, "#f59e0b");
+    brandGrad.addColorStop(1, "#ec4899");
+    ctx.fillStyle = brandGrad;
+    ctx.fill();
+
+    ctx.fillStyle = "#060b19";
+    ctx.font = `900 32px ${FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.fillText("🏁 تحدي الكل", WIDTH - 209, headerY + 2);
+
+    const qCount = Math.max(1, Number(sessionData.questionCount) || 1);
+    ctx.textAlign = "left";
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `800 25px ${FONT_FAMILY}`;
+    ctx.fillText(`${qCount} سؤال  •  ${truncateToWidth(ctx, sessionData.categoryLabel || "منوّعات", 340)}`, 74, headerY - 14);
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `600 22px ${FONT_FAMILY}`;
+    ctx.fillText(formatArabicDate(sessionData.timestamp || Date.now()), 74, headerY + 20);
+
+    const players = (Array.isArray(sessionData.standings) ? sessionData.standings : [])
+      .map((p, idx) => ({
+        name: String(p.name || `لاعب ${idx + 1}`).slice(0, 24),
+        avatar: String(p.avatar || "👤").slice(0, 4),
+        score: Math.max(0, Math.round(Number(p.score) || 0)),
+        correctCount: Math.max(0, Math.floor(Number(p.correctCount) || 0)),
+        accuracy: Math.max(0, Math.min(100, Math.round(Number(p.accuracy) || 0))),
+        fastestMs: Number.isFinite(Number(p.fastestMs)) && Number(p.fastestMs) > 0 ? Number(p.fastestMs) : null
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12);
+
+    // 2) منصة التتويج للمراكز الثلاثة الأولى
+    const podiumY = 176;
+    const podiumH = 290;
+    const slotW = 290;
+    const slotGap = 24;
+    const podiumCenterX = WIDTH / 2;
+    const slots = [
+      { rank: 1, player: players[0] || null, x: podiumCenterX - slotW / 2, h: 224, medal: "🥇", color: "#fbbf24", bg: "rgba(245, 158, 11, 0.2)" },
+      { rank: 2, player: players[1] || null, x: podiumCenterX + slotW / 2 + slotGap, h: 186, medal: "🥈", color: "#cbd5e1", bg: "rgba(148, 163, 184, 0.16)" },
+      { rank: 3, player: players[2] || null, x: podiumCenterX - slotW / 2 - slotGap - slotW, h: 162, medal: "🥉", color: "#f97316", bg: "rgba(249, 115, 22, 0.16)" }
+    ];
+
+    slots.forEach((slot) => {
+      if (!slot.player) return;
+      const topY = podiumY + (podiumH - slot.h);
+      drawRoundedRect(ctx, slot.x, topY, slotW, slot.h, 24);
+      ctx.fillStyle = slot.bg;
+      ctx.fill();
+      ctx.strokeStyle = slot.color;
+      ctx.lineWidth = slot.rank === 1 ? 3 : 2;
+      ctx.stroke();
+
+      const cx = slot.x + slotW / 2;
+      ctx.textAlign = "center";
+      ctx.font = `900 42px ${FONT_FAMILY}`;
+      ctx.fillStyle = slot.color;
+      ctx.fillText(slot.medal, cx, topY + 42);
+
+      ctx.fillStyle = palette.textPrimary;
+      ctx.font = `900 28px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, slot.player.name, slotW - 28), cx, topY + 96);
+
+      ctx.fillStyle = slot.color;
+      ctx.font = `900 34px ${FONT_FAMILY}`;
+      ctx.fillText(`${slot.player.score}`, cx, topY + 142);
+
+      if (slot.h >= 180) {
+        ctx.fillStyle = palette.textSecondary;
+        ctx.font = `700 18px ${FONT_FAMILY}`;
+        ctx.fillText(`دقة ${slot.player.accuracy}%`, cx, topY + slot.h - 24);
+      }
+    });
+
+    // 3) جدول الترتيب الكامل
+    ctx.textAlign = "right";
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText(`جدول الترتيب الكامل (${players.length} لاعبين)`, WIDTH - 74, 504);
+
+    const listY = 536;
+    const listH = 510;
+    const twoCols = players.length > 6;
+    const colGap = 16;
+    const colW = twoCols ? Math.floor((WIDTH - 136 - colGap) / 2) : WIDTH - 136;
+    const rows = twoCols ? Math.ceil(players.length / 2) : Math.max(1, players.length);
+    const rowGap = 10;
+    const rowH = Math.min(78, Math.floor((listH - rowGap * (rows - 1)) / rows));
+
+    players.forEach((p, idx) => {
+      const col = twoCols ? idx % 2 : 0;
+      const row = twoCols ? Math.floor(idx / 2) : idx;
+      const x = twoCols ? (col === 0 ? WIDTH - 68 - colW : 68) : 68;
+      const y = listY + row * (rowH + rowGap);
+      const isTop = idx === 0;
+
+      drawRoundedRect(ctx, x, y, colW, rowH, 16);
+      ctx.fillStyle = isTop ? "rgba(245, 158, 11, 0.16)" : palette.cardBg;
+      ctx.fill();
+      ctx.strokeStyle = isTop ? "#fbbf24" : palette.cardBorder;
+      ctx.lineWidth = isTop ? 2 : 1.2;
+      ctx.stroke();
+
+      const cy = y + rowH / 2;
+      ctx.textAlign = "right";
+      ctx.fillStyle = isTop ? "#fde68a" : palette.accent1;
+      ctx.font = `900 23px ${FONT_FAMILY}`;
+      ctx.fillText(`#${idx + 1}`, x + colW - 18, cy);
+
+      ctx.fillStyle = palette.textPrimary;
+      ctx.font = `800 24px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, p.name, colW - 210), x + colW - 64, cy);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = isTop ? "#fbbf24" : "#38bdf8";
+      ctx.font = `900 27px ${FONT_FAMILY}`;
+      ctx.fillText(`${p.score}`, x + 18, cy);
+    });
+
+    // 4) بطاقة أسرع إجابة وأعلى دقة
+    let fastest = null;
+    players.forEach((p) => {
+      if (p.fastestMs && (!fastest || p.fastestMs < fastest.fastestMs)) fastest = p;
+    });
+    const statY = 1072;
+    const statH = 128;
+    drawRoundedRect(ctx, 68, statY, WIDTH - 136, statH, 22);
+    ctx.fillStyle = palette.cardBg;
+    ctx.fill();
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText("⚡ أسرع إجابة صحيحة في السباق", WIDTH / 2, statY + 42);
+    ctx.fillStyle = "#34d399";
+    ctx.font = `900 32px ${FONT_FAMILY}`;
+    const fastLabel = fastest ? `${fastest.name} (${(fastest.fastestMs / 1000).toFixed(2)} ثانية)` : "—";
+    ctx.fillText(truncateToWidth(ctx, fastLabel, WIDTH - 180), WIDTH / 2, statY + 88);
+
+    // 5) التذييل
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(96, HEIGHT - 102);
+    ctx.lineTo(WIDTH - 96, HEIGHT - 102);
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText("سين جيم  •  طور «تحدي الكل» الجماعي بالهواتف", WIDTH / 2, HEIGHT - 66);
+
+    return canvas;
+  }
+
   window.SeenJeemResultCard = {
     WIDTH,
     HEIGHT,
@@ -1212,6 +1413,7 @@
     generateTournamentResultCard,
     generateMafiaResultCard,
     generateAudioChallengeResultCard,
+    generateQuizRaceResultCard,
     canvasToBlob,
     getDefaultFilename,
     downloadBlobAsPNG,

@@ -101,6 +101,7 @@
       this.playMode = "local"; // "local" | "wireless"
       this.selectedCategoryId = "random"; // "random" | categoryId
       this.outsiderCount = 1; // 1 | 2 (فقط عند >= 6 لاعبين)
+      this.outsidersKnowEachOther = true; // خيار فرعي عند تفعيل متسلّلين اثنين
       this.discussionSeconds = 90; // 0 | 60 | 90 | 120 | 180
       this.showQrOnTv = true;
       this.vipControlEnabled = true;
@@ -699,6 +700,7 @@
         secretWord: drawn.secretWord,
         guessChoices: drawn.guessChoices,
         outsiderIds,
+        outsidersKnowEachOther: effectiveOutsiders === 2 && Boolean(this.outsidersKnowEachOther),
         pairs,
         pairIndex: 0,
         questionCycle: 1,
@@ -714,6 +716,7 @@
         topVotedIds: [],
         // مرحلة تخمين اللي برا السالفة
         guessOutsiderIdx: 0,
+        guessReadyToPick: false,
         outsiderGuesses: {}, // { outsiderId: word }
         roundScores: []
       };
@@ -733,12 +736,17 @@
         const rolesByUid = {};
         this.players.forEach((p) => {
           const isOutsider = outsiderIds.includes(p.id);
+          const partnerNames =
+            isOutsider && this.round.outsidersKnowEachOther
+              ? outsiderIds.filter((oid) => oid !== p.id).map((oid) => this._findPlayerName(oid))
+              : [];
           rolesByUid[p.id] = {
             roundNumber: this.roundNumber,
             isOutsider,
             categoryName: drawn.category.name,
             categoryIcon: drawn.category.icon,
-            secretWord: isOutsider ? null : drawn.secretWord
+            secretWord: isOutsider ? null : drawn.secretWord,
+            partnerNames
           };
         });
         await window.SeenJeemBaraSalfaSync.publishPrivateRolesAndResetActions(rolesByUid);
@@ -959,6 +967,7 @@
       if (!this.round) return;
       this.phase = "outsider_guess";
       this.round.guessOutsiderIdx = 0;
+      this.round.guessReadyToPick = false;
       this.round.outsiderGuesses = {};
       this._playSfx("playReveal");
       this._syncWirelessAndTV();
@@ -971,6 +980,7 @@
       if (!oid) return;
       this.round.outsiderGuesses[oid] = word;
       this.round.guessOutsiderIdx += 1;
+      this.round.guessReadyToPick = false;
       this._playSfx("playTileOpen");
       if (this.round.guessOutsiderIdx >= this.round.outsiderIds.length) {
         this.finalizeRoundResults();
@@ -1326,8 +1336,18 @@
               <div class="bs-pills-row">
                 <button type="button" class="tactical-opt-btn${this.outsiderCount === 1 ? " active" : ""}" data-bs-outsiders="1">1 برا السالفة</button>
                 <button type="button" class="tactical-opt-btn${this.outsiderCount === 2 ? " active" : ""}" data-bs-outsiders="2" ${!canHaveTwoOutsiders ? "disabled title='يتطلب 6 لاعبين فأكثر'" : ""}>
-                  2 برا السالفة ${!canHaveTwoOutsiders ? "(6+ لاعبين)" : ""}
+                  🕵️🕵️ وضع متسلّلين اثنين ${!canHaveTwoOutsiders ? "(6+ لاعبين)" : ""}
                 </button>
+              </div>
+              <div class="bs-two-imposter-meta">
+                <span class="bs-ideal-pill">✨ مثالي لـ 8+ لاعبين</span>
+                ${
+                  this.outsiderCount === 2 && canHaveTwoOutsiders
+                    ? `<button type="button" id="bs-btn-toggle-know-each-other" class="tactical-opt-btn${this.outsidersKnowEachOther ? " active" : ""}">
+                        🤝 هل يعرف المتسلّلان بعضهما؟ ${this.outsidersKnowEachOther ? "نعم ✅" : "لا (سري)"}
+                      </button>`
+                    : ""
+                }
               </div>
             </div>
 
@@ -1469,6 +1489,14 @@
         });
       });
 
+      const knowBtn = document.getElementById("bs-btn-toggle-know-each-other");
+      if (knowBtn) {
+        knowBtn.addEventListener("click", () => {
+          this.outsidersKnowEachOther = !this.outsidersKnowEachOther;
+          this._render();
+        });
+      }
+
       this.bodyEl.querySelectorAll("[data-bs-timer]").forEach((btn) => {
         btn.addEventListener("click", () => {
           this.discussionSeconds = Number(btn.dataset.bsTimer) || 0;
@@ -1603,6 +1631,10 @@
       // الوضع المحلي (Hold-to-Reveal)
       const player = this.players[r.revealIdx];
       const isOutsider = r.outsiderIds.includes(player.id);
+      const partnerNames =
+        isOutsider && r.outsidersKnowEachOther
+          ? r.outsiderIds.filter((oid) => oid !== player.id).map((oid) => this._findPlayerName(oid))
+          : [];
       return `
         <div class="bs-stage-card">
           <div class="bs-stage-badge">🔐 كشف الأدوار السرية (${r.revealIdx + 1} / ${this.players.length}) • ${escapeHtml(r.category.icon)} ${escapeHtml(r.category.name)}</div>
@@ -1618,6 +1650,11 @@
               ${
                 isOutsider
                   ? `<div class="bs-outsider-alert">🕵️ أنت برا السالفة!</div>
+                     ${
+                       partnerNames.length > 0
+                         ? `<div class="bs-partner-box">🤝 شريكك «برا السالفة» هو: <strong>${escapeHtml(partnerNames.join("، "))}</strong></div>`
+                         : ""
+                     }
                      <p class="bs-outsider-tip">حاول تفهم الموضوع من أسئلة الآخرين بدون ما تنكشف!</p>`
                   : `<div class="bs-insider-label">أنت داخل السالفة — الكلمة السرية هي:</div>
                      <div class="bs-secret-word">${escapeHtml(r.secretWord)}</div>`
@@ -1836,13 +1873,29 @@
       const r = this.round;
       const outsiderNames = r.outsiderIds.map((id) => this._findPlayerName(id));
       const topNames = (r.topVotedIds || []).map((id) => `${this._findPlayerName(id)} (${r.voteCounts[id]} صوت)`);
+      const caughtOutsiderIds = r.outsiderIds.filter((oid) => (r.topVotedIds || []).includes(oid));
+      const anyOutsiderHitCount = r.outsiderIds.filter((oid) => Number(r.voteCounts && r.voteCounts[oid]) > 0).length;
+      let catchSummaryHtml = "";
+      if (r.outsiderIds.length === 2) {
+        if (caughtOutsiderIds.length === 2) {
+          catchSummaryHtml = `<div class="bs-catch-summary is-both">🎯 برافو! نجحت الأغلبية في كشف المتسلّلين الاثنين معاً!</div>`;
+        } else if (caughtOutsiderIds.length === 1) {
+          catchSummaryHtml = `<div class="bs-catch-summary is-one">🔎 تم كشف متسلّل واحد بالأغلبية (${escapeHtml(this._findPlayerName(caughtOutsiderIds[0]))}) بينما أفلت الآخر!</div>`;
+        } else if (anyOutsiderHitCount > 0) {
+          catchSummaryHtml = `<div class="bs-catch-summary is-partial">👀 بعض اللاعبين شكّوا في أحد المتسلّلين، لكن لم تكن الأغلبية ضدّهما!</div>`;
+        } else {
+          catchSummaryHtml = `<div class="bs-catch-summary is-none">😈 أفلت المتسلّلان الاثنان بالكامل دون أي تصويت عليهما!</div>`;
+        }
+      }
       return `
         <div class="bs-stage-card">
           <div class="bs-stage-badge">🥁 نتائج التصويت وكشف الحقيقة</div>
           <div class="bs-outsider-reveal-banner">
-            <div class="bs-reveal-eyebrow">${outsiderNames.length > 1 ? "🕵️ اللي «برا السالفة» هم:" : "🕵️ اللي «برا السالفة» الحقيقي هو:"}</div>
+            <div class="bs-reveal-eyebrow">${outsiderNames.length > 1 ? "🕵️🕵️ اللي «برا السالفة» هم:" : "🕵️ اللي «برا السالفة» الحقيقي هو:"}</div>
             <div class="bs-reveal-names">${escapeHtml(outsiderNames.join("  و  "))}</div>
           </div>
+
+          ${catchSummaryHtml}
 
           ${
             topNames.length > 0
@@ -1858,7 +1911,7 @@
                   <div class="bs-vote-row${isHit ? " is-hit" : ""}">
                     <strong>${escapeHtml(v.voterName)}</strong>
                     <span class="bs-vote-arrow">⬅️ صوّت على ⬅️</span>
-                    <span class="bs-vote-target">${escapeHtml(v.targetName)} ${isHit ? "✅" : ""}</span>
+                    <span class="bs-vote-target">${escapeHtml(v.targetName)} ${isHit ? "✅ (+100)" : ""}</span>
                   </div>
                 `;
               })
@@ -1889,7 +1942,7 @@
           <div class="bs-stage-card">
             <div class="bs-stage-badge">🎯 الفرصة الأخيرة لتخمين الكلمة • ${escapeHtml(r.category.icon)} ${escapeHtml(r.category.name)}</div>
             <h2 class="bs-stage-title">⏳ بانتظار تخمين: ${escapeHtml(waitingNames.join(" و ") || "الجميع خمّن!")}</h2>
-            <p class="bs-stage-sub">ظهرت الخيارات الـ 8 على هاتف اللي «برا السالفة» لاختيار الكلمة السرية (+100 نقطة عند الصواب).</p>
+            <p class="bs-stage-sub">ظهرت الخيارات الـ 8 على هاتف ${r.outsiderIds.length > 1 ? "كل متسلّل" : "اللي «برا السالفة»"} لاختيار الكلمة السرية (+100 نقطة لكل متسلّل يصيبها).</p>
             <div class="bs-choices-grid is-readonly">
               ${r.guessChoices.map((w) => `<div class="bs-choice-pill">${escapeHtml(w)}</div>`).join("")}
             </div>
@@ -1902,22 +1955,36 @@
 
       const currentOid = r.outsiderIds[r.guessOutsiderIdx];
       const currentName = this._findPlayerName(currentOid);
+      const needsPrivacyShield = r.outsiderIds.length > 1 && !r.guessReadyToPick;
       return `
         <div class="bs-stage-card">
           <div class="bs-stage-badge">🎯 الفرصة الأخيرة (${r.guessOutsiderIdx + 1} / ${r.outsiderIds.length}) • ${escapeHtml(r.category.icon)} ${escapeHtml(r.category.name)}</div>
           <h2 class="bs-stage-title">يا <span class="brand-highlight">${escapeHtml(currentName)}</span> — شو كانت الكلمة السرية؟</h2>
-          <p class="bs-stage-sub">اختر كلمة واحدة من بين الـ 8 خيارات أدناه لتربح +100 نقطة:</p>
-          <div class="bs-choices-grid">
-            ${r.guessChoices
-              .map(
-                (w) => `
-              <button type="button" class="btn btn-secondary bs-choice-btn" data-bs-guess-word="${escapeHtml(w)}">
-                ${escapeHtml(w)}
-              </button>
-            `
-              )
-              .join("")}
-          </div>
+          ${
+            needsPrivacyShield
+              ? `
+                <p class="bs-stage-sub">مرّر الجهاز إلى <strong>${escapeHtml(currentName)}</strong> ليختار تخمينه سراً دون أن يرى شريكه اختياره.</p>
+                <div class="bs-stage-actions">
+                  <button type="button" id="bs-btn-show-guess-choices" class="btn btn-primary btn-lg">
+                    🔒 أنا ${escapeHtml(currentName)} — اعرض الخيارات الـ 8
+                  </button>
+                </div>
+              `
+              : `
+                <p class="bs-stage-sub">اختر كلمة واحدة من بين الـ 8 خيارات أدناه لتربح +100 نقطة:</p>
+                <div class="bs-choices-grid">
+                  ${r.guessChoices
+                    .map(
+                      (w) => `
+                    <button type="button" class="btn btn-secondary bs-choice-btn" data-bs-guess-word="${escapeHtml(w)}">
+                      ${escapeHtml(w)}
+                    </button>
+                  `
+                    )
+                    .join("")}
+                </div>
+              `
+          }
         </div>
       `;
     }
@@ -1925,6 +1992,15 @@
     _bindOutsiderGuessEvents() {
       const forceBtn = document.getElementById("bs-btn-force-results");
       if (forceBtn) forceBtn.addEventListener("click", () => this.finalizeRoundResults());
+      const showGuessBtn = document.getElementById("bs-btn-show-guess-choices");
+      if (showGuessBtn) {
+        showGuessBtn.addEventListener("click", () => {
+          if (this.round) {
+            this.round.guessReadyToPick = true;
+            this._render();
+          }
+        });
+      }
       this.bodyEl.querySelectorAll("[data-bs-guess-word]").forEach((btn) => {
         btn.addEventListener("click", () => this.recordLocalOutsiderGuess(btn.dataset.bsGuessWord));
       });

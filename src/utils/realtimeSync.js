@@ -40,7 +40,8 @@
       m === "mafia-player" ||
       m === "blitz-player" ||
       m === "mgk-player" ||
-      m === "audio-player"
+      m === "audio-player" ||
+      m === "quiz-race-player"
     ) {
       return m;
     }

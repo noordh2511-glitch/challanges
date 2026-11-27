@@ -434,7 +434,8 @@
           categoryName: String(r.categoryName || ""),
           categoryIcon: String(r.categoryIcon || "🕵️"),
           // حماية قاطعة: الكلمة السرية null تماماً للي «برا السالفة»
-          secretWord: isOut ? null : String(r.secretWord || "")
+          secretWord: isOut ? null : String(r.secretWord || ""),
+          partnerNames: isOut && Array.isArray(r.partnerNames) ? r.partnerNames.map((n) => String(n || "").trim()).filter(Boolean).slice(0, 3) : []
         };
       });
       try {

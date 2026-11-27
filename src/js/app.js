@@ -1023,6 +1023,10 @@
     hofMafiaTotalSessionsPill: document.getElementById("hof-mafia-total-sessions-pill"),
     hofMafiaRecordsGrid: document.getElementById("hof-mafia-records-grid"),
     hofMafiaLeaderboardWrap: document.getElementById("hof-mafia-leaderboard-wrap"),
+    hofQuizRaceSection: document.getElementById("hof-quiz-race-section"),
+    hofQuizRaceTotalPill: document.getElementById("hof-quiz-race-total-pill"),
+    hofQuizRaceRecordsGrid: document.getElementById("hof-quiz-race-records-grid"),
+    hofQuizRaceLeaderboardWrap: document.getElementById("hof-quiz-race-leaderboard-wrap"),
     hofTotalMatchesPill: document.getElementById("hof-total-matches-pill"),
     hofRecordsGrid: document.getElementById("hof-records-grid"),
     hofLeaderboardWrap: document.getElementById("hof-leaderboard-wrap"),
@@ -10811,6 +10815,9 @@
       } else if (customPayload && customPayload.cardType === "mafia" && typeof resultCardGen.generateMafiaResultCard === "function") {
         state.currentResultCardPrefix = "mafia-result";
         canvas = await resultCardGen.generateMafiaResultCard(customPayload.sessionData, state.theme);
+      } else if (customPayload && customPayload.cardType === "quiz-race" && typeof resultCardGen.generateQuizRaceResultCard === "function") {
+        state.currentResultCardPrefix = "quiz-race-result";
+        canvas = await resultCardGen.generateQuizRaceResultCard(customPayload.sessionData, state.theme);
       } else if (customPayload && customPayload.cardType === "audio-challenge" && typeof resultCardGen.generateAudioChallengeResultCard === "function") {
         state.currentResultCardPrefix = "audio-challenge-result";
         canvas = await resultCardGen.generateAudioChallengeResultCard(customPayload.sessionData, state.theme);
@@ -12720,7 +12727,8 @@
     const profile = historyStore.getActiveProfile();
     const isBaraView = state.hofActiveView === "bara-salfa";
     const isMafiaView = state.hofActiveView === "mafia";
-    const activeTabName = isMafiaView ? "mafia" : isBaraView ? "bara-salfa" : "seen-jeem";
+    const isQuizRaceView = state.hofActiveView === "quiz-race";
+    const activeTabName = isQuizRaceView ? "quiz-race" : isMafiaView ? "mafia" : isBaraView ? "bara-salfa" : "seen-jeem";
 
     if (dom.hofViewTabs) {
       dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
@@ -12729,9 +12737,93 @@
         tab.setAttribute("aria-selected", String(active));
       });
     }
-    if (dom.hofSeenJeemSections) dom.hofSeenJeemSections.hidden = isBaraView || isMafiaView;
+    if (dom.hofSeenJeemSections) dom.hofSeenJeemSections.hidden = isBaraView || isMafiaView || isQuizRaceView;
     if (dom.hofBaraSalfaSection) dom.hofBaraSalfaSection.hidden = !isBaraView;
     if (dom.hofMafiaSection) dom.hofMafiaSection.hidden = !isMafiaView;
+    if (dom.hofQuizRaceSection) dom.hofQuizRaceSection.hidden = !isQuizRaceView;
+
+    if (isQuizRaceView) {
+      const qrHof =
+        typeof archiveStore.computeQuizRaceHallOfFame === "function"
+          ? archiveStore.computeQuizRaceHallOfFame(profile.id)
+          : { totalRaces: 0, records: {}, leaderboard: [] };
+      const rec = qrHof.records || {};
+
+      if (dom.hofProfileSubtitle) {
+        dom.hofProfileSubtitle.textContent = `المجموعة النشطة: ${profile.name} • إحصائيات سباقات «تحدي الكل» المحفوظة`;
+      }
+      if (dom.hofQuizRaceTotalPill) {
+        dom.hofQuizRaceTotalPill.textContent = `${qrHof.totalRaces} سباق`;
+      }
+      if (dom.btnHofClearArchive) {
+        dom.btnHofClearArchive.textContent = "🗑️ تصفير إحصائيات تحدي الكل للمجموعة";
+        dom.btnHofClearArchive.disabled = qrHof.totalRaces === 0;
+      }
+
+      if (dom.hofQuizRaceRecordsGrid) {
+        dom.hofQuizRaceRecordsGrid.innerHTML = `
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🏆</div>
+            <div class="hof-rec-val">${rec.highestScore ? rec.highestScore.score : "—"}</div>
+            <div class="hof-rec-lbl">أعلى رصيد في سباق</div>
+            <div class="hof-rec-sub">${rec.highestScore ? escapeHtml(rec.highestScore.name) : "لم يُسجّل سباق بعد"}</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">⚡</div>
+            <div class="hof-rec-val">${rec.fastestAnswer ? `${(rec.fastestAnswer.fastestMs / 1000).toFixed(2)}ث` : "—"}</div>
+            <div class="hof-rec-lbl">أسرع إجابة صحيحة</div>
+            <div class="hof-rec-sub">${rec.fastestAnswer ? escapeHtml(rec.fastestAnswer.name) : "لم يُسجّل سباق بعد"}</div>
+          </div>
+          <div class="hof-record-card">
+            <div class="hof-rec-icon">🔥</div>
+            <div class="hof-rec-val">${rec.bestStreak ? `×${rec.bestStreak.streak}` : "—"}</div>
+            <div class="hof-rec-lbl">أطول سلسلة صحيحة</div>
+            <div class="hof-rec-sub">${rec.bestStreak ? escapeHtml(rec.bestStreak.name) : "لم يُسجّل سباق بعد"}</div>
+          </div>
+        `;
+      }
+
+      if (dom.hofQuizRaceLeaderboardWrap) {
+        if (!qrHof.leaderboard || qrHof.leaderboard.length === 0) {
+          dom.hofQuizRaceLeaderboardWrap.innerHTML = `<div class="empty-inline-note">أكمل أول سباق «تحدي الكل» لتظهر قائمة المتصدرين والدقة وأسرع الإجابات لمجموعة «${escapeHtml(profile.name)}».</div>`;
+        } else {
+          dom.hofQuizRaceLeaderboardWrap.innerHTML = `
+            <div class="hof-table-scroll">
+              <table class="hof-leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>اللاعب</th>
+                    <th>السباقات</th>
+                    <th>الانتصارات</th>
+                    <th>أعلى رصيد</th>
+                    <th>متوسط الدقة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${qrHof.leaderboard
+                    .slice(0, 20)
+                    .map(
+                      (row, idx) => `
+                    <tr class="${idx === 0 ? "is-rank-1" : ""}">
+                      <td><strong>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}</strong></td>
+                      <td><strong>${escapeHtml(row.displayName)}</strong></td>
+                      <td>${row.races}</td>
+                      <td><strong>${row.wins}</strong></td>
+                      <td>${row.bestScore}</td>
+                      <td>${row.avgAccuracy}%</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+      return;
+    }
 
     if (isMafiaView) {
       const mafiaHof =
@@ -15345,7 +15437,14 @@
       dom.hofViewTabs.querySelectorAll("[data-hof-view]").forEach((tab) => {
         tab.addEventListener("click", () => {
           const v = tab.dataset.hofView;
-          state.hofActiveView = v === "bara-salfa" ? "bara-salfa" : v === "mafia" ? "mafia" : "seen-jeem";
+          state.hofActiveView =
+            v === "bara-salfa"
+              ? "bara-salfa"
+              : v === "mafia"
+                ? "mafia"
+                : v === "quiz-race"
+                  ? "quiz-race"
+                  : "seen-jeem";
           renderHallOfFameModal();
         });
       });
@@ -15361,6 +15460,21 @@
     if (dom.btnHofClearArchive) {
       dom.btnHofClearArchive.addEventListener("click", () => {
         const profile = historyStore.getActiveProfile();
+        if (state.hofActiveView === "quiz-race") {
+          openConfirmDialog({
+            title: `تصفير إحصائيات «تحدي الكل» لمجموعة «${profile.name}»؟`,
+            message: "سيتم حذف جميع سباقات وإحصائيات «تحدي الكل» المحفوظة لهذه المجموعة فقط.",
+            confirmText: "نعم، صفّر الإحصائيات",
+            onConfirm: () => {
+              if (typeof archiveStore.clearQuizRaceProfileStats === "function") {
+                archiveStore.clearQuizRaceProfileStats(profile.id);
+              }
+              renderHallOfFameModal();
+              showToast(`🗑️ تم تصفير إحصائيات «تحدي الكل» لمجموعة «${profile.name}»`, "info");
+            }
+          });
+          return;
+        }
         if (state.hofActiveView === "mafia") {
           openConfirmDialog({
             title: `تصفير إحصائيات «المافيا» لمجموعة «${profile.name}»؟`,
@@ -15949,8 +16063,14 @@
       }
       return;
     }
+    if (urlMode === "quiz-race-player") {
+      if (window.SeenJeemQuizRacePlayerView && typeof window.SeenJeemQuizRacePlayerView.init === "function") {
+        window.SeenJeemQuizRacePlayerView.init();
+      }
+      return;
+    }
 
-    // جسر خفيف يسمح لوحدات «برا السالفة» و«المافيا» و«تحدي الصوت» و«نظام البطولة» بالوصول المنظّم لمشاهد التلفزيون والغرفة اللاسلكية وبطاقة النتيجة
+    // جسر خفيف يسمح لوحدات «برا السالفة» و«المافيا» و«تحدي الكل» و«تحدي الصوت» و«نظام البطولة» بالوصول المنظّم لمشاهد التلفزيون والغرفة اللاسلكية وبطاقة النتيجة
     window.SeenJeemHostBridge = {
       broadcastTV: (opts = { skipWireless: true }) =>
         broadcastLiveDisplayState(opts && typeof opts === "object" ? opts : { skipWireless: true }),
@@ -15969,6 +16089,7 @@
       getAllCategories: () => (Array.isArray(state.allCategories) ? state.allCategories : []),
       openBaraResultCard: (sessionData) => openResultCardModal({ cardType: "bara-salfa", sessionData }),
       openMafiaResultCard: (sessionData) => openResultCardModal({ cardType: "mafia", sessionData }),
+      openQuizRaceResultCard: (sessionData) => openResultCardModal({ cardType: "quiz-race", sessionData }),
       openAudioChallengeResultCard: (sessionData) => openResultCardModal({ cardType: "audio-challenge", sessionData }),
       openTournamentResultCard: (tournamentData) => openResultCardModal({ cardType: "tournament", tournamentData }),
       refreshCustomPacks: () => refreshCustomPacksFromStore(),
@@ -16031,6 +16152,11 @@
     if (btnLaunchMafia && window.SeenJeemMafia) {
       window.SeenJeemMafia.init();
       btnLaunchMafia.addEventListener("click", () => window.SeenJeemMafia.open());
+    }
+    const btnLaunchQuizRace = document.getElementById("btn-launch-quiz-race");
+    if (btnLaunchQuizRace && window.SeenJeemQuizRace) {
+      window.SeenJeemQuizRace.init();
+      btnLaunchQuizRace.addEventListener("click", () => window.SeenJeemQuizRace.open());
     }
     const btnLaunchAudioChallenge = document.getElementById("btn-launch-audio-challenge");
     if (btnLaunchAudioChallenge && window.SeenJeemAudioChallengeMode) {

@@ -26,6 +26,7 @@
     BARA_HISTORY: "bara-salfa-history-v1",
     BARA_STATS: "bara-salfa-stats-v1",
     MAFIA_STATS: "mafia-stats-v1",
+    QUIZ_RACE_STATS: "quiz-race-stats-v1",
     AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
     FAVORITE_CATEGORIES: "seen-jeem-favorites-v1",
     TOURNAMENT: "seen-jeem-tournament-v1"
@@ -76,6 +77,10 @@
       window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllMafiaSessions === "function"
         ? window.SeenJeemArchiveStore.getAllMafiaSessions()
         : safeReadJSON(KEYS.MAFIA_STATS, []);
+    const quizRaceStats =
+      window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllQuizRaceSessions === "function"
+        ? window.SeenJeemArchiveStore.getAllQuizRaceSessions()
+        : safeReadJSON(KEYS.QUIZ_RACE_STATS, []);
     const audioChallengeHistory = safeReadJSON(KEYS.AUDIO_CHALLENGE_HISTORY, []);
     const favoriteCategories =
       window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.loadFavorites === "function"
@@ -158,6 +163,7 @@
             : {},
         baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
         mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
+        quizRaceStats: Array.isArray(quizRaceStats) ? quizRaceStats : [],
         audioChallengeHistory: Array.isArray(audioChallengeHistory) ? audioChallengeHistory : [],
         favoriteCategories: Array.isArray(favoriteCategories) ? favoriteCategories : [],
         activeTournament: activeTournament && typeof activeTournament === "object" ? activeTournament : null,
@@ -384,6 +390,13 @@
         window.SeenJeemArchiveStore.importMafiaSessions(d.mafiaStats, isReplace ? "replace" : "merge");
       } else {
         safeWriteJSON(KEYS.MAFIA_STATS, d.mafiaStats);
+      }
+    }
+    if (Array.isArray(d.quizRaceStats)) {
+      if (window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.importQuizRaceSessions === "function") {
+        window.SeenJeemArchiveStore.importQuizRaceSessions(d.quizRaceStats, isReplace ? "replace" : "merge");
+      } else {
+        safeWriteJSON(KEYS.QUIZ_RACE_STATS, d.quizRaceStats);
       }
     }
     if (Array.isArray(d.audioChallengeHistory)) {

@@ -54,6 +54,9 @@
       this.nightPickedTargetName = "";
       this.voteSentRound = 0;
       this.votePickedLabel = "";
+      this.rulesGuideOpen = false;
+      this.mayorConfirmOpen = false;
+      this.mayorRevealSending = false;
       this._timerLoop = null;
     }
 
@@ -322,12 +325,18 @@
           <header class="mp-topbar">
             <div class="mp-brand">🎭 <span>المافيا</span></div>
             <div class="mp-meta-pills">
+              ${
+                this.joined
+                  ? `<button type="button" id="mp-btn-rules-guide" class="btn btn-ghost btn-xxs mp-guide-btn">📖 القواعد</button>`
+                  : ""
+              }
               ${this.roomCode ? `<span class="mp-code-pill">${escapeHtml(this.roomCode)}</span>` : ""}
               <span class="mp-conn-dot ${this.connected ? "is-on" : ""}">${this.connected ? "🟢 متصل" : "⚪ اتصال..."}</span>
             </div>
           </header>
 
           ${this.errorMessage ? `<div class="mp-error-banner">${escapeHtml(this.errorMessage)}</div>` : ""}
+          ${this.joined && this.rulesGuideOpen ? this._renderRulesGuideHtml() : ""}
 
           ${
             showReminder
@@ -350,6 +359,46 @@
       `;
 
       this._bindRenderedEvents();
+    }
+
+    _renderRulesGuideHtml() {
+      const pub = this.publicState || {};
+      const rules = pub.rulesSummary || {};
+      const rosterCount = Array.isArray(pub.playersRoster) ? pub.playersRoster.length : 6;
+      const activeRoles =
+        window.SeenJeemMafiaEngine && typeof window.SeenJeemMafiaEngine.getActiveRolesForGuide === "function"
+          ? window.SeenJeemMafiaEngine.getActiveRolesForGuide(rules, rosterCount)
+          : [
+              { icon: "🕵️", label: "مافيا", team: "mafia", description: "يتفق أفراد المافيا ليلاً على إقصاء لاعب واحد." },
+              { icon: "🩺", label: "الطبيب", team: "citizens", description: "يحمي لاعباً واحداً كل ليلة من هجوم المافيا." },
+              { icon: "🔍", label: "المحقق", team: "citizens", description: "يفحص لاعباً كل ليلة وتصله النتيجة سراً عند الفجر." },
+              { icon: "🏘️", label: "مواطن", team: "citizens", description: "يكتشف المافيا في النقاش ويصوّت لإقصائهم." }
+            ];
+      return `
+        <section class="mp-card mp-rules-guide-card">
+          <div class="mp-rules-guide-head">
+            <strong>📖 شرح الأدوار والقواعد (الجلسة الحالية)</strong>
+            <button type="button" id="mp-btn-close-rules" class="btn btn-ghost btn-xxs">✕ إغلاق</button>
+          </div>
+          <div class="mp-rules-roles-list">
+            ${activeRoles
+              .map(
+                (r) => `
+              <div class="mp-rules-role-row team-${escapeHtml(r.team || "citizens")}">
+                <span class="mp-rules-role-name">${escapeHtml(r.icon)} <strong>${escapeHtml(r.label)}</strong></span>
+                <span class="mp-rules-role-desc">${escapeHtml(r.description)}</span>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+          <div class="mp-rules-summary-box">
+            <div>🌙 <strong>الليل:</strong> يختار الجميع من هواتفهم معاً للحفاظ على السرية التامة.</div>
+            <div>☀️ <strong>النهار:</strong> نقاش حر ثم تصويت سري لإقصاء المشتبه به.</div>
+            <div>🏆 <strong>الفوز:</strong> يفوز المواطنون بإقصاء كل المافيا، وتفوز المافيا عند التساوي في العدد.</div>
+          </div>
+        </section>
+      `;
     }
 
     _renderJoinHtml() {
@@ -479,7 +528,7 @@
         const detLog = this._renderDetectiveIntelHtml();
         return `
           <div class="mp-card mp-center">
-            <div class="mp-big-emoji">${ds.saved ? "🩺✨" : ds.eliminated ? "💀" : "☀️"}</div>
+            <div class="mp-big-emoji">${ds.saved ? "🩺✨" : ds.bodyguardSacrificed ? "🛡️" : ds.eliminated ? "💀" : "☀️"}</div>
             <h2>${escapeHtml(ds.headline || "")}</h2>
             <p class="mp-muted">${escapeHtml(ds.subtitle || "")}</p>
             ${detLog}
@@ -489,11 +538,17 @@
 
       if (phase === "day_discussion") {
         const detLog = this._renderDetectiveIntelHtml();
+        const mayorBox = this._renderMayorActionHtml(pub, myUid);
+        const mayorBanner = pub.mayorAnnouncement
+          ? `<div class="mp-mayor-banner">${escapeHtml(pub.mayorAnnouncement.message || "")}</div>`
+          : "";
         return `
           <div class="mp-card mp-center">
             <div class="mp-phase-tag">💬 نقاش النهار — اليوم ${pub.roundNumber || 1}</div>
+            ${mayorBanner}
             <h2>تناقشوا لكشف المافيا!</h2>
             <div id="mp-live-timer" class="mp-timer-big">${this._formatLiveTimer(pub.timer)}</div>
+            ${mayorBox}
             ${detLog}
           </div>
         `;
@@ -502,13 +557,20 @@
       if (phase === "day_voting") {
         const alreadyVoted = this.voteSentRound === pub.roundNumber;
         const targets = (pub.playersRoster || []).filter((p) => p.alive && p.uid !== myUid);
+        const mayorBox = this._renderMayorActionHtml(pub, myUid);
+        const mayorBanner = pub.mayorAnnouncement
+          ? `<div class="mp-mayor-banner">${escapeHtml(pub.mayorAnnouncement.message || "")}</div>`
+          : "";
+        const isRevealedMayor = pub.revealedMayorUid === myUid;
         return `
           <div class="mp-card">
-            <div class="mp-phase-tag">🗳️ التصويت النهاري السري — اليوم ${pub.roundNumber || 1}</div>
+            <div class="mp-phase-tag">🗳️ التصويت النهاري السري — اليوم ${pub.roundNumber || 1}${isRevealedMayor ? " • 🎖️ صوتك ×2" : ""}</div>
+            ${mayorBanner}
             <div id="mp-live-timer" class="mp-timer-big">${this._formatLiveTimer(pub.timer)}</div>
+            ${mayorBox}
             ${
               alreadyVoted
-                ? `<div class="mp-done-box">✅ تم تسجيل تصويتك السري (${escapeHtml(this.votePickedLabel)}) — بانتظار بقية الأحياء...</div>`
+                ? `<div class="mp-done-box">✅ تم تسجيل تصويتك السري (${escapeHtml(this.votePickedLabel)})${isRevealedMayor ? " بقوة ×2" : ""} — بانتظار بقية الأحياء...</div>`
                 : `
                   <p class="mp-muted">اختر من تريد إقصاءه اليوم أو تخطّ التصويت:</p>
                   <div class="mp-targets-grid">
@@ -516,7 +578,7 @@
                       .map(
                         (t) => `
                       <button type="button" class="btn btn-secondary mp-target-btn" data-mp-vote="${escapeHtml(t.uid)}" data-mp-label="${escapeHtml(t.name)}">
-                        🎯 ${escapeHtml(t.name)}
+                        🎯 ${t.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(t.name)}
                       </button>
                     `
                       )
@@ -542,11 +604,48 @@
               ${(vr.tally || []).map((t) => `<div class="mp-reveal-row"><strong>${escapeHtml(t.name)}</strong><span>${t.votes} صوت</span></div>`).join("")}
               <div class="mp-reveal-row"><strong>⏭️ تخطي</strong><span>${vr.skipVotes || 0} صوت</span></div>
             </div>
+            ${
+              Array.isArray(vr.voteBreakdown) && vr.voteBreakdown.length > 0
+                ? `<div class="mp-reveal-list">
+                    ${vr.voteBreakdown
+                      .map(
+                        (v) =>
+                          `<div class="mp-reveal-row"><span>${v.isMayor ? "🎖️ " : ""}${escapeHtml(v.voterName)}${v.weight === 2 ? ` <strong class="mafia-x2-badge">×2</strong>` : ""}</span><span>⬅️ ${escapeHtml(v.targetName)}</span></div>`
+                      )
+                      .join("")}
+                  </div>`
+                : ""
+            }
           </div>
         `;
       }
 
       return `<div class="mp-card mp-center"><p class="mp-muted">بانتظار تحديث الجلسة...</p></div>`;
+    }
+
+    _renderMayorActionHtml(pub, myUid) {
+      if (!this.privateRole || this.privateRole.role !== "mayor") return "";
+      if (pub.revealedMayorUid === myUid) {
+        return `<div class="mp-intel-banner is-mayor">🎖️ تم إعلان صفتك كعمدة — صوتك يُحسب بصوتين (×2) بقية الجلسة!</div>`;
+      }
+      if (pub.revealedMayorUid) return "";
+      if (this.mayorConfirmOpen) {
+        return `
+          <div class="mp-mayor-confirm-box">
+            <strong>🎖️ تأكيد إعلان صفتك كعمدة؟</strong>
+            <p class="mp-muted">ستُكشف صفتك علناً للجميع وتصبح شارة 🎖️ بجانب اسمك، ويُحسب صوتك بصوتين (×2) طوال الجلسة.</p>
+            <div class="mp-mayor-confirm-btns">
+              <button type="button" id="mp-btn-mayor-confirm" class="btn btn-amber" ${this.mayorRevealSending ? "disabled" : ""}>✅ نعم، أعلن صفتي كعمدة</button>
+              <button type="button" id="mp-btn-mayor-cancel" class="btn btn-ghost">إلغاء</button>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="mp-mayor-action-wrap">
+          <button type="button" id="mp-btn-mayor-ask" class="btn btn-amber mp-big-btn">🎖️ إعلان صفتي كعمدة (صوت ×2)</button>
+        </div>
+      `;
     }
 
     _renderNightActionHtml(pub, myUid) {
@@ -584,6 +683,15 @@
           disabledUids.add(intel.lastProtectedUid);
           extraBanner = `<div class="mp-intel-banner">ℹ️ لا يمكنك حماية نفس الشخص الذي حميته الليلة السابقة.</div>`;
         }
+      } else if (role === "bodyguard") {
+        title = "🛡️ اختر لاعباً لحراسته الليلة";
+        subtitle = "إن استهدفته المافيا سينجو اللاعب وتُقصى أنت بدلاً عنه (لا يمكنك حراسة نفسك):";
+        actionType = "guard";
+        targets = alive.filter((p) => p.uid !== myUid);
+        if (pub.rulesSummary && pub.rulesSummary.noConsecutiveProtect && intel.lastGuardedUid) {
+          disabledUids.add(intel.lastGuardedUid);
+          extraBanner = `<div class="mp-intel-banner">ℹ️ لا يمكنك حراسة نفس الشخص مرتين متتاليتين.</div>`;
+        }
       } else if (role === "detective") {
         title = "🔍 اختر لاعباً لفحصه الليلة";
         subtitle = "ستصلك نتيجته سراً على هاتفك مع بزوغ الفجر:";
@@ -611,7 +719,7 @@
                       const isDis = disabledUids.has(t.uid);
                       return `
                         <button type="button" class="btn btn-secondary mp-target-btn" data-mp-night-type="${actionType}" data-mp-night-target="${escapeHtml(t.uid)}" data-mp-label="${escapeHtml(t.name)}" ${isDis ? "disabled" : ""}>
-                          ${role === "doctor" && t.uid === myUid ? "🩺 حماية نفسي" : `👤 ${escapeHtml(t.name)}`}
+                          ${role === "doctor" && t.uid === myUid ? "🩺 حماية نفسي" : `${t.isRevealedMayor ? "🎖️" : "👤"} ${escapeHtml(t.name)}`}
                           ${isDis ? " (غير متاح)" : ""}
                         </button>
                       `;
@@ -824,6 +932,54 @@
           }, 800);
         });
       });
+
+      const rulesBtn = document.getElementById("mp-btn-rules-guide");
+      if (rulesBtn) {
+        rulesBtn.addEventListener("click", () => {
+          this.rulesGuideOpen = !this.rulesGuideOpen;
+          this._render();
+        });
+      }
+      const closeRulesBtn = document.getElementById("mp-btn-close-rules");
+      if (closeRulesBtn) {
+        closeRulesBtn.addEventListener("click", () => {
+          this.rulesGuideOpen = false;
+          this._render();
+        });
+      }
+
+      const mayorAskBtn = document.getElementById("mp-btn-mayor-ask");
+      if (mayorAskBtn) {
+        mayorAskBtn.addEventListener("click", () => {
+          this.mayorConfirmOpen = true;
+          this._render();
+        });
+      }
+      const mayorCancelBtn = document.getElementById("mp-btn-mayor-cancel");
+      if (mayorCancelBtn) {
+        mayorCancelBtn.addEventListener("click", () => {
+          this.mayorConfirmOpen = false;
+          this._render();
+        });
+      }
+      const mayorConfirmBtn = document.getElementById("mp-btn-mayor-confirm");
+      if (mayorConfirmBtn) {
+        mayorConfirmBtn.addEventListener("click", async () => {
+          if (!this.publicState || !window.SeenJeemMafiaSync || this.mayorRevealSending) return;
+          this.mayorRevealSending = true;
+          this._render();
+          const res = await window.SeenJeemMafiaSync.submitMayorReveal({
+            gameId: this.publicState.gameId,
+            roundNumber: this.publicState.roundNumber || 1
+          });
+          this.mayorRevealSending = false;
+          this.mayorConfirmOpen = false;
+          if (!res.ok) {
+            this.errorMessage = res.error || "تعذّر إعلان صفتك كعمدة.";
+          }
+          this._render();
+        });
+      }
     }
   }
 

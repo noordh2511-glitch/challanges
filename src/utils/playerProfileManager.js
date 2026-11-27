@@ -303,8 +303,23 @@
         }
       } catch (_err) {}
 
-      const totalSessions = sjTotal + baraHof.totalRounds + mafiaHof.totalSessions + (audioClipsPlayed > 0 ? Math.ceil(audioClipsPlayed / 5) : 0);
-      const totalWins = sjWins + (myMafiaRow ? myMafiaRow.totalWins : 0) + baraCorrectVotes;
+      // 5) إحصائيات تحدي الكل
+      const qrHof =
+        archive && typeof archive.computeQuizRaceHallOfFame === "function"
+          ? archive.computeQuizRaceHallOfFame(profileId)
+          : { totalRaces: 0, leaderboard: [] };
+      const myQrRow = (qrHof.leaderboard || []).find((r) => r.key === myKey) || null;
+      const qrRaces = myQrRow ? myQrRow.races : qrHof.totalRaces;
+      const qrWins = myQrRow ? myQrRow.wins : 0;
+      const qrTopScore = myQrRow ? myQrRow.bestScore : (qrHof.records && qrHof.records.highestScore ? qrHof.records.highestScore.score : 0);
+
+      const totalSessions =
+        sjTotal +
+        baraHof.totalRounds +
+        mafiaHof.totalSessions +
+        qrHof.totalRaces +
+        (audioClipsPlayed > 0 ? Math.ceil(audioClipsPlayed / 5) : 0);
+      const totalWins = sjWins + (myMafiaRow ? myMafiaRow.totalWins : 0) + baraCorrectVotes + qrWins;
 
       // حساب المستوى (يتصاعد كل 3 جلسات)
       const level = Math.max(1, Math.floor(totalSessions / 3) + 1);
@@ -383,7 +398,8 @@
           seenJeem: { matches: sjTotal, wins: sjWins, topScore: sjTopScore },
           baraSalfa: { rounds: baraRounds, detectRate: baraDetectRate, guessRate: baraGuessRate },
           mafia: { sessions: mafiaSessions, winRate: mafiaWinRate },
-          audioChallenge: { clipsPlayed: audioClipsPlayed }
+          audioChallenge: { clipsPlayed: audioClipsPlayed },
+          quizRace: { races: qrRaces, wins: qrWins, topScore: qrTopScore }
         },
         badges
       };

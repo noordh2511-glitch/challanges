@@ -77,6 +77,7 @@
         "wireless-room-modal",
         "bara-salfa-modal",
         "mafia-modal",
+        "quiz-race-modal",
         "audio-challenge-modal",
         "tournament-modal",
         "custom-pack-builder-modal",
@@ -84,6 +85,7 @@
         "player-view-root",
         "bara-player-root",
         "mafia-player-root",
+        "quiz-race-player-root",
         "confirm-modal",
         "resume-match-modal",
         "image-lightbox",
@@ -2571,38 +2573,46 @@
         html = `
           <div class="tv-bara-card tv-mafia-card is-dawn-card">
             <div class="tv-side-mode-tag">☀️ تقرير فجر اليوم ${mv.roundNumber || 1}</div>
-            <div class="tv-mafia-moon">${ds.saved ? "🩺✨" : ds.eliminated ? "💀" : "☀️"}</div>
+            <div class="tv-mafia-moon">${ds.saved ? "🩺✨" : ds.bodyguardSacrificed ? "🛡️" : ds.eliminated ? "💀" : "☀️"}</div>
             <h1 class="tv-bara-title">${escapeHtml(ds.headline || "")}</h1>
             <p class="tv-bara-sub">${escapeHtml(ds.subtitle || "")}</p>
             <div class="tv-bara-chips">
-              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${escapeHtml(p.name)}</span>`).join("")}
-              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${escapeHtml(p.name)}${p.revealedRole ? ` (${escapeHtml(p.revealedRole.icon)} ${escapeHtml(p.revealedRole.label)})` : ""}</span>`).join("")}
+              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${p.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(p.name)}</span>`).join("")}
+              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${p.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(p.name)}${p.revealedRole ? ` (${escapeHtml(p.revealedRole.icon)} ${escapeHtml(p.revealedRole.label)})` : ""}</span>`).join("")}
             </div>
           </div>
         `;
       } else if (mv.phase === "day_discussion") {
         const isUnl = mv.timer && mv.timer.status === "unlimited";
+        const mayorBanner = mv.mayorAnnouncement
+          ? `<div class="tv-mafia-mayor-banner">${escapeHtml(mv.mayorAnnouncement.message || "")}</div>`
+          : "";
         html = `
           <div class="tv-bara-card tv-mafia-card">
             <div class="tv-side-mode-tag">💬 نقاش النهار — اليوم ${mv.roundNumber || 1}</div>
+            ${mayorBanner}
             <h1 class="tv-bara-title">من المافيا بينكم؟ تناقشوا الآن!</h1>
             <div class="tv-bara-giant-timer${!isUnl && rem <= 10 ? " danger" : ""}">${isUnl ? "∞" : formatTime(rem)}</div>
             <div class="tv-bara-chips">
-              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${escapeHtml(p.name)}</span>`).join("")}
-              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${escapeHtml(p.name)}</span>`).join("")}
+              ${alive.map((p) => `<span class="tv-bara-chip is-done">🟢 ${p.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(p.name)}</span>`).join("")}
+              ${dead.map((p) => `<span class="tv-bara-chip is-dead-tv">💀 ${p.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(p.name)}</span>`).join("")}
             </div>
           </div>
         `;
       } else if (mv.phase === "day_voting") {
         const votedSet = new Set(prog.votedUids || []);
+        const mayorBanner = mv.mayorAnnouncement
+          ? `<div class="tv-mafia-mayor-banner">${escapeHtml(mv.mayorAnnouncement.message || "")}</div>`
+          : "";
         html = `
           <div class="tv-bara-card tv-mafia-card">
             <div class="tv-side-mode-tag">🗳️ التصويت النهاري السري — اليوم ${mv.roundNumber || 1}</div>
+            ${mayorBanner}
             <h1 class="tv-bara-title">صوّتوا سراً من هواتفكم!</h1>
             <div class="tv-bara-giant-timer${rem <= 10 ? " danger" : ""}">${formatTime(rem)}</div>
             <div class="tv-bara-progress">${votedSet.size} / ${alive.length} صوّتوا</div>
             <div class="tv-bara-chips">
-              ${alive.map((p) => `<span class="tv-bara-chip${votedSet.has(p.uid) ? " is-done" : ""}">${votedSet.has(p.uid) ? "✅" : "⏳"} ${escapeHtml(p.name)}</span>`).join("")}
+              ${alive.map((p) => `<span class="tv-bara-chip${votedSet.has(p.uid) ? " is-done" : ""}">${votedSet.has(p.uid) ? "✅" : "⏳"} ${p.isRevealedMayor ? "🎖️ " : ""}${escapeHtml(p.name)}</span>`).join("")}
             </div>
           </div>
         `;
@@ -2618,7 +2628,7 @@
                 .map(
                   (v) => `
                 <div class="tv-bara-vote-item${vr.eliminated && v.targetUid === vr.eliminated.uid ? " is-hit" : ""}">
-                  <strong>${escapeHtml(v.voterName)}</strong> ⬅️ ${escapeHtml(v.targetName)}
+                  <strong>${v.isMayor ? "🎖️ " : ""}${escapeHtml(v.voterName)}${v.weight === 2 ? ` <span class="mafia-x2-badge">×2</span>` : ""}</strong> ⬅️ ${escapeHtml(v.targetName)}
                 </div>
               `
                 )

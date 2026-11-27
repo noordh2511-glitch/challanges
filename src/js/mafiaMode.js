@@ -39,6 +39,20 @@
       team: "jester",
       description: "هدفك الوحيد إقناع المدينة بإقصائك عبر التصويت النهاري لتفوز وحدك فوراً!"
     },
+    bodyguard: {
+      id: "bodyguard",
+      label: "الحارس",
+      icon: "🛡️",
+      team: "citizens",
+      description: "اختر كل ليلة لاعباً آخر لحراسته — إن استهدفته المافيا ينجو اللاعب وتُقصى أنت بدلاً عنه."
+    },
+    mayor: {
+      id: "mayor",
+      label: "العمدة",
+      icon: "🎖️",
+      team: "citizens",
+      description: "يمكنك إعلان صفتك كعمدة علناً مرة واحدة في النهار ليُحسب صوتك بصوتين (×2) بقية الجلسة."
+    },
     citizen: {
       id: "citizen",
       label: "مواطن",
@@ -47,6 +61,18 @@
       description: "راقب النقاشات، اكتشف أفراد المافيا، وصوّت لإقصائهم لحماية المدينة."
     }
   });
+
+  function getActiveRolesForGuide(rules = {}, playerCount = 6) {
+    const n = Math.max(4, Number(playerCount) || 6);
+    const list = [ROLE_META.mafia];
+    if (rules.doctorEnabled !== false) list.push(ROLE_META.doctor);
+    if (rules.detectiveEnabled !== false) list.push(ROLE_META.detective);
+    if (rules.jesterEnabled === true && n >= 6) list.push(ROLE_META.jester);
+    if (rules.bodyguardEnabled === true && n >= 6) list.push(ROLE_META.bodyguard);
+    if (rules.mayorEnabled === true && n >= 6) list.push(ROLE_META.mayor);
+    list.push(ROLE_META.citizen);
+    return list;
+  }
 
   function escapeHtml(str) {
     if (typeof str !== "string") return "";
@@ -107,6 +133,8 @@
     if (config.doctorEnabled !== false && pool.length < n) pool.push("doctor");
     if (config.detectiveEnabled !== false && pool.length < n) pool.push("detective");
     if (config.jesterEnabled === true && n >= 6 && pool.length < n) pool.push("jester");
+    if (config.bodyguardEnabled === true && n >= 6 && pool.length < n) pool.push("bodyguard");
+    if (config.mayorEnabled === true && n >= 6 && pool.length < n) pool.push("mayor");
     while (pool.length < n) pool.push("citizen");
 
     const shuffledRoles = shuffleArray(pool, rng);
@@ -183,7 +211,11 @@
   }
 
   /**
-   * معالجة أحداث الليل بدقة (أغلبية المافيا + حماية الطبيب + فحص المحقق)
+   * معالجة أحداث الليل بدقة (أغلبية المافيا + حماية الطبيب + حراسة الحارس + فحص المحقق)
+   * أولوية حل الفجر الصارمة:
+   * 1) الطبيب يطابق هدف المافيا -> إنقاذ كامل، لا يُقصى أحد (الحارس يظل حياً حتى لو حرس نفس اللاعب)
+   * 2) الحارس يطابق هدف المافيا -> ينجو المستهدف ويُقصى الحارس بدلاً عنه برسالة مخصصة
+   * 3) غير ذلك -> يُقصى هدف المافيا كالمعتاد
    */
   function resolveNightActions({
     players,
@@ -191,6 +223,7 @@
     nightActions,
     roundNumber,
     lastProtectedUid = null,
+    lastGuardedUid = null,
     noConsecutiveProtect = true,
     rng = Math.random
   }) {
@@ -235,7 +268,21 @@
       doctorTargetUid = act.targetUid;
     });
 
-    // 3) قرار المحقق الحي
+    // 3) قرار الحارس الحي (لا يحرس نفسه، ويحترم منع التكرار المتتالي)
+    let bodyguardUid = null;
+    let bodyguardTargetUid = null;
+    players.forEach((p) => {
+      if (!p.alive || roleMap[p.uid] !== "bodyguard") return;
+      bodyguardUid = p.uid;
+      const act = nightActions && nightActions[p.uid];
+      if (!act || Number(act.roundNumber) !== Number(roundNumber)) return;
+      if (act.actionType !== "guard" || !act.targetUid) return;
+      if (!aliveSet.has(act.targetUid) || act.targetUid === p.uid) return;
+      if (noConsecutiveProtect && lastGuardedUid && act.targetUid === lastGuardedUid) return;
+      bodyguardTargetUid = act.targetUid;
+    });
+
+    // 4) قرار المحقق الحي
     let detectiveUid = null;
     let investigationResult = null;
     players.forEach((p) => {
@@ -254,26 +301,49 @@
       };
     });
 
-    // 4) المقارنة الحاسمة بين المافيا والطبيب
-    const saved = Boolean(mafiaTargetUid && doctorTargetUid && mafiaTargetUid === doctorTargetUid);
-    const eliminatedUid = mafiaTargetUid && !saved ? mafiaTargetUid : null;
+    // 5) المقارنة الحاسمة بترتيب الأولوية الصارم (الطبيب أولاً ثم الحارس ثم الإقصاء العادي)
+    const doctorSaved = Boolean(mafiaTargetUid && doctorTargetUid && mafiaTargetUid === doctorTargetUid);
+    const bodyguardSacrificed = Boolean(
+      !doctorSaved && mafiaTargetUid && bodyguardUid && bodyguardTargetUid && mafiaTargetUid === bodyguardTargetUid
+    );
+
+    let eliminatedUid = null;
+    let savedBy = null;
+    let dawnMessage = null;
+    if (doctorSaved) {
+      savedBy = "doctor";
+    } else if (bodyguardSacrificed) {
+      savedBy = "bodyguard";
+      eliminatedUid = bodyguardUid;
+      const bgPlayer = byUid.get(bodyguardUid);
+      const bgName = bgPlayer ? bgPlayer.name : "الحارس";
+      dawnMessage = `🛡️ اعترض الحارس الهجوم وأنقذ أحد المواطنين، فتم إقصاء ${bgName} بدلاً عنه!`;
+    } else if (mafiaTargetUid) {
+      eliminatedUid = mafiaTargetUid;
+    }
 
     return {
       mafiaTargetUid,
       doctorUid,
       doctorTargetUid,
+      bodyguardUid,
+      bodyguardTargetUid,
       detectiveUid,
       investigationResult,
-      saved,
+      saved: doctorSaved,
+      bodyguardSacrificed,
+      savedBy,
       eliminatedUid,
-      nextLastProtectedUid: doctorTargetUid || null
+      dawnMessage,
+      nextLastProtectedUid: doctorTargetUid || null,
+      nextLastGuardedUid: bodyguardTargetUid || null
     };
   }
 
   /**
-   * معالجة تصويت النهار السري (تعددية واضحة بدون تعادل وتفوّق على التخطي)
+   * معالجة تصويت النهار السري (تعددية واضحة بدون تعادل وتفوّق على التخطي + وزن صوت العمدة المُعلن ×2)
    */
-  function resolveDayVotes({ players, dayVotes, roundNumber }) {
+  function resolveDayVotes({ players, dayVotes, roundNumber, revealedMayorUid = null }) {
     const aliveList = players.filter((p) => p.alive);
     const aliveSet = new Set(aliveList.map((p) => p.uid));
     const byUid = new Map(players.map((p) => [p.uid, p]));
@@ -285,43 +355,53 @@
     aliveList.forEach((voter) => {
       const v = dayVotes && dayVotes[voter.uid];
       const hasValidRound = Boolean(v && Number(v.roundNumber) === Number(roundNumber) && typeof v.targetUid === "string");
+      const isMayor = Boolean(revealedMayorUid && voter.uid === revealedMayorUid);
+      const weight = isMayor ? 2 : 1;
 
       if (!hasValidRound) {
         voteBreakdown.push({
           voterUid: voter.uid,
           voterName: voter.name,
           targetUid: "ABSTAIN",
-          targetName: "لم يصوّت"
+          targetName: "لم يصوّت",
+          weight: 0,
+          isMayor
         });
         return;
       }
 
       if (v.targetUid === "SKIP") {
-        skipVotes += 1;
+        skipVotes += weight;
         voteBreakdown.push({
           voterUid: voter.uid,
           voterName: voter.name,
           targetUid: "SKIP",
-          targetName: "تخطي التصويت"
+          targetName: "تخطي التصويت",
+          weight,
+          isMayor
         });
         return;
       }
 
       if (v.targetUid !== voter.uid && aliveSet.has(v.targetUid)) {
-        counts.set(v.targetUid, (counts.get(v.targetUid) || 0) + 1);
+        counts.set(v.targetUid, (counts.get(v.targetUid) || 0) + weight);
         const target = byUid.get(v.targetUid);
         voteBreakdown.push({
           voterUid: voter.uid,
           voterName: voter.name,
           targetUid: v.targetUid,
-          targetName: target ? target.name : "لاعب"
+          targetName: target ? target.name : "لاعب",
+          weight,
+          isMayor
         });
       } else {
         voteBreakdown.push({
           voterUid: voter.uid,
           voterName: voter.name,
           targetUid: "ABSTAIN",
-          targetName: "تصويت غير صالح"
+          targetName: "تصويت غير صالح",
+          weight: 0,
+          isMayor
         });
       }
     });
@@ -379,6 +459,8 @@
         doctorEnabled: true,
         detectiveEnabled: true,
         jesterEnabled: false,
+        bodyguardEnabled: false,
+        mayorEnabled: false,
         revealRoleOnDeath: true,
         noConsecutiveProtect: true,
         nightSeconds: 45,
@@ -387,6 +469,7 @@
         vipEnabled: true,
         showQrOnTv: true
       };
+      this.rulesGuideOpen = false;
 
       // حالة الغرفة اللاسلكية
       this.room = {
@@ -405,11 +488,14 @@
       this.roundNumber = 0;
       this.players = []; // [{ uid, name, alive, eliminatedAtRound, eliminatedBy, revealedRole }]
       this._secretRoles = {}; // uid -> roleId (سري!)
-      this._privateIntel = {}; // uid -> { investigations: [], mafiaPicks: {}, lastProtectedUid: null } (سري!)
+      this._privateIntel = {}; // uid -> { investigations: [], mafiaPicks: {}, lastProtectedUid: null, lastGuardedUid: null } (سري!)
       this._nightActions = {}; // uid -> actionObj (سري!)
       this._dayVotes = {}; // uid -> voteObj (سري!)
       this._readyUids = new Set();
       this._lastProtectedUid = null;
+      this._lastGuardedUid = null;
+      this._revealedMayorUid = null;
+      this.mayorAnnouncement = null;
       this._sessionTimeline = []; // أحداث مفصّلة تُكشف في game_over فقط!
       this._statsCounters = { doctorSaves: 0, detectiveHits: 0, detectiveChecks: 0, nightsPlayed: 0 };
       this._recordedSessionId = "";
@@ -562,6 +648,7 @@
           onPlayers: (map) => this._onPlayersChanged(map),
           onNightActions: (actions) => this._onNightActionsChanged(actions),
           onDayVotes: (votes) => this._onDayVotesChanged(votes),
+          onMayorReveals: (reveals) => this._onMayorRevealsChanged(reveals),
           onVipCommand: (cmd) => this._onVipCommand(cmd),
           onConnectionState: (isConn) => {
             this.room.connected = isConn;
@@ -615,6 +702,9 @@
       this._dayVotes = {};
       this._readyUids = new Set();
       this._lastProtectedUid = null;
+      this._lastGuardedUid = null;
+      this._revealedMayorUid = null;
+      this.mayorAnnouncement = null;
       this._sessionTimeline = [];
       this._statsCounters = { doctorSaves: 0, detectiveHits: 0, detectiveChecks: 0, nightsPlayed: 0 };
       this._recordedSessionId = "";
@@ -730,6 +820,42 @@
       }
     }
 
+    _onMayorRevealsChanged(revealsMap) {
+      const clean = revealsMap && typeof revealsMap === "object" ? revealsMap : {};
+      Object.keys(clean).forEach((uid) => {
+        const entry = clean[uid];
+        if (!entry || entry.gameId !== this.gameId) return;
+        this.revealMayor(uid);
+      });
+    }
+
+    revealMayor(uid) {
+      if (!uid || this._revealedMayorUid) return false;
+      if (this.phase !== "day_discussion" && this.phase !== "day_voting") return false;
+      if (this._secretRoles[uid] !== "mayor") return false;
+      const mayorPlayer = this.players.find((p) => p.uid === uid && p.alive);
+      if (!mayorPlayer) return false;
+
+      this._revealedMayorUid = uid;
+      mayorPlayer.revealedRole = { role: "mayor", label: "العمدة", icon: "🎖️" };
+      this.mayorAnnouncement = {
+        uid,
+        name: mayorPlayer.name,
+        roundNumber: this.roundNumber,
+        message: `🎖️ أعلن ${mayorPlayer.name} صفته كعمدة للمدينة! يُحسب صوته بصوتين (×2) بقية الجلسة.`
+      };
+      this._sessionTimeline.push({
+        roundNumber: this.roundNumber,
+        icon: "🎖️",
+        text: `النهار ${this.roundNumber}: أعلن «${mayorPlayer.name}» صفته كعمدة للمدينة (صوت ×2)`
+      });
+      this._playSfx("dawn");
+      this._toast(`🎖️ أعلن ${mayorPlayer.name} صفته كعمدة (صوت ×2)!`, "success");
+      this._render();
+      this._syncDisplayAndFirebase();
+      return true;
+    }
+
     _getVotedAliveUids() {
       const out = [];
       this.players.forEach((p) => {
@@ -767,6 +893,8 @@
         if (typeof p.doctorEnabled === "boolean") this.config.doctorEnabled = p.doctorEnabled;
         if (typeof p.detectiveEnabled === "boolean") this.config.detectiveEnabled = p.detectiveEnabled;
         if (typeof p.jesterEnabled === "boolean") this.config.jesterEnabled = p.jesterEnabled;
+        if (typeof p.bodyguardEnabled === "boolean") this.config.bodyguardEnabled = p.bodyguardEnabled;
+        if (typeof p.mayorEnabled === "boolean") this.config.mayorEnabled = p.mayorEnabled;
         if (typeof p.revealRoleOnDeath === "boolean") this.config.revealRoleOnDeath = p.revealRoleOnDeath;
         this._render();
         this._syncDisplayAndFirebase();
@@ -811,7 +939,8 @@
           gameId,
           investigations: [],
           mafiaPicks: {},
-          lastProtectedUid: null
+          lastProtectedUid: null,
+          lastGuardedUid: null
         };
       });
       this._privateIntel = initialIntel;
@@ -833,7 +962,7 @@
       this.dawnSummary = null;
       this.voteResult = null;
 
-      // تصفير اختيارات شركاء المافيا لليلة الجديدة في privateIntel مع الإبقاء على lastProtectedUid و investigations
+      // تصفير اختيارات شركاء المافيا لليلة الجديدة في privateIntel مع الإبقاء على lastProtectedUid و lastGuardedUid و investigations
       if (this.room.active && window.SeenJeemMafiaSync) {
         await window.SeenJeemMafiaSync.clearRoundActions({ night: true, votes: true });
         this.players.forEach((p) => {
@@ -865,10 +994,12 @@
         nightActions: this._nightActions,
         roundNumber: this.roundNumber,
         lastProtectedUid: this._lastProtectedUid,
+        lastGuardedUid: this._lastGuardedUid,
         noConsecutiveProtect: this.config.noConsecutiveProtect
       });
 
       this._lastProtectedUid = res.nextLastProtectedUid;
+      this._lastGuardedUid = res.nextLastGuardedUid;
 
       // تحديث بيانات الطبيب السرية (lastProtectedUid)
       if (res.doctorUid) {
@@ -879,6 +1010,18 @@
         this._privateIntel[res.doctorUid] = docIntel;
         if (this.room.active && window.SeenJeemMafiaSync) {
           window.SeenJeemMafiaSync.publishPrivateIntelForUid(res.doctorUid, docIntel).catch(() => {});
+        }
+      }
+
+      // تحديث بيانات الحارس السرية (lastGuardedUid)
+      if (res.bodyguardUid) {
+        const bgIntel = {
+          ...(this._privateIntel[res.bodyguardUid] || {}),
+          lastGuardedUid: this.config.noConsecutiveProtect ? res.nextLastGuardedUid : null
+        };
+        this._privateIntel[res.bodyguardUid] = bgIntel;
+        if (this.room.active && window.SeenJeemMafiaSync) {
+          window.SeenJeemMafiaSync.publishPrivateIntelForUid(res.bodyguardUid, bgIntel).catch(() => {});
         }
       }
 
@@ -904,7 +1047,7 @@
         });
       }
 
-      // معالجة النتيجة العلنية للفجر (دون كشف الطبيب أو الضحية الناجية عند الإنقاذ)
+      // معالجة النتيجة العلنية للفجر (الأولوية: الطبيب -> الحارس -> الإقصاء العادي)
       let dawnHeadline = "☀️ أشرقت الشمس بسلام — لم يُقصَ أحد هذه الليلة!";
       let dawnSub = "عمّ الهدوء شوارع المدينة هذه الليلة.";
       let eliminatedInfo = null;
@@ -921,6 +1064,30 @@
           text: `الليلة ${this.roundNumber}: أنقذ الطبيب (${docP ? docP.name : "الطبيب"}) اللاعب «${savedP ? savedP.name : ""}» من إقصاء المافيا!`
         });
         this._playSfx("dawn");
+      } else if (res.bodyguardSacrificed && res.eliminatedUid) {
+        const bgVictim = this.players.find((p) => p.uid === res.eliminatedUid);
+        if (bgVictim) {
+          bgVictim.alive = false;
+          bgVictim.eliminatedAtRound = this.roundNumber;
+          bgVictim.eliminatedBy = "bodyguard_sacrifice";
+          const roleMeta = ROLE_META.bodyguard;
+          bgVictim.revealedRole = { role: roleMeta.id, label: roleMeta.label, icon: roleMeta.icon };
+          eliminatedInfo = {
+            uid: bgVictim.uid,
+            name: bgVictim.name,
+            revealedRole: bgVictim.revealedRole
+          };
+          dawnHeadline =
+            res.dawnMessage || `🛡️ اعترض الحارس الهجوم وأنقذ أحد المواطنين، فتم إقصاء ${bgVictim.name} بدلاً عنه!`;
+          dawnSub = `ضحّى الحارس (${bgVictim.name}) بنفسه لحماية أحد المواطنين — تحوّل الآن إلى وضع المتفرج.`;
+          const protectedP = this.players.find((p) => p.uid === res.mafiaTargetUid);
+          this._sessionTimeline.push({
+            roundNumber: this.roundNumber,
+            icon: "🛡️",
+            text: `الليلة ${this.roundNumber}: اعترض الحارس «${bgVictim.name}» هجوم المافيا على «${protectedP ? protectedP.name : "أحد المواطنين"}» وأُقصي بدلاً عنه!`
+          });
+        }
+        this._playSfx("elim");
       } else if (res.eliminatedUid) {
         const victim = this.players.find((p) => p.uid === res.eliminatedUid);
         if (victim) {
@@ -954,6 +1121,7 @@
       this.dawnSummary = {
         roundNumber: this.roundNumber,
         saved: res.saved,
+        bodyguardSacrificed: Boolean(res.bodyguardSacrificed),
         eliminated: eliminatedInfo,
         headline: dawnHeadline,
         subtitle: dawnSub
@@ -1015,7 +1183,8 @@
       const res = resolveDayVotes({
         players: this.players,
         dayVotes: this._dayVotes,
-        roundNumber: this.roundNumber
+        roundNumber: this.roundNumber,
+        revealedMayorUid: this._revealedMayorUid
       });
 
       let eliminatedInfo = null;
@@ -1236,14 +1405,16 @@
               uid: p.uid,
               name: p.name,
               alive: true,
+              isRevealedMayor: false,
               revealedRole: null
             }))
           : this.players.map((p) => ({
               uid: p.uid,
               name: p.name,
               alive: Boolean(p.alive),
+              isRevealedMayor: Boolean(this._revealedMayorUid && p.uid === this._revealedMayorUid),
               eliminatedAtRound: p.eliminatedAtRound || null,
-              // الدور السري لا يظهر إلا إذا أُقصي اللاعب وكان الكشف مفعّلاً، أو عند game_over!
+              // الدور السري لا يظهر إلا إذا أُقصي اللاعب وكان الكشف مفعّلاً، أو العمدة بعد إعلانه، أو عند game_over!
               revealedRole: p.revealedRole ? { ...p.revealedRole } : null
             }));
 
@@ -1266,10 +1437,14 @@
         joinLocked: this.room.joinLocked,
         vipEnabled: this.config.vipEnabled,
         vipUid: this.room.vipUid,
+        revealedMayorUid: this._revealedMayorUid || null,
+        mayorAnnouncement: this.mayorAnnouncement || null,
         rulesSummary: {
           doctorEnabled: this.config.doctorEnabled,
           detectiveEnabled: this.config.detectiveEnabled,
           jesterEnabled: this.config.jesterEnabled,
+          bodyguardEnabled: this.config.bodyguardEnabled,
+          mayorEnabled: this.config.mayorEnabled,
           revealRoleOnDeath: this.config.revealRoleOnDeath,
           noConsecutiveProtect: this.config.noConsecutiveProtect
         },
@@ -1375,6 +1550,10 @@
           }
           break;
         }
+        case "toggle-rules-guide":
+          this.rulesGuideOpen = !this.rulesGuideOpen;
+          this._render();
+          break;
         case "set-mafia-count": {
           const val = btn.dataset.val;
           if (val === "auto") {
@@ -1471,17 +1650,58 @@
           ? Math.min(maxMafia, Math.max(1, this.config.mafiaCount))
           : getDefaultMafiaCount(Math.max(4, count));
       const jesterAllowed = count >= 6;
+      const bodyguardAllowed = count >= 6;
+      const mayorAllowed = count >= 6;
       const fbReady = Boolean(window.SeenJeemMafiaSync && window.SeenJeemMafiaSync.isConfigured());
+      const activeRoles = getActiveRolesForGuide(this.config, Math.max(4, count));
 
       return `
         <div class="mafia-stage mafia-setup-stage">
           <div class="mafia-intro-banner">
             <div>
               <strong>🎭 وضع الراوي الآلي (بدون مشرف بشري!)</strong>
-              <p>الجميع يلعب من هواتفهم بسرية تامة، وهذه الشاشة (والتلفزيون) تدير الليل والنهار والتصويت دون كشف أي دور سري.</p>
+              <p>الجميع يلعب من هواتفهم بسرية تامة، وهذه الشاشة تدير الليل والنهار والتصويت دون كشف أي دور سري.</p>
             </div>
-            <span class="mafia-ideal-badge">👥 4–16 لاعباً • المثالي 5+</span>
+            <div class="mafia-intro-actions">
+              <span class="mafia-ideal-badge">👥 4–16 لاعباً • المثالي 5+</span>
+              <button type="button" class="btn btn-gold-outline btn-xs" data-mafia-act="toggle-rules-guide">
+                📖 شرح الأدوار والقواعد
+              </button>
+            </div>
           </div>
+
+          ${
+            this.rulesGuideOpen
+              ? `
+                <section class="bank-section mafia-rules-guide-panel">
+                  <div class="bank-section-header">
+                    <h3 class="bank-section-title">📖 دليل الأدوار النشطة والقواعد السريعة</h3>
+                    <button type="button" class="btn btn-ghost btn-xxs" data-mafia-act="toggle-rules-guide">✕ إغلاق</button>
+                  </div>
+                  <div class="mafia-guide-roles-grid">
+                    ${activeRoles
+                      .map(
+                        (r) => `
+                      <div class="mafia-guide-role-card team-${escapeHtml(r.team)}">
+                        <div class="mafia-guide-role-head">
+                          <span>${escapeHtml(r.icon)} <strong>${escapeHtml(r.label)}</strong></span>
+                          <span class="mafia-guide-team-pill">${r.team === "mafia" ? "فريق المافيا" : r.team === "jester" ? "فريق مستقل" : "فريق المواطنين"}</span>
+                        </div>
+                        <p>${escapeHtml(r.description)}</p>
+                      </div>
+                    `
+                      )
+                      .join("")}
+                  </div>
+                  <div class="mafia-guide-summary">
+                    <span>🌙 <strong>الليل:</strong> الجميع يتفاعل من هواتفهم معاً للحفاظ على السرية.</span>
+                    <span>☀️ <strong>النهار:</strong> نقاش مفتوح ثم تصويت سري لإقصاء المشتبه به.</span>
+                    <span>🏆 <strong>الفوز:</strong> يفوز المواطنون بإقصاء كل المافيا، وتفوز المافيا عند التساوي في العدد.</span>
+                  </div>
+                </section>
+              `
+              : ""
+          }
 
           <!-- 1) قسم الغرفة اللاسلكية والـ QR -->
           <section class="bank-section mafia-room-section">
@@ -1530,7 +1750,7 @@
                           ? `<div class="empty-inline-note">بانتظار مسح رمز QR من هواتف اللاعبين...</div>`
                           : `<div class="mafia-lobby-list">
                               ${lobby
-                                .map((p, idx) => {
+                                .map((p) => {
                                   const isVip = this.room.vipUid === p.uid;
                                   return `
                                     <div class="mafia-lobby-player${isVip ? " is-vip" : ""}">
@@ -1555,7 +1775,7 @@
           <section class="bank-section mafia-config-section">
             <div class="bank-section-header">
               <h3 class="bank-section-title">⚙️ توزيع الأدوار وقواعد الجلسة</h3>
-              <span class="bank-count-pill">🕵️ ${effectiveMafia} مافيا • ${this.config.doctorEnabled ? "🩺 طبيب" : ""} ${this.config.detectiveEnabled ? "🔍 محقق" : ""} ${this.config.jesterEnabled && jesterAllowed ? "🃏 مهرج" : ""}</span>
+              <span class="bank-count-pill">🕵️ ${effectiveMafia} مافيا${this.config.doctorEnabled ? " • 🩺 طبيب" : ""}${this.config.detectiveEnabled ? " • 🔍 محقق" : ""}${this.config.jesterEnabled && jesterAllowed ? " • 🃏 مهرج" : ""}${this.config.bodyguardEnabled && bodyguardAllowed ? " • 🛡️ حارس" : ""}${this.config.mayorEnabled && mayorAllowed ? " • 🎖️ عمدة" : ""}</span>
             </div>
 
             <div class="mafia-config-grid">
@@ -1575,6 +1795,8 @@
                   <button type="button" class="tactical-opt-btn${this.config.doctorEnabled ? " active" : ""}" data-mafia-act="toggle-rule" data-key="doctorEnabled">🩺 الطبيب</button>
                   <button type="button" class="tactical-opt-btn${this.config.detectiveEnabled ? " active" : ""}" data-mafia-act="toggle-rule" data-key="detectiveEnabled">🔍 المحقق</button>
                   <button type="button" class="tactical-opt-btn${this.config.jesterEnabled && jesterAllowed ? " active" : ""}" data-mafia-act="toggle-rule" data-key="jesterEnabled" ${!jesterAllowed ? "disabled title='يُتاح عند 6 لاعبين فأكثر'" : ""}>🃏 المهرج (6+)</button>
+                  <button type="button" class="tactical-opt-btn${this.config.bodyguardEnabled && bodyguardAllowed ? " active" : ""}" data-mafia-act="toggle-rule" data-key="bodyguardEnabled" ${!bodyguardAllowed ? "disabled title='يُتاح عند 6 لاعبين فأكثر'" : ""}>🛡️ الحارس (6+)</button>
+                  <button type="button" class="tactical-opt-btn${this.config.mayorEnabled && mayorAllowed ? " active" : ""}" data-mafia-act="toggle-rule" data-key="mayorEnabled" ${!mayorAllowed ? "disabled title='يُتاح عند 6 لاعبين فأكثر'" : ""}>🎖️ العمدة (6+)</button>
                 </div>
               </div>
 
@@ -1671,7 +1893,7 @@
         <div class="mafia-stage mafia-center-stage is-dawn-theme">
           <div class="mafia-phase-pill is-dawn">☀️ فجر اليوم رقم ${this.roundNumber}</div>
           <div class="mafia-dawn-hero${ds.saved ? " is-saved" : ds.eliminated ? " is-elim" : ""}">
-            <div class="mafia-dawn-icon">${ds.saved ? "🩺✨" : ds.eliminated ? "💀" : "☀️"}</div>
+            <div class="mafia-dawn-icon">${ds.saved ? "🩺✨" : ds.bodyguardSacrificed ? "🛡️" : ds.eliminated ? "💀" : "☀️"}</div>
             <h2 class="mafia-big-title">${escapeHtml(ds.headline || "أشرقت الشمس على المدينة!")}</h2>
             <p class="mafia-big-sub">${escapeHtml(ds.subtitle || "")}</p>
           </div>
@@ -1690,9 +1912,13 @@
 
     _renderDiscussionHtml() {
       const isUnl = this.timer.status === "unlimited";
+      const mayorBanner = this.mayorAnnouncement
+        ? `<div class="mafia-mayor-banner">${escapeHtml(this.mayorAnnouncement.message || "")}</div>`
+        : "";
       return `
         <div class="mafia-stage mafia-center-stage is-day-theme">
           <div class="mafia-phase-pill is-day">💬 نقاش النهار — اليوم ${this.roundNumber}</div>
+          ${mayorBanner}
           <h2 class="mafia-big-title">من تشتبهون أنه من المافيا؟</h2>
           <div id="mafia-live-timer" class="mafia-giant-timer${!isUnl && this.timer.remainingSeconds <= 10 ? " danger" : ""}">${isUnl ? "∞" : formatTime(this.timer.remainingSeconds)}</div>
           ${this._renderRosterOverviewHtml()}
@@ -1708,9 +1934,13 @@
     _renderVotingHtml() {
       const alive = this.players.filter((p) => p.alive);
       const votedSet = new Set(this._getVotedAliveUids());
+      const mayorBanner = this.mayorAnnouncement
+        ? `<div class="mafia-mayor-banner">${escapeHtml(this.mayorAnnouncement.message || "")}</div>`
+        : "";
       return `
         <div class="mafia-stage mafia-center-stage is-day-theme">
           <div class="mafia-phase-pill is-vote">🗳️ تصويت النهار السري — اليوم ${this.roundNumber}</div>
+          ${mayorBanner}
           <h2 class="mafia-big-title">صوّتوا سراً من هواتفكم!</h2>
           <div id="mafia-live-timer" class="mafia-giant-timer${this.timer.remainingSeconds <= 10 ? " danger" : ""}">${formatTime(this.timer.remainingSeconds)}</div>
           <div class="mafia-progress-counter">${votedSet.size} / ${alive.length} صوّتوا</div>
@@ -1720,7 +1950,7 @@
                 (p) => `
               <div class="mafia-status-chip${votedSet.has(p.uid) ? " is-done" : ""}">
                 <span>${votedSet.has(p.uid) ? "✅" : "⏳"}</span>
-                <span>${escapeHtml(p.name)}</span>
+                <span>${this._revealedMayorUid === p.uid ? "🎖️ " : ""}${escapeHtml(p.name)}</span>
               </div>
             `
               )
@@ -1767,7 +1997,7 @@
               .map(
                 (v) => `
               <div class="mafia-vote-row">
-                <strong>${escapeHtml(v.voterName)}</strong>
+                <strong>${v.isMayor ? "🎖️ " : ""}${escapeHtml(v.voterName)}${v.weight === 2 ? ` <span class="mafia-x2-badge">×2</span>` : ""}</strong>
                 <span>⬅️</span>
                 <span class="${v.targetUid === "SKIP" ? "is-skip-text" : ""}">${escapeHtml(v.targetName)}</span>
               </div>
@@ -1850,7 +2080,7 @@
           <div class="mafia-roster-col">
             <h4>🟢 الأحياء (${alive.length})</h4>
             <div class="mafia-status-chips">
-              ${alive.map((p) => `<span class="mafia-status-chip is-alive-chip">👤 ${escapeHtml(p.name)}</span>`).join("")}
+              ${alive.map((p) => `<span class="mafia-status-chip is-alive-chip">${this._revealedMayorUid === p.uid ? "🎖️" : "👤"} ${escapeHtml(p.name)}</span>`).join("")}
             </div>
           </div>
           ${
@@ -1862,7 +2092,7 @@
                     ${dead
                       .map(
                         (p) =>
-                          `<span class="mafia-status-chip is-dead-chip">👻 ${escapeHtml(p.name)}${p.revealedRole ? ` (${escapeHtml(p.revealedRole.icon)} ${escapeHtml(p.revealedRole.label)})` : ""}</span>`
+                          `<span class="mafia-status-chip is-dead-chip">👻 ${this._revealedMayorUid === p.uid ? "🎖️ " : ""}${escapeHtml(p.name)}${p.revealedRole ? ` (${escapeHtml(p.revealedRole.icon)} ${escapeHtml(p.revealedRole.label)})` : ""}</span>`
                       )
                       .join("")}
                   </div>
@@ -1878,6 +2108,7 @@
   window.SeenJeemMafia = new MafiaController();
   window.SeenJeemMafiaEngine = {
     ROLE_META,
+    getActiveRolesForGuide,
     getDefaultMafiaCount,
     getMaxAllowedMafia,
     assignRoles,

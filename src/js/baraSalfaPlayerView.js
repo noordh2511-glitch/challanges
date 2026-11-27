@@ -309,9 +309,15 @@
     _renderRoleCardContent(role) {
       if (!role) return `<p class="pl-sub-note">بانتظار توزيع الأدوار من جهاز المقدّم...</p>`;
       if (role.isOutsider) {
+        const partners = Array.isArray(role.partnerNames) ? role.partnerNames.filter(Boolean) : [];
         return `
           <div class="bp-role-cat">${escapeHtml(role.categoryIcon || "🕵️")} الفئة: ${escapeHtml(role.categoryName || "")}</div>
           <div class="bp-role-outsider">🕵️ أنت برا السالفة!</div>
+          ${
+            partners.length > 0
+              ? `<div class="bp-partner-pill">🤝 شريكك «برا السالفة» هو: <strong>${escapeHtml(partners.join("، "))}</strong></div>`
+              : ""
+          }
           <p class="pl-sub-note">حاول تفهم الموضوع من الأسئلة بدون ما ينتبه أحد!</p>
         `;
       }

@@ -22,6 +22,7 @@
     BARA_HISTORY: "bara-salfa-history-v1",
     BARA_CUSTOM: "bara-salfa-custom-v1",
     MAFIA_STATS: "mafia-stats-v1",
+    QUIZ_RACE_STATS: "quiz-race-stats-v1",
     AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
     FAVORITE_CATEGORIES: "seen-jeem-favorites-v1",
     FLAGGED: "seen-jeem-flagged-v1",
@@ -95,6 +96,10 @@
       window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllMafiaSessions === "function"
         ? window.SeenJeemArchiveStore.getAllMafiaSessions()
         : safeReadJSON(LOCAL_KEYS.MAFIA_STATS, []);
+    const quizRaceStats =
+      window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllQuizRaceSessions === "function"
+        ? window.SeenJeemArchiveStore.getAllQuizRaceSessions()
+        : safeReadJSON(LOCAL_KEYS.QUIZ_RACE_STATS, []);
     const baraSalfaHistory = safeReadJSON(LOCAL_KEYS.BARA_HISTORY, {});
     const baraSalfaCustom = safeReadJSON(LOCAL_KEYS.BARA_CUSTOM, []);
     const audioChallengeHistory = safeReadJSON(LOCAL_KEYS.AUDIO_CHALLENGE_HISTORY, []);
@@ -123,6 +128,7 @@
       matchArchive: Array.isArray(matchArchive) ? matchArchive : [],
       baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
       mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
+      quizRaceStats: Array.isArray(quizRaceStats) ? quizRaceStats : [],
       audioChallengeHistory: Array.isArray(audioChallengeHistory)
         ? audioChallengeHistory.filter((x) => typeof x === "string" && x.trim())
         : [],
@@ -242,6 +248,15 @@
     return Array.from(byId.values()).sort((a, b) => (Number(b.playedAt) || 0) - (Number(a.playedAt) || 0));
   }
 
+  function mergeQuizRaceStatsLists(localList, cloudList) {
+    const byId = new Map();
+    [...(Array.isArray(cloudList) ? cloudList : []), ...(Array.isArray(localList) ? localList : [])].forEach((s) => {
+      if (!s || typeof s !== "object" || !s.raceId) return;
+      if (!byId.has(s.raceId)) byId.set(s.raceId, s);
+    });
+    return Array.from(byId.values()).sort((a, b) => (Number(b.playedAt) || 0) - (Number(a.playedAt) || 0));
+  }
+
   function mergeBaraHistory(localHist, cloudHist) {
     const out = {};
     const keys = new Set([
@@ -323,6 +338,7 @@
       matchArchive: mergeMatchArchiveLists(local.matchArchive, cloud.matchArchive),
       baraSalfaStats: mergeBaraStatsLists(local.baraSalfaStats, cloud.baraSalfaStats),
       mafiaStats: mergeMafiaStatsLists(local.mafiaStats, cloud.mafiaStats),
+      quizRaceStats: mergeQuizRaceStatsLists(local.quizRaceStats, cloud.quizRaceStats),
       audioChallengeHistory: Array.from(
         new Set(
           [
@@ -382,6 +398,13 @@
         window.SeenJeemArchiveStore.importMafiaSessions(payload.mafiaStats, "replace");
       } else {
         safeWriteJSON(LOCAL_KEYS.MAFIA_STATS, payload.mafiaStats);
+      }
+    }
+    if (Array.isArray(payload.quizRaceStats)) {
+      if (window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.importQuizRaceSessions === "function") {
+        window.SeenJeemArchiveStore.importQuizRaceSessions(payload.quizRaceStats, "replace");
+      } else {
+        safeWriteJSON(LOCAL_KEYS.QUIZ_RACE_STATS, payload.quizRaceStats);
       }
     }
     if (Array.isArray(payload.audioChallengeHistory)) {

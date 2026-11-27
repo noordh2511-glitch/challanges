@@ -201,6 +201,14 @@
             ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child($uid).exists()))"
           }
         },
+        "mayorReveals": {
+          ".read": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child($uid).exists()))"
+          }
+        },
         "vipCommands": {
           ".read": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || root.child('mafiaRooms').child($roomCode).child('meta/vipUid').val() === auth.uid)",
           ".write": "auth != null && (root.child('mafiaRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (root.child('mafiaRooms').child($roomCode).child('meta/vipEnabled').val() !== false && root.child('mafiaRooms').child($roomCode).child('meta/vipUid').val() === auth.uid && !root.child('mafiaRooms').child($roomCode).child('kicked').child(auth.uid).exists()))",
@@ -282,6 +290,53 @@
           "$cmdId": {
             ".write": "auth != null && (root.child('quickRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!root.child('quickRooms').child($roomCode).child('kicked').child(auth.uid).exists() && newData.child('uid').val() === auth.uid && (root.child('quickRooms').child($roomCode).child('meta/judgeUid').val() === auth.uid || root.child('quickRooms').child($roomCode).child('meta/activeActorUid').val() === auth.uid || (newData.child('type').val() === 'CLAIM_NEXT_ACTOR' && root.child('quickRooms').child($roomCode).child('meta/gameType').val() === 'mgk'))))",
             ".validate": "!newData.exists() || (newData.hasChildren(['type', 'uid', 'ts']) && newData.child('type').isString() && newData.child('uid').val() === auth.uid)"
+          }
+        }
+      }
+    },
+    "quizRaceRooms": {
+      ".read": false,
+      ".write": false,
+      "$roomCode": {
+        ".write": "auth != null && data.child('meta/ownerUid').val() === auth.uid && !newData.exists()",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))"
+        },
+        "publicState": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+        },
+        "players": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && (root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (!newData.exists() && (!data.exists() || $uid === auth.uid)) || (auth.uid === $uid && !root.child('quizRaceRooms').child($roomCode).child('kicked').child($uid).exists() && (data.exists() || root.child('quizRaceRooms').child($roomCode).child('meta/joinLocked').val() !== true)))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 28)"
+          }
+        },
+        "kicked": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
+          }
+        },
+        "answers": {
+          ".read": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid || (auth.uid === $uid && !root.child('quizRaceRooms').child($roomCode).child('kicked').child($uid).exists()))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['questionIndex', 'optionIndex']) && newData.child('questionIndex').isNumber() && newData.child('optionIndex').isNumber() && newData.child('optionIndex').val() >= 0 && newData.child('optionIndex').val() <= 3)"
+          }
+        },
+        "playerResults": {
+          ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid)",
+            ".write": "auth != null && root.child('quizRaceRooms').child($roomCode).child('meta/ownerUid').val() === auth.uid"
           }
         }
       }
