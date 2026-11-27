@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.20.0";
+const CACHE_VERSION = "seen-jeem-v4.21.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -39,6 +39,7 @@ const APP_SHELL_URLS = [
   "./src/utils/mafiaSync.js",
   "./src/utils/quickGamesSync.js",
   "./src/utils/quizRaceSync.js",
+  "./src/utils/categoryThemes.js",
   "./src/utils/categoryBrowser.js",
   "./src/utils/backupManager.js",
   "./src/utils/resultCardGenerator.js",

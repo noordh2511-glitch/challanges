@@ -274,7 +274,18 @@
               <!-- الصورة المفردة (يدعم blur / zoom / invert / silhouette / memory / normal) -->
               <div id="tv-q-single-media" class="tv-media-wrap" hidden>
                 <div id="tv-visual-stage" class="visual-image-stage tv-visual-stage">
-                  <img id="tv-q-img" class="tv-media-img" alt="صورة السؤال" draggable="false" />
+                  <div id="tv-visual-skeleton" class="visual-image-skeleton" hidden aria-live="polite">
+                    <span class="visual-loading-spinner" aria-hidden="true"></span>
+                    <span class="visual-loading-label">جاري تحميل الصورة...</span>
+                  </div>
+                  <div id="tv-visual-error" class="visual-image-error" hidden role="alert">
+                    <div class="visual-error-icon" aria-hidden="true">🖼️</div>
+                    <div class="visual-error-title">تعذّر تحميل الصورة حالياً</div>
+                    <div class="visual-error-actions">
+                      <button type="button" id="btn-tv-retry-img" class="btn btn-primary btn-xs">🔄 إعادة المحاولة</button>
+                    </div>
+                  </div>
+                  <img id="tv-q-img" class="tv-media-img" alt="صورة السؤال" loading="eager" decoding="async" draggable="false" />
                 </div>
               </div>
 
@@ -310,11 +321,11 @@
               <div id="tv-answer-compare-wrap" class="tv-answer-compare-wrap" hidden>
                 <div class="tv-compare-img-col">
                   <span class="multi-img-label">🖼️ صورة السؤال</span>
-                  <img id="tv-compare-q-img" class="tv-answer-img" alt="صورة السؤال" />
+                  <img id="tv-compare-q-img" class="tv-answer-img" alt="صورة السؤال" loading="eager" decoding="async" />
                 </div>
                 <div class="tv-compare-img-col is-answer">
                   <span class="multi-img-label">✅ صورة الإجابة</span>
-                  <img id="tv-compare-a-img" class="tv-answer-img" alt="صورة الإجابة" />
+                  <img id="tv-compare-a-img" class="tv-answer-img" alt="صورة الإجابة" loading="eager" decoding="async" />
                 </div>
               </div>
 
@@ -330,7 +341,7 @@
                 <div id="tv-q-answer-text" class="tv-answer-text"></div>
                 <div id="tv-q-answer-exp" class="tv-answer-exp" hidden></div>
                 <div id="tv-q-answer-img-wrap" class="tv-answer-img-wrap" hidden>
-                  <img id="tv-q-answer-img" class="tv-answer-img" alt="صورة الإجابة" />
+                  <img id="tv-q-answer-img" class="tv-answer-img" alt="صورة الإجابة" loading="eager" decoding="async" />
                 </div>
               </div>
             </main>
@@ -1673,7 +1684,7 @@
                 this.dom.visualStage.classList.add("visual-mode-silhouette");
               }
 
-              this.dom.qImg.src = desiredSrc;
+              this._setTVSingleImageSrc(desiredSrc);
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   this.dom.visualStage.classList.remove("no-visual-transition");
@@ -1681,7 +1692,7 @@
               });
             } else if (this.dom.qImg.getAttribute("src") !== desiredSrc) {
               this.dom.qImg.classList.add("tv-img-swap-fade");
-              this.dom.qImg.src = desiredSrc;
+              this._setTVSingleImageSrc(desiredSrc);
               setTimeout(() => this.dom.qImg.classList.remove("tv-img-swap-fade"), 320);
             }
 
@@ -1815,6 +1826,61 @@
       }
     }
 
+    _setTVSingleImageSrc(src) {
+      if (!this.dom.qImg) return;
+      const clean = String(src || "").trim();
+      const stage = this.dom.visualStage;
+      const skel = document.getElementById("tv-visual-skeleton");
+      const errBox = document.getElementById("tv-visual-error");
+      const retryBtn = document.getElementById("btn-tv-retry-img");
+
+      this.dom.qImg.alt = "صورة السؤال";
+      this.dom.qImg.removeAttribute("title");
+      this.dom.qImg.loading = "eager";
+      this.dom.qImg.decoding = "async";
+      this.dom.qImg.onload = null;
+      this.dom.qImg.onerror = null;
+
+      if (!clean) {
+        this.dom.qImg.removeAttribute("src");
+        if (stage) stage.classList.remove("is-loading", "has-error");
+        if (skel) skel.hidden = true;
+        if (errBox) errBox.hidden = true;
+        return;
+      }
+
+      if (stage) {
+        stage.classList.add("is-loading");
+        stage.classList.remove("has-error");
+      }
+      if (skel) skel.hidden = false;
+      if (errBox) errBox.hidden = true;
+      this.dom.qImg.hidden = false;
+
+      this.dom.qImg.onload = () => {
+        if (stage) stage.classList.remove("is-loading", "has-error");
+        if (skel) skel.hidden = true;
+        if (errBox) errBox.hidden = true;
+      };
+      this.dom.qImg.onerror = () => {
+        if (stage) {
+          stage.classList.remove("is-loading");
+          stage.classList.add("has-error");
+        }
+        if (skel) skel.hidden = true;
+        if (errBox) errBox.hidden = false;
+        this.dom.qImg.hidden = true;
+      };
+      if (retryBtn) {
+        retryBtn.onclick = () => {
+          const sep = clean.includes("?") ? "&" : "?";
+          const bust = /^data:|^blob:/i.test(clean) ? clean : `${clean}${sep}_r=${Date.now()}`;
+          this._setTVSingleImageSrc(bust);
+        };
+      }
+      this.dom.qImg.src = clean;
+    }
+
     _renderTVMultiImages(visualType, images, showPlus) {
       const cleanImgs = images.map(normalizeImgUrl).filter(Boolean).slice(0, visualType === "spot-diff" ? 2 : 4);
       const count = cleanImgs.length;
@@ -1832,12 +1898,58 @@
       const spotLabels = ["الصورة أ", "الصورة ب"];
       cleanImgs.forEach((src, idx) => {
         const card = document.createElement("div");
-        card.className = "tv-multi-img-card";
+        card.className = "tv-multi-img-card is-loading";
         const cap = visualType === "spot-diff" ? spotLabels[idx] || `صورة ${idx + 1}` : `صورة ${idx + 1}`;
-        card.innerHTML = `
-          <span class="multi-img-label">${cap}</span>
-          <img class="tv-multi-img-el" src="${escapeHtml(src)}" alt="${cap}" />
-        `;
+
+        const lbl = document.createElement("span");
+        lbl.className = "multi-img-label";
+        lbl.textContent = cap;
+
+        const img = document.createElement("img");
+        img.className = "tv-multi-img-el";
+        img.alt = "صورة السؤال";
+        img.loading = "eager";
+        img.decoding = "async";
+
+        const errBox = document.createElement("div");
+        errBox.className = "multi-img-error-box";
+        errBox.hidden = true;
+
+        const errTxt = document.createElement("div");
+        errTxt.className = "multi-img-error-text";
+        errTxt.textContent = "تعذّر تحميل الصورة حالياً";
+
+        const retryBtn = document.createElement("button");
+        retryBtn.type = "button";
+        retryBtn.className = "btn btn-primary btn-xs";
+        retryBtn.textContent = "🔄 إعادة المحاولة";
+        retryBtn.addEventListener("click", () => {
+          errBox.hidden = true;
+          img.hidden = false;
+          card.classList.add("is-loading");
+          const sep = src.includes("?") ? "&" : "?";
+          img.src = /^data:|^blob:/i.test(src) ? src : `${src}${sep}_r=${Date.now()}`;
+        });
+
+        img.onload = () => {
+          card.classList.remove("is-loading", "has-img-error");
+          errBox.hidden = true;
+          img.hidden = false;
+        };
+        img.onerror = () => {
+          card.classList.remove("is-loading");
+          card.classList.add("has-img-error");
+          img.hidden = true;
+          errBox.hidden = false;
+        };
+
+        errBox.appendChild(errTxt);
+        errBox.appendChild(retryBtn);
+        card.appendChild(lbl);
+        card.appendChild(img);
+        card.appendChild(errBox);
+        img.src = src;
+
         this.dom.multiImages.appendChild(card);
         if (usePlus && idx < cleanImgs.length - 1) {
           const plus = document.createElement("div");

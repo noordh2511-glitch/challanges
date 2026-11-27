@@ -467,7 +467,7 @@
                   <input type="file" id="cpb-q-img-file" accept="image/*" hidden />
                   ${q.questionImage ? `<button type="button" id="cpb-btn-clear-qimg" class="btn btn-danger-outline btn-xxs">✕ حذف</button>` : ""}
                 </div>
-                ${q.questionImage ? `<div class="cpb-img-preview"><img src="${escapeHtml(q.questionImage)}" alt="معاينة صورة السؤال" /></div>` : ""}
+                ${q.questionImage ? `<div class="cpb-img-preview"><img src="${escapeHtml(q.questionImage)}" alt="معاينة صورة السؤال" loading="lazy" decoding="async" onerror="this.hidden=true;if(this.nextElementSibling)this.nextElementSibling.hidden=false;" /><span class="img-fallback-inline" hidden>تعذّر تحميل الصورة حالياً</span></div>` : ""}
               </div>
             `
                 : ""
@@ -482,7 +482,7 @@
                 <input type="file" id="cpb-a-img-file" accept="image/*" hidden />
                 ${q.answerImage ? `<button type="button" id="cpb-btn-clear-aimg" class="btn btn-danger-outline btn-xxs">✕ حذف</button>` : ""}
               </div>
-              ${q.answerImage ? `<div class="cpb-img-preview"><img src="${escapeHtml(q.answerImage)}" alt="معاينة صورة الإجابة" /></div>` : ""}
+              ${q.answerImage ? `<div class="cpb-img-preview"><img src="${escapeHtml(q.answerImage)}" alt="معاينة صورة الإجابة" loading="lazy" decoding="async" onerror="this.hidden=true;if(this.nextElementSibling)this.nextElementSibling.hidden=false;" /><span class="img-fallback-inline" hidden>تعذّر تحميل الصورة حالياً</span></div>` : ""}
             </div>
           </div>
 

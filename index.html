@@ -371,6 +371,28 @@
               <span id="category-breadcrumb-current" class="breadcrumb-current"></span>
             </div>
 
+            <!-- شريط البحث والتصفية المدمج داخل الفئة الرئيسية المفتوحة (Pack 20) -->
+            <div id="category-sub-toolbar" class="category-sub-toolbar" hidden role="search" aria-label="بحث وتصفية الفئات الفرعية">
+              <div class="category-search-wrap subcat-search-wrap">
+                <span class="category-search-icon" aria-hidden="true">🔍</span>
+                <input
+                  type="search"
+                  id="subcat-search-input"
+                  class="category-search-input"
+                  placeholder="ابحث داخل هذه الفئة..."
+                  autocomplete="off"
+                  aria-label="ابحث داخل الفئات الفرعية"
+                />
+                <button type="button" id="btn-clear-subcat-search" class="category-search-clear" aria-label="مسح البحث" title="مسح البحث" hidden>×</button>
+              </div>
+              <div id="subcat-quick-filters" class="category-quick-filters subcat-quick-filters" role="tablist" aria-label="فلاتر الفئات الفرعية">
+                <button type="button" class="quick-filter-chip active" data-sub-filter="all" aria-pressed="true">الكل</button>
+                <button type="button" class="quick-filter-chip" data-sub-filter="new" aria-pressed="false">🟢 جديد لم يُلعب</button>
+                <button type="button" class="quick-filter-chip" data-sub-filter="media" aria-pressed="false">🖼️ صور وصوت</button>
+                <button type="button" class="quick-filter-chip" data-sub-filter="favorites" aria-pressed="false">⭐ المفضلة</button>
+              </div>
+            </div>
+
             <div id="setup-categories-grid" class="setup-categories-grid" role="group" aria-label="قائمة الفئات المتوفرة"></div>
           </section>
         </div>
@@ -1269,7 +1291,7 @@
               </div>
               <div id="visual-image-error" class="visual-image-error" hidden role="alert">
                 <div class="visual-error-icon" aria-hidden="true">🖼️</div>
-                <div class="visual-error-title">تعذّر تحميل صورة السؤال</div>
+                <div class="visual-error-title">تعذّر تحميل الصورة حالياً</div>
                 <p class="visual-error-desc">تحقّق من الاتصال بالإنترنت ثم اضغط إعادة المحاولة دون ضياع الجولة.</p>
                 <div class="visual-error-actions">
                   <button type="button" id="btn-retry-visual-image" class="btn btn-primary btn-xs">
@@ -1280,7 +1302,7 @@
                   </button>
                 </div>
               </div>
-              <img id="modal-question-image" class="modal-media-img" alt="صورة السؤال" draggable="false" />
+              <img id="modal-question-image" class="modal-media-img" alt="صورة السؤال" loading="eager" decoding="async" draggable="false" />
               <span id="single-image-zoom-hint" class="zoom-hint-badge" hidden>🔍 اضغط للتكبير</span>
             </div>
             <div id="blur-controls-wrap" class="blur-controls-wrap" hidden>
@@ -1382,11 +1404,11 @@
               <div id="answer-compare-grid" class="answer-compare-grid" hidden>
                 <div class="answer-compare-col">
                   <span class="multi-img-label">صورة السؤال</span>
-                  <img id="answer-compare-q-img" class="modal-media-img" alt="صورة السؤال للمقارنة" />
+                  <img id="answer-compare-q-img" class="modal-media-img" alt="صورة السؤال" loading="eager" decoding="async" />
                 </div>
                 <div class="answer-compare-col is-answer">
                   <span class="multi-img-label">✅ صورة الإجابة</span>
-                  <img id="answer-compare-a-img" class="modal-media-img" alt="صورة الإجابة للمقارنة" />
+                  <img id="answer-compare-a-img" class="modal-media-img" alt="صورة الإجابة" loading="eager" decoding="async" />
                 </div>
               </div>
               <div id="answer-image-stage" class="visual-image-stage answer-image-stage is-zoomable">
@@ -1395,14 +1417,14 @@
                   <span class="visual-loading-label">جاري تحميل صورة الإجابة...</span>
                 </div>
                 <div id="answer-image-error" class="visual-image-error" hidden role="alert">
-                  <div class="visual-error-title">تعذّر تحميل صورة الإجابة</div>
+                  <div class="visual-error-title">تعذّر تحميل الصورة حالياً</div>
                   <div class="visual-error-actions">
                     <button type="button" id="btn-retry-answer-image" class="btn btn-primary btn-xs">
                       🔄 إعادة المحاولة
                     </button>
                   </div>
                 </div>
-                <img id="modal-answer-image" class="modal-media-img" alt="صورة الإجابة" />
+                <img id="modal-answer-image" class="modal-media-img" alt="صورة الإجابة" loading="eager" decoding="async" />
                 <span id="answer-image-zoom-hint" class="zoom-hint-badge">🔍 اضغط للتكبير</span>
               </div>
             </div>
@@ -1647,7 +1669,7 @@
 
           <div id="cloud-signed-in-box" class="cloud-signed-in-box" hidden>
             <div class="cloud-user-card">
-              <img id="cloud-user-avatar" class="cloud-user-avatar" alt="صورة الحساب" hidden />
+              <img id="cloud-user-avatar" class="cloud-user-avatar" alt="صورة الحساب" loading="lazy" decoding="async" hidden />
               <div class="cloud-user-info">
                 <strong id="cloud-user-name">المالك</strong>
                 <span id="cloud-user-email" class="cloud-user-email"></span>
@@ -2831,7 +2853,7 @@
 
       <div class="result-card-preview-wrap">
         <div id="result-card-loading" class="result-card-loading">⏳ جاري رسم بطاقة النتيجة عالية الدقة...</div>
-        <img id="result-card-preview-img" class="result-card-preview-img" alt="معاينة بطاقة نتيجة المباراة" hidden />
+        <img id="result-card-preview-img" class="result-card-preview-img" alt="معاينة بطاقة نتيجة المباراة" loading="lazy" decoding="async" hidden />
       </div>
 
       <div class="result-card-actions">
@@ -3269,6 +3291,7 @@
   <script src="src/utils/mafiaSync.js"></script>
   <script src="src/utils/quickGamesSync.js"></script>
   <script src="src/utils/quizRaceSync.js"></script>
+  <script src="src/utils/categoryThemes.js"></script>
   <script src="src/utils/categoryBrowser.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>

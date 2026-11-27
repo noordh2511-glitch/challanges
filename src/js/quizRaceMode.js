@@ -424,6 +424,13 @@
 
     _getMainCategoryOptions() {
       const cats = this._getAllCategories();
+      if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.buildMainCategoryGroups === "function") {
+        return window.SeenJeemCategoryBrowser.buildMainCategoryGroups(cats).map((g) => ({
+          id: g.id,
+          label: g.label,
+          icon: g.icon
+        }));
+      }
       const counts = new Map();
       cats.forEach((cat) => {
         const mId = resolveMainGroupId(cat);
@@ -1346,7 +1353,17 @@
 
           <div class="qr-question-hero">
             <h2 class="qr-question-text">${escapeHtml(q.prompt)}</h2>
-            ${q.imageUrl ? `<img src="${escapeHtml(q.imageUrl)}" class="qr-question-img" alt="صورة السؤال" />` : ""}
+            ${
+              q.imageUrl
+                ? `<div class="qr-img-stage is-loading">
+                    <img src="${escapeHtml(q.imageUrl)}" class="qr-question-img" alt="صورة السؤال" loading="eager" decoding="async" onload="this.parentElement.classList.remove('is-loading','has-error');this.hidden=false;" onerror="this.hidden=true;this.parentElement.classList.remove('is-loading');this.parentElement.classList.add('has-error');if(this.nextElementSibling)this.nextElementSibling.hidden=false;" />
+                    <div class="safe-img-error-card" hidden>
+                      <span>تعذّر تحميل الصورة حالياً</span>
+                      <button type="button" class="btn btn-primary btn-xs" onclick="const box=this.parentElement;const img=box.previousElementSibling;if(img){box.hidden=true;img.hidden=false;img.parentElement.classList.remove('has-error');img.parentElement.classList.add('is-loading');const s=img.getAttribute('src')||'';img.removeAttribute('src');setTimeout(()=>img.setAttribute('src',s),30);}">🔄 إعادة المحاولة</button>
+                    </div>
+                  </div>`
+                : ""
+            }
           </div>
 
           <div class="qr-options-board">
@@ -1422,7 +1439,7 @@
               ? `
                 <div class="qr-explanation-box">
                   ${rev.explanation ? `<p>💡 ${escapeHtml(rev.explanation)}</p>` : ""}
-                  ${rev.answerImage ? `<img src="${escapeHtml(rev.answerImage)}" class="qr-answer-img" alt="صورة الإجابة" />` : ""}
+                  ${rev.answerImage ? `<img src="${escapeHtml(rev.answerImage)}" class="qr-answer-img" alt="صورة الإجابة" loading="eager" decoding="async" onerror="this.hidden=true;" />` : ""}
                 </div>
               `
               : ""

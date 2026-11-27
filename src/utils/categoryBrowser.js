@@ -155,75 +155,98 @@
   }
 
   /**
-   * تحديد الفئة الرئيسية لأي فئة فرعية
+   * التحقق من أن الفئة تحتوي على سؤال واحد صالح على الأقل (لمنع عرض بطاقات فارغة)
+   */
+  function hasValidQuestions(cat) {
+    if (!cat || !Array.isArray(cat.questions) || cat.questions.length === 0) return false;
+    return cat.questions.some(
+      (q) =>
+        q &&
+        typeof q === "object" &&
+        ((typeof q.question === "string" && q.question.trim().length > 0) ||
+          (typeof q.answer === "string" && q.answer.trim().length > 0))
+    );
+  }
+
+  function resolveThemeEntry(rawNameOrId, fallbackIcon = "") {
+    const themes = window.SeenJeemCategoryThemes;
+    if (themes && typeof themes.resolveTheme === "function") {
+      return themes.resolveTheme(rawNameOrId, { fallbackIcon });
+    }
+    const raw = typeof rawNameOrId === "string" ? rawNameOrId.trim() : "";
+    const lower = raw.toLowerCase();
+    if (MAIN_CATALOG_MAP.has(lower)) return MAIN_CATALOG_MAP.get(lower);
+    const normExplicit = normalizeArabicSearch(raw);
+    for (const item of MAIN_CATEGORY_CATALOG) {
+      if (normalizeArabicSearch(item.label) === normExplicit) return item;
+    }
+    if (!raw) return MAIN_CATALOG_MAP.get("general-misc");
+    const dynId = `main-${normExplicit.replace(/\s+/g, "-")}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+    return {
+      id: dynId,
+      label: raw,
+      icon: fallbackIcon || "📂",
+      color: DYNAMIC_COLORS[hash % DYNAMIC_COLORS.length],
+      accent: DYNAMIC_COLORS[hash % DYNAMIC_COLORS.length],
+      gradient: "",
+      isCountry: false,
+      order: 500
+    };
+  }
+
+  /**
+   * تحديد الفئة الرئيسية لأي فئة فرعية عبر سجل الأعلام والألوان (categoryThemes.js)
    */
   function resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet } = {}) {
-    if (!cat || typeof cat !== "object") return MAIN_CATALOG_MAP.get("general-misc");
+    if (!cat || typeof cat !== "object") return resolveThemeEntry("general-misc");
 
     // 1) الفئات الخاصة بالمستخدم
     if (isCustomCategory(cat, customIdsSet)) {
-      return MAIN_CATALOG_MAP.get("custom-packs");
+      return resolveThemeEntry("custom-packs");
     }
 
-    // 2) حقل mainCategory / section صريح من الشيت إذا لم يكن ضمن المعرّفات القياسية
+    // 2) حقل mainCategory / section صريح من الشيت (يدعم الدول العربية الـ 22 والفئات الموسّعة أو أي قسم جديد)
     const rawExplicit =
       (typeof cat.mainCategory === "string" && cat.mainCategory.trim()) ||
       (typeof cat.section === "string" && cat.section.trim()) ||
       "";
     if (rawExplicit) {
-      const lower = rawExplicit.toLowerCase();
-      if (MAIN_CATALOG_MAP.has(lower)) return MAIN_CATALOG_MAP.get(lower);
-      // مطابقة بالاسم العربي إن وُجد
-      const normExplicit = normalizeArabicSearch(rawExplicit);
-      for (const item of MAIN_CATEGORY_CATALOG) {
-        if (normalizeArabicSearch(item.label) === normExplicit) return item;
-      }
-      // إنشاء بطاقة رئيسية ديناميكية جديدة إن أضاف الشيت قسماً رئيسياً جديداً
-      const dynId = `main-${normExplicit.replace(/\s+/g, "-")}`;
-      let hash = 0;
-      for (let i = 0; i < rawExplicit.length; i++) hash = (hash * 31 + rawExplicit.charCodeAt(i)) >>> 0;
-      return {
-        id: dynId,
-        label: rawExplicit,
-        icon: cat.mainIcon || "📂",
-        color: DYNAMIC_COLORS[hash % DYNAMIC_COLORS.length]
-      };
+      return resolveThemeEntry(rawExplicit, cat.mainIcon || "");
     }
 
     // 3) الاعتماد على resolveCategoryGroup الحالي إن كان موجوداً
     const groupId = typeof resolveGroupFn === "function" ? resolveGroupFn(cat) : cat.group;
-    if (groupId && MAIN_CATALOG_MAP.has(groupId)) {
-      return MAIN_CATALOG_MAP.get(groupId);
+    if (groupId) {
+      return resolveThemeEntry(groupId);
     }
 
     // 4) أي فئة بدون فئة رئيسية -> منوّعات عامة
-    return MAIN_CATALOG_MAP.get("general-misc");
+    return resolveThemeEntry("general-misc");
+  }
+
+  function resolveMainCategoryId(cat, opts = {}) {
+    const info = resolveMainCategoryInfo(cat, opts);
+    return info ? info.id : "general-misc";
   }
 
   /**
-   * بناء قائمة بطاقات الفئات الرئيسية مع إحصائياتها الحية وشارات الاختيار
+   * بناء قائمة بطاقات الفئات الرئيسية والدول العربية التي تملك محتوى فعلياً فقط (لا بطاقات فارغة!)
    */
   function buildMainCategoryGroups(allCategories, { resolveGroupFn, customIdsSet, selectedIds = [], getNewCountFn } = {}) {
     const selectedSet = new Set(Array.isArray(selectedIds) ? selectedIds : []);
     const groupMap = new Map();
 
-    // ضمان ظهور الترتيب المتناسق للفئات الرئيسية القياسية
-    MAIN_CATEGORY_CATALOG.forEach((meta) => {
-      groupMap.set(meta.id, {
-        ...meta,
-        subcategories: [],
-        subCount: 0,
-        selectedCount: 0,
-        newQuestionsTotal: 0
-      });
-    });
-
     (Array.isArray(allCategories) ? allCategories : []).forEach((cat) => {
-      if (!cat || !cat.id) return;
+      if (!cat || !cat.id || !hasValidQuestions(cat)) return;
       const meta = resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet });
       if (!groupMap.has(meta.id)) {
         groupMap.set(meta.id, {
           ...meta,
+          color: meta.accent || meta.color || "#38bdf8",
+          accent: meta.accent || meta.color || "#38bdf8",
+          gradient: meta.gradient || "",
           subcategories: [],
           subCount: 0,
           selectedCount: 0,
@@ -237,11 +260,19 @@
       bucket.newQuestionsTotal += typeof getNewCountFn === "function" ? getNewCountFn(cat) : (cat.questions ? cat.questions.length : 0);
     });
 
-    return Array.from(groupMap.values()).filter((g) => g.subCount > 0);
+    const themes = window.SeenJeemCategoryThemes;
+    return Array.from(groupMap.values())
+      .filter((g) => g.subCount > 0)
+      .sort((a, b) => {
+        const ordA = Number.isFinite(Number(a.order)) ? Number(a.order) : themes ? themes.getOrderIndex(a.id) : 500;
+        const ordB = Number.isFinite(Number(b.order)) ? Number(b.order) : themes ? themes.getOrderIndex(b.id) : 500;
+        if (ordA !== ordB) return ordA - ordB;
+        return String(a.label || "").localeCompare(String(b.label || ""), "ar");
+      });
   }
 
   /**
-   * البحث الفوري + الفلاتر السريعة عبر الفئات الفرعية
+   * البحث الفوري + الفلاتر السريعة عبر الفئات الفرعية (يدعم النطاق الشامل أو التصفية داخل الفئة الرئيسية المفتوحة)
    */
   function filterSubcategories(
     allCategories,
@@ -249,6 +280,7 @@
       query = "",
       quickFilter = "all", // "all" | "new" | "media" | "custom" | "favorites"
       activeMainId = null,
+      scopeToActiveMain = false,
       favoritesList = null,
       customIdsSet = null,
       resolveGroupFn = null,
@@ -256,15 +288,19 @@
     } = {}
   ) {
     const favSet = new Set(Array.isArray(favoritesList) ? favoritesList : loadFavorites());
-    const normQ = normalizeArabicSearch(query);
-    const isGlobalSearchOrFilter = Boolean(normQ) || quickFilter !== "all";
+    const themes = window.SeenJeemCategoryThemes;
+    const normFn = themes && typeof themes.normalizeArabic === "function" ? themes.normalizeArabic : normalizeArabicSearch;
+    const stripAlFn = themes && typeof themes.stripLeadingAl === "function" ? themes.stripLeadingAl : (s) => s;
+    const normQ = normFn(query);
+    const normQNoAl = stripAlFn(normQ);
+    const isGlobalSearchOrFilter = !scopeToActiveMain && (Boolean(normQ) || quickFilter !== "all");
 
     return (Array.isArray(allCategories) ? allCategories : [])
       .filter((cat) => {
-        if (!cat || !cat.id) return false;
+        if (!cat || !cat.id || !hasValidQuestions(cat)) return false;
         const mainMeta = resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet });
 
-        if (!isGlobalSearchOrFilter && activeMainId && mainMeta.id !== activeMainId) {
+        if ((scopeToActiveMain || !isGlobalSearchOrFilter) && activeMainId && mainMeta.id !== activeMainId) {
           return false;
         }
 
@@ -280,8 +316,9 @@
         }
 
         if (normQ) {
-          const hay = normalizeArabicSearch(`${cat.name || ""} ${cat.description || ""} ${mainMeta.label || ""}`);
-          if (!hay.includes(normQ)) return false;
+          const aliasesStr = Array.isArray(mainMeta.aliases) ? mainMeta.aliases.join(" ") : "";
+          const hay = normFn(`${cat.name || ""} ${cat.description || ""} ${mainMeta.label || ""} ${aliasesStr}`);
+          if (!hay.includes(normQ) && (!normQNoAl || !hay.includes(normQNoAl))) return false;
         }
 
         return true;
@@ -370,6 +407,7 @@
     FAVORITES_STORAGE_KEY,
     MAIN_CATEGORY_CATALOG,
     normalizeArabicSearch,
+    hasValidQuestions,
     loadFavorites,
     saveFavorites,
     isFavorite,
@@ -379,6 +417,7 @@
     isMediaCategory,
     isCustomCategory,
     resolveMainCategoryInfo,
+    resolveMainCategoryId,
     buildMainCategoryGroups,
     filterSubcategories,
     completeRandomSelection

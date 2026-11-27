@@ -1554,6 +1554,8 @@
   state.setupPresetMode = "classic-6"; // "quick-4" | "classic-6" | "surprise-6"
   state.setupWizardStep = 1; // 1 | 2 | 3
   state.activeMainCategoryId = null; // null = Level 1 (Main Cards), string = Level 2 (Subcategories)
+  state.subSearchQuery = "";
+  state.subQuickFilter = "all";
   state.quickFilter = "all"; // "all" | "new" | "media" | "custom" | "favorites"
   state.teamColors = TEAM_COLOR_PALETTE.slice(0, 6);
 
@@ -1891,6 +1893,10 @@
 
     const breadcrumbBar = document.getElementById("category-breadcrumb-bar");
     const breadcrumbCurrent = document.getElementById("category-breadcrumb-current");
+    const subToolbar = document.getElementById("category-sub-toolbar");
+    const subSearchInput = document.getElementById("subcat-search-input");
+    const btnClearSubSearch = document.getElementById("btn-clear-subcat-search");
+    const subQuickFiltersBar = document.getElementById("subcat-quick-filters");
     const isGlobalFlatView = Boolean(trimmedSearch) || state.quickFilter !== "all";
     const mainGroups = browser
       ? browser.buildMainCategoryGroups(state.allCategories, {
@@ -1904,20 +1910,26 @@
     // التأكد أن الفئة الرئيسية المفتوحة ما زالت موجودة
     if (state.activeMainCategoryId && !mainGroups.some((g) => g.id === state.activeMainCategoryId)) {
       state.activeMainCategoryId = null;
+      state.subSearchQuery = "";
+      state.subQuickFilter = "all";
     }
 
     dom.setupCategoriesGrid.innerHTML = "";
 
-    // المستوى الأول: بطاقات الفئات الرئيسية (عند عدم البحث وعدم تفعيل فلتر وعدم الدخول لفئة رئيسية)
+    // المستوى الأول: بطاقات الفئات الرئيسية والدول العربية (عند عدم البحث الشامل وعدم تفعيل فلتر وعدم الدخول لفئة رئيسية)
     if (!isGlobalFlatView && !state.activeMainCategoryId && browser) {
       if (breadcrumbBar) breadcrumbBar.hidden = true;
+      if (subToolbar) subToolbar.hidden = true;
       dom.setupCategoriesGrid.classList.add("is-main-level");
 
       mainGroups.forEach((group) => {
         const card = document.createElement("button");
         card.type = "button";
-        card.className = `main-cat-card${group.selectedCount > 0 ? " has-selections" : ""}`;
-        card.style.setProperty("--main-color", group.color || "#38bdf8");
+        card.className = `main-cat-card${group.selectedCount > 0 ? " has-selections" : ""}${group.isCountry ? " is-country-card" : ""}`;
+        card.style.setProperty("--main-color", group.accent || group.color || "#38bdf8");
+        if (group.gradient) {
+          card.style.setProperty("--main-gradient", group.gradient);
+        }
         card.dataset.mainCatId = group.id;
         card.innerHTML = `
           ${group.selectedCount > 0 ? `<span class="main-cat-sel-badge">✓ ${group.selectedCount} مختارة</span>` : ""}
@@ -1930,6 +1942,9 @@
         `;
         card.addEventListener("click", () => {
           state.activeMainCategoryId = group.id;
+          state.subSearchQuery = "";
+          state.subQuickFilter = "all";
+          if (subSearchInput) subSearchInput.value = "";
           renderSetupScreen();
         });
         dom.setupCategoriesGrid.appendChild(card);
@@ -1941,8 +1956,10 @@
 
     // المستوى الثاني أو نتائج البحث/الفلاتر السريعة: بطاقات الفئات الفرعية
     dom.setupCategoriesGrid.classList.remove("is-main-level");
+    const isInSubScope = Boolean(!isGlobalFlatView && state.activeMainCategoryId);
+
     if (breadcrumbBar) {
-      if (!isGlobalFlatView && state.activeMainCategoryId) {
+      if (isInSubScope) {
         const activeGroupObj = mainGroups.find((g) => g.id === state.activeMainCategoryId);
         breadcrumbBar.hidden = false;
         if (breadcrumbCurrent && activeGroupObj) {
@@ -1953,11 +1970,32 @@
       }
     }
 
+    if (subToolbar) {
+      subToolbar.hidden = !isInSubScope;
+      if (isInSubScope) {
+        const rawSub = typeof state.subSearchQuery === "string" ? state.subSearchQuery : "";
+        if (subSearchInput && subSearchInput.value !== rawSub) {
+          subSearchInput.value = rawSub;
+        }
+        if (btnClearSubSearch) {
+          btnClearSubSearch.hidden = rawSub.trim().length === 0;
+        }
+        if (subQuickFiltersBar) {
+          subQuickFiltersBar.querySelectorAll("[data-sub-filter]").forEach((chip) => {
+            const isAct = chip.dataset.subFilter === (state.subQuickFilter || "all");
+            chip.classList.toggle("active", isAct);
+            chip.setAttribute("aria-pressed", String(isAct));
+          });
+        }
+      }
+    }
+
     const filteredItems = browser
       ? browser.filterSubcategories(state.allCategories, {
-          query: rawSearch,
-          quickFilter: state.quickFilter,
-          activeMainId: isGlobalFlatView ? null : state.activeMainCategoryId,
+          query: isInSubScope ? state.subSearchQuery : rawSearch,
+          quickFilter: isInSubScope ? state.subQuickFilter || "all" : state.quickFilter,
+          activeMainId: isInSubScope ? state.activeMainCategoryId : null,
+          scopeToActiveMain: isInSubScope,
           favoritesList: favList,
           customIdsSet,
           resolveGroupFn: resolveCategoryGroup,
@@ -1968,20 +2006,32 @@
     if (filteredItems.length === 0) {
       const emptyBox = document.createElement("div");
       emptyBox.className = "categories-empty-state";
-      emptyBox.innerHTML = `
-        <div class="categories-empty-icon" aria-hidden="true">🔍</div>
-        <div class="categories-empty-title">لا توجد فئات مطابقة للتصفية الحالية</div>
-        <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو اختيار فلتر آخر أو العودة لكل الفئات الرئيسية.</div>
-      `;
+      emptyBox.innerHTML = isInSubScope
+        ? `
+          <div class="categories-empty-icon" aria-hidden="true">🔍</div>
+          <div class="categories-empty-title">لا توجد فئات فرعية مطابقة داخل هذه الفئة</div>
+          <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو اختيار فلتر آخر لعرض بقية الفئات الفرعية.</div>
+        `
+        : `
+          <div class="categories-empty-icon" aria-hidden="true">🔍</div>
+          <div class="categories-empty-title">لا توجد فئات مطابقة للتصفية الحالية</div>
+          <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو اختيار فلتر آخر أو العودة لكل الفئات الرئيسية.</div>
+        `;
       const resetBtn = document.createElement("button");
       resetBtn.type = "button";
       resetBtn.className = "btn btn-secondary btn-sm";
-      resetBtn.textContent = "عرض كل الفئات الرئيسية";
+      resetBtn.textContent = isInSubScope ? "إظهار جميع الفئات الفرعية" : "عرض كل الفئات الرئيسية";
       resetBtn.addEventListener("click", () => {
-        state.searchQuery = "";
-        state.quickFilter = "all";
-        state.activeMainCategoryId = null;
-        if (dom.categorySearchInput) dom.categorySearchInput.value = "";
+        if (isInSubScope) {
+          state.subSearchQuery = "";
+          state.subQuickFilter = "all";
+          if (subSearchInput) subSearchInput.value = "";
+        } else {
+          state.searchQuery = "";
+          state.quickFilter = "all";
+          state.activeMainCategoryId = null;
+          if (dom.categorySearchInput) dom.categorySearchInput.value = "";
+        }
         renderSetupScreen();
       });
       emptyBox.appendChild(resetBtn);
@@ -4433,6 +4483,11 @@
 
     dom.modalQuestionImage.onload = null;
     dom.modalQuestionImage.onerror = null;
+    // حماية منع التسريب + تحميل فوري للصورة النشطة
+    dom.modalQuestionImage.alt = "صورة السؤال";
+    dom.modalQuestionImage.removeAttribute("title");
+    dom.modalQuestionImage.loading = "eager";
+    dom.modalQuestionImage.decoding = "async";
 
     if (!cleanSrc) {
       dom.modalQuestionImage.removeAttribute("src");
@@ -4865,7 +4920,9 @@
 
     const img = document.createElement("img");
     img.className = "multi-img-el";
-    img.alt = item.caption;
+    img.alt = "صورة السؤال";
+    img.loading = "eager";
+    img.decoding = "async";
 
     const hint = document.createElement("span");
     hint.className = "zoom-hint-badge";
@@ -4877,7 +4934,7 @@
 
     const errText = document.createElement("div");
     errText.className = "multi-img-error-text";
-    errText.textContent = "تعذّر تحميل هذه الصورة";
+    errText.textContent = "تعذّر تحميل الصورة حالياً";
 
     const retryBtn = document.createElement("button");
     retryBtn.type = "button";
@@ -4887,6 +4944,7 @@
     let cardRetryAttempt = 0;
     const loadCardImg = (attempt) => {
       card.classList.remove("has-img-error");
+      card.classList.add("is-loading");
       errorBox.hidden = true;
       img.hidden = false;
       hint.hidden = false;
@@ -4894,9 +4952,11 @@
       imagePreloader
         .preloadOne(item.src, { retryAttempt: attempt })
         .then((loaded) => {
+          card.classList.remove("is-loading", "has-img-error");
           img.src = loaded.src || item.src;
         })
         .catch(() => {
+          card.classList.remove("is-loading");
           card.classList.add("has-img-error");
           img.hidden = true;
           hint.hidden = true;
@@ -9395,7 +9455,7 @@
     body.innerHTML = `
       <div class="profile-hero-card" style="--profile-accent: ${escapeHtml(accent)};">
         <div class="profile-hero-avatar">
-          ${showPhoto ? `<img src="${escapeHtml(googlePhoto)}" alt="${escapeHtml(profile.displayName)}" />` : `<span>${escapeHtml(currentEmoji)}</span>`}
+          ${showPhoto ? `<img src="${escapeHtml(googlePhoto)}" alt="الصورة الشخصية" loading="lazy" decoding="async" />` : `<span>${escapeHtml(currentEmoji)}</span>`}
         </div>
         <div class="profile-hero-info">
           <div class="profile-hero-top">
@@ -14442,7 +14502,41 @@
     if (btnBackToMainCats) {
       btnBackToMainCats.addEventListener("click", () => {
         state.activeMainCategoryId = null;
+        state.subSearchQuery = "";
+        state.subQuickFilter = "all";
+        const subInp = document.getElementById("subcat-search-input");
+        if (subInp) subInp.value = "";
         renderSetupScreen();
+      });
+    }
+
+    const subSearchInput = document.getElementById("subcat-search-input");
+    if (subSearchInput) {
+      subSearchInput.addEventListener("input", (e) => {
+        state.subSearchQuery = e.target.value || "";
+        renderSetupScreen();
+      });
+    }
+
+    const btnClearSubSearch = document.getElementById("btn-clear-subcat-search");
+    if (btnClearSubSearch) {
+      btnClearSubSearch.addEventListener("click", () => {
+        state.subSearchQuery = "";
+        if (subSearchInput) {
+          subSearchInput.value = "";
+          subSearchInput.focus();
+        }
+        renderSetupScreen();
+      });
+    }
+
+    const subQuickFiltersBar = document.getElementById("subcat-quick-filters");
+    if (subQuickFiltersBar) {
+      subQuickFiltersBar.querySelectorAll("[data-sub-filter]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          state.subQuickFilter = chip.dataset.subFilter || "all";
+          renderSetupScreen();
+        });
       });
     }
 

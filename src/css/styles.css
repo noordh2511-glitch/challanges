@@ -17740,3 +17740,109 @@ body.quick-player-mode {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   الحزمة العشرون: هوية الدول العربية والفئات الموسّعة، بحث الفئات الفرعية، وحماية الصور
+   ========================================================= */
+
+/* 1) التدرّج المتناسق لبطاقات الفئات الرئيسية والدول العربية عبر الثيمات الثلاثة */
+.main-cat-card {
+  background-image: var(--main-gradient, none);
+}
+.main-cat-card.is-country-card .main-cat-icon {
+  font-size: 2.35rem;
+  line-height: 1.1;
+}
+
+/* 2) شريط البحث والتصفية المدمج داخل شاشة الفئات الفرعية */
+.category-sub-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.category-sub-toolbar[hidden] {
+  display: none !important;
+}
+.subcat-search-wrap {
+  width: 100%;
+}
+.subcat-quick-filters {
+  margin-bottom: 0;
+}
+
+/* 3) تحسين تحميل صور المشاهد (Shimmer + Safe Error Fallback) */
+.qr-img-stage {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.qr-img-stage.is-loading::before,
+.multi-img-card.is-loading::before,
+.tv-multi-img-card.is-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: sjImgShimmer 1.35s linear infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+@keyframes sjImgShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.safe-img-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(251, 113, 133, 0.45);
+  color: var(--text-primary);
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+.safe-img-error-card[hidden],
+.img-fallback-inline[hidden] {
+  display: none !important;
+}
+.img-fallback-inline {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(244, 63, 94, 0.14);
+  border: 1px solid rgba(251, 113, 133, 0.4);
+  color: #fecdd3;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+/* ثيم التباين العالي والملكي الذهبي لشريط البحث الفرعي */
+[data-theme="high-contrast"] .category-sub-toolbar {
+  background: rgba(0, 0, 0, 0.86);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+[data-theme="royal-gold"] .category-sub-toolbar {
+  background: rgba(20, 14, 4, 0.72);
+  border-color: rgba(251, 191, 36, 0.32);
+}
