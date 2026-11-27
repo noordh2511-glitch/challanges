@@ -353,6 +353,16 @@
         pub.charadesSoloView.turnSummary = [];
       }
     }
+    if (pub.audioChallengeView && typeof pub.audioChallengeView === "object") {
+      // منع تسريب الإجابة أو أي مسار صوتي داخل Firebase publicState
+      delete pub.audioChallengeView.audioSrc;
+      delete pub.audioChallengeView.audioUrl;
+      if (pub.audioChallengeView.phase !== "revealed") {
+        pub.audioChallengeView.revealedAnswer = null;
+        pub.audioChallengeView.revealedExplanation = null;
+        pub.audioChallengeView.revealedAnswerImage = null;
+      }
+    }
     if (pub.intermission) {
       stabilizeTimerHolder(pub.intermission, "remainingSeconds", "timer");
     }

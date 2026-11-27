@@ -1045,6 +1045,165 @@
     return canvas;
   }
 
+  /**
+   * توليد بطاقة نتيجة طور «تحدي الصوت» المستقل بدقة 1080×1350 (4:5) — تدعم حتى 6 فرق
+   */
+  async function generateAudioChallengeResultCard(sessionData = {}, theme = "dark-glass") {
+    await ensureArabicFontReady();
+    const palette = THEME_PALETTES[theme] || THEME_PALETTES["dark-glass"];
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    ctx.direction = "rtl";
+    ctx.textBaseline = "middle";
+
+    const bgGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    bgGrad.addColorStop(0, palette.bgTop);
+    bgGrad.addColorStop(0.5, palette.bgMid);
+    bgGrad.addColorStop(1, palette.bgBot);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const orb1 = ctx.createRadialGradient(WIDTH * 0.8, HEIGHT * 0.14, 10, WIDTH * 0.8, HEIGHT * 0.14, 420);
+    orb1.addColorStop(0, "rgba(34, 211, 238, 0.28)");
+    orb1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = orb1;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    drawRoundedRect(ctx, 32, 32, WIDTH - 64, HEIGHT - 64, 38);
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // 1) الترويسة
+    const headerY = 104;
+    drawRoundedRect(ctx, WIDTH - 350, headerY - 34, 282, 68, 20);
+    const brandGrad = ctx.createLinearGradient(WIDTH - 350, headerY - 34, WIDTH - 68, headerY + 34);
+    brandGrad.addColorStop(0, "#38bdf8");
+    brandGrad.addColorStop(1, "#a855f7");
+    ctx.fillStyle = brandGrad;
+    ctx.fill();
+
+    ctx.fillStyle = "#060b19";
+    ctx.font = `900 30px ${FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.fillText("🎵 تحدي الصوت", WIDTH - 209, headerY + 2);
+
+    const totalRounds = Math.max(1, Number(sessionData.totalRounds) || 1);
+    ctx.textAlign = "left";
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText(`عدد المقاطع: ${totalRounds}`, 74, headerY - 14);
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `600 22px ${FONT_FAMILY}`;
+    ctx.fillText(formatArabicDate(sessionData.timestamp || Date.now()), 74, headerY + 20);
+
+    const teams = (Array.isArray(sessionData.teams) ? sessionData.teams : [])
+      .map((t, idx) => ({
+        name: String(t.name || `الفريق ${idx + 1}`).slice(0, 24),
+        score: Math.max(0, Math.round(Number(t.score) || 0)),
+        correctCount: Math.max(0, Math.floor(Number(t.correctCount) || 0)),
+        color: t.color || "#22d3ee"
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    const topScore = teams[0] ? teams[0].score : 0;
+    const leaders = teams.filter((t) => t.score === topScore);
+    const isDraw = leaders.length !== 1;
+
+    // 2) لافتة البطل
+    const heroX = 68;
+    const heroY = 180;
+    const heroW = WIDTH - 136;
+    const heroH = 240;
+    drawRoundedRect(ctx, heroX, heroY, heroW, heroH, 30);
+    ctx.fillStyle = palette.heroBg;
+    ctx.fill();
+    ctx.strokeStyle = isDraw ? palette.accent1 : palette.heroBorder;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    drawTrophyIcon(ctx, WIDTH / 2, heroY + 62, isDraw, palette.accent2);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.accent2;
+    ctx.font = `800 24px ${FONT_FAMILY}`;
+    ctx.fillText(isDraw ? "تعادل في قمة تحدي الصوت!" : "بطل تحدي الصوت المستقل", WIDTH / 2, heroY + 122);
+
+    ctx.fillStyle = palette.textPrimary;
+    ctx.font = `900 46px ${FONT_FAMILY}`;
+    const heroName = isDraw
+      ? leaders.slice(0, 2).map((l) => l.name).join(" و ")
+      : (leaders[0] && leaders[0].name) || "—";
+    ctx.fillText(truncateToWidth(ctx, heroName, heroW - 80), WIDTH / 2, heroY + 178);
+
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    const modeLabel = sessionData.playbackMode === "progressive" ? "نمط التدرّج الزمني (3ث ← 7ث ← كامل)" : "النمط القياسي";
+    ctx.fillText(`${modeLabel}  •  ${totalRounds} مقطع`, WIDTH / 2, heroY + 216);
+
+    // 3) ترتيب الفرق (حتى 6 فرق)
+    ctx.textAlign = "right";
+    ctx.fillStyle = palette.textSecondary;
+    ctx.font = `800 26px ${FONT_FAMILY}`;
+    ctx.fillText("الترتيب النهائي للفرق", WIDTH - 74, 466);
+
+    const listY = 500;
+    const listH = 660;
+    const count = Math.max(1, teams.length);
+    const rowGap = 14;
+    const rowH = Math.min(102, Math.floor((listH - rowGap * (count - 1)) / count));
+
+    teams.forEach((t, idx) => {
+      const y = listY + idx * (rowH + rowGap);
+      const isLead = t.score === topScore && topScore > 0;
+      drawRoundedRect(ctx, 68, y, WIDTH - 136, rowH, 20);
+      ctx.fillStyle = isLead ? "rgba(245, 158, 11, 0.16)" : palette.cardBg;
+      ctx.fill();
+      ctx.strokeStyle = isLead ? "#fbbf24" : t.color;
+      ctx.lineWidth = isLead ? 2.5 : 1.5;
+      ctx.stroke();
+
+      const cy = y + rowH / 2;
+      ctx.textAlign = "right";
+      ctx.fillStyle = isLead ? "#fde68a" : t.color;
+      ctx.font = `900 28px ${FONT_FAMILY}`;
+      ctx.fillText(`#${idx + 1}`, WIDTH - 96, cy);
+
+      ctx.fillStyle = palette.textPrimary;
+      ctx.font = `900 32px ${FONT_FAMILY}`;
+      ctx.fillText(truncateToWidth(ctx, t.name, 480), WIDTH - 156, cy - 12);
+
+      ctx.fillStyle = palette.textMuted;
+      ctx.font = `700 20px ${FONT_FAMILY}`;
+      ctx.fillText(`إجابات صحيحة: ${t.correctCount}`, WIDTH - 156, cy + 20);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = isLead ? "#fbbf24" : t.color;
+      ctx.font = `900 42px ${FONT_FAMILY}`;
+      ctx.fillText(`${t.score} نقطة`, 96, cy);
+    });
+
+    // 4) التذييل
+    ctx.strokeStyle = palette.cardBorder;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(96, HEIGHT - 102);
+    ctx.lineTo(WIDTH - 96, HEIGHT - 102);
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = palette.textMuted;
+    ctx.font = `700 22px ${FONT_FAMILY}`;
+    ctx.fillText("سين جيم  •  طور «تحدي الصوت» المستقل", WIDTH / 2, HEIGHT - 66);
+
+    return canvas;
+  }
+
   window.SeenJeemResultCard = {
     WIDTH,
     HEIGHT,
@@ -1052,6 +1211,7 @@
     generateBaraSalfaResultCard,
     generateTournamentResultCard,
     generateMafiaResultCard,
+    generateAudioChallengeResultCard,
     canvasToBlob,
     getDefaultFilename,
     downloadBlobAsPNG,

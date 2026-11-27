@@ -22,6 +22,7 @@
     BARA_HISTORY: "bara-salfa-history-v1",
     BARA_CUSTOM: "bara-salfa-custom-v1",
     MAFIA_STATS: "mafia-stats-v1",
+    AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
     FLAGGED: "seen-jeem-flagged-v1",
     TOURNAMENT: "seen-jeem-tournament-v1",
     THEME: "seen_jeem_theme_v1",
@@ -95,6 +96,7 @@
         : safeReadJSON(LOCAL_KEYS.MAFIA_STATS, []);
     const baraSalfaHistory = safeReadJSON(LOCAL_KEYS.BARA_HISTORY, {});
     const baraSalfaCustom = safeReadJSON(LOCAL_KEYS.BARA_CUSTOM, []);
+    const audioChallengeHistory = safeReadJSON(LOCAL_KEYS.AUDIO_CHALLENGE_HISTORY, []);
     const flaggedQuestions =
       window.SeenJeemFlaggedStore && typeof window.SeenJeemFlaggedStore.getAll === "function"
         ? window.SeenJeemFlaggedStore.getAll()
@@ -116,6 +118,9 @@
       matchArchive: Array.isArray(matchArchive) ? matchArchive : [],
       baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
       mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
+      audioChallengeHistory: Array.isArray(audioChallengeHistory)
+        ? audioChallengeHistory.filter((x) => typeof x === "string" && x.trim())
+        : [],
       baraSalfaHistory:
         baraSalfaHistory && typeof baraSalfaHistory === "object" && !Array.isArray(baraSalfaHistory)
           ? baraSalfaHistory
@@ -310,6 +315,14 @@
       matchArchive: mergeMatchArchiveLists(local.matchArchive, cloud.matchArchive),
       baraSalfaStats: mergeBaraStatsLists(local.baraSalfaStats, cloud.baraSalfaStats),
       mafiaStats: mergeMafiaStatsLists(local.mafiaStats, cloud.mafiaStats),
+      audioChallengeHistory: Array.from(
+        new Set(
+          [
+            ...(Array.isArray(cloud.audioChallengeHistory) ? cloud.audioChallengeHistory : []),
+            ...(Array.isArray(local.audioChallengeHistory) ? local.audioChallengeHistory : [])
+          ].filter((x) => typeof x === "string" && x.trim())
+        )
+      ).slice(-500),
       baraSalfaHistory: mergeBaraHistory(local.baraSalfaHistory, cloud.baraSalfaHistory),
       baraSalfaCustom: mergeBaraCustomCategories(local.baraSalfaCustom, cloud.baraSalfaCustom),
       flaggedQuestions: mergeFlaggedQuestions(local.flaggedQuestions, cloud.flaggedQuestions),
@@ -354,6 +367,12 @@
       } else {
         safeWriteJSON(LOCAL_KEYS.MAFIA_STATS, payload.mafiaStats);
       }
+    }
+    if (Array.isArray(payload.audioChallengeHistory)) {
+      safeWriteJSON(
+        LOCAL_KEYS.AUDIO_CHALLENGE_HISTORY,
+        payload.audioChallengeHistory.filter((x) => typeof x === "string" && x.trim())
+      );
     }
     if (payload.baraSalfaHistory && typeof payload.baraSalfaHistory === "object") {
       safeWriteJSON(LOCAL_KEYS.BARA_HISTORY, payload.baraSalfaHistory);

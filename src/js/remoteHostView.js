@@ -372,6 +372,8 @@
         stageHtml = this._renderBlitzControl(pub, priv);
       } else if (pub.screen === "charades-solo" && pub.charadesSoloView) {
         stageHtml = this._renderCharadesSoloControl(pub, priv);
+      } else if (pub.screen === "audio-challenge" && pub.audioChallengeView) {
+        stageHtml = this._renderAudioChallengeControl(pub, priv);
       } else if (pub.screen === "final" && pub.finalRoundView) {
         stageHtml = this._renderFinalControl(pub, priv);
       } else if (pub.screen === "winner") {
@@ -720,6 +722,93 @@
               `
               : `<button type="button" class="btn btn-amber rh-touch-btn" data-rh-cmd="CHARADES_ACTION" data-payload='{"action":"${cv.phase === "ready" ? "begin" : "next"}"}'>${cv.phase === "ready" ? "🎬 ابدأ الدور" : "الدور التالي ←"}</button>`
           }
+        </section>
+      `;
+    }
+
+    _renderAudioChallengeControl(pub, priv) {
+      const ac = pub.audioChallengeView || {};
+      const acPriv = (priv && priv.audioChallenge) || {};
+      const teams = Array.isArray(ac.teams) ? ac.teams : [];
+      const st = ac.audioState || {};
+      const pts = Number(ac.currentPoints) || 100;
+      const bz = (pub.wireless && pub.wireless.buzzer) || pub.buzzer || {};
+      const isBuzzed = bz.state === "buzzed" && bz.winnerTeamName;
+
+      if (ac.phase === "setup" || ac.phase === "summary") {
+        return `
+          <section class="rh-card rh-alert-card">
+            <div class="rh-alert-icon">🎵</div>
+            <h2 class="rh-alert-title">${ac.phase === "summary" ? "نهاية تحدي الصوت!" : "طور تحدي الصوت المستقل"}</h2>
+            <p class="rh-alert-desc">${ac.phase === "summary" ? "شاهد النتائج النهائية على الشاشة الرئيسية." : "ابدأ الجلسة الصوتية من الجهاز الرئيسي لتظهر أزرار التحكم هنا فوراً."}</p>
+          </section>
+        `;
+      }
+
+      return `
+        <section class="rh-card">
+          <div class="rh-card-head">
+            <span>🎵 تحدي الصوت (${ac.roundNumber || 1}/${ac.totalRounds || 1})</span>
+            <span class="rh-timer-pill">+${pts} نقطة</span>
+          </div>
+
+          <div class="rh-secret-box">
+            <div class="rh-secret-label">🔒 الإجابة السرية (للمقدّم فقط)</div>
+            <div class="rh-secret-answer">✅ ${escapeHtml(acPriv.answer || ac.revealedAnswer || "—")}</div>
+            ${acPriv.explanation ? `<div class="rh-secret-meta">${escapeHtml(acPriv.explanation)}</div>` : ""}
+          </div>
+
+          <div class="rh-btn-row rh-cols-3">
+            <button type="button" class="btn btn-primary rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"${st.playing ? "pause" : "play"}"}'>${st.playing ? "⏸️ إيقاف" : "▶️ تشغيل"}</button>
+            <button type="button" class="btn btn-secondary rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"replay"}'>🔁 إعادة</button>
+            ${
+              ac.playbackMode === "standard"
+                ? `<button type="button" class="btn btn-gold-outline rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"teaser","seconds":5}'>⚡ 5ث</button>`
+                : `<button type="button" class="btn btn-gold-outline rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"reveal"}'>👁️ كشف</button>`
+            }
+          </div>
+
+          ${
+            ac.playbackMode === "progressive"
+              ? `
+                <div class="rh-btn-row rh-cols-3">
+                  <button type="button" class="btn ${ac.progressiveStage === 0 ? "btn-amber" : "btn-secondary"} rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"stage","level":0}'>3ث (+300)</button>
+                  <button type="button" class="btn ${ac.progressiveStage === 1 ? "btn-amber" : "btn-secondary"} rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"stage","level":1}'>7ث (+200)</button>
+                  <button type="button" class="btn ${ac.progressiveStage === 2 ? "btn-amber" : "btn-secondary"} rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"stage","level":2}'>كامل (+100)</button>
+                </div>
+              `
+              : ""
+          }
+
+          ${
+            isBuzzed
+              ? `<button type="button" class="btn btn-danger-outline rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"buzzer-wrong"}'>❌ خطأ — متابعة المقطع وفتح الجرس</button>`
+              : ""
+          }
+
+          ${
+            !ac.freePlay && teams.length > 0
+              ? `
+                <div class="rh-btn-row rh-cols-2">
+                  ${teams
+                    .map(
+                      (t, idx) => `
+                    <button type="button" class="btn btn-steal-win rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"award","teamIdx":${idx}}'>
+                      ✅ ${escapeHtml(t.name)} (+${pts})
+                    </button>
+                  `
+                    )
+                    .join("")}
+                </div>
+              `
+              : ""
+          }
+
+          <div class="rh-btn-row rh-cols-3">
+            <button type="button" class="btn btn-gold-outline rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"reveal"}'>👁️ كشف</button>
+            <button type="button" class="btn btn-ghost rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"skip"}'>⏭️ تخطي</button>
+            <button type="button" class="btn btn-primary rh-touch-btn" data-rh-cmd="AUDIO_CHALLENGE_MODE_ACTION" data-payload='{"action":"next"}'>⬅️ التالي</button>
+          </div>
         </section>
       `;
     }

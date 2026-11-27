@@ -26,6 +26,7 @@
     BARA_HISTORY: "bara-salfa-history-v1",
     BARA_STATS: "bara-salfa-stats-v1",
     MAFIA_STATS: "mafia-stats-v1",
+    AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
     TOURNAMENT: "seen-jeem-tournament-v1"
   });
 
@@ -74,6 +75,7 @@
       window.SeenJeemArchiveStore && typeof window.SeenJeemArchiveStore.getAllMafiaSessions === "function"
         ? window.SeenJeemArchiveStore.getAllMafiaSessions()
         : safeReadJSON(KEYS.MAFIA_STATS, []);
+    const audioChallengeHistory = safeReadJSON(KEYS.AUDIO_CHALLENGE_HISTORY, []);
     const activeTournament = safeReadJSON(KEYS.TOURNAMENT, null);
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
@@ -151,6 +153,7 @@
             : {},
         baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
         mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
+        audioChallengeHistory: Array.isArray(audioChallengeHistory) ? audioChallengeHistory : [],
         activeTournament: activeTournament && typeof activeTournament === "object" ? activeTournament : null,
         matchSettings,
         preferences: {
@@ -375,6 +378,15 @@
         window.SeenJeemArchiveStore.importMafiaSessions(d.mafiaStats, isReplace ? "replace" : "merge");
       } else {
         safeWriteJSON(KEYS.MAFIA_STATS, d.mafiaStats);
+      }
+    }
+    if (Array.isArray(d.audioChallengeHistory)) {
+      const incoming = d.audioChallengeHistory.filter((x) => typeof x === "string" && x.trim());
+      if (isReplace) {
+        safeWriteJSON(KEYS.AUDIO_CHALLENGE_HISTORY, Array.from(new Set(incoming)));
+      } else {
+        const cur = safeReadJSON(KEYS.AUDIO_CHALLENGE_HISTORY, []);
+        safeWriteJSON(KEYS.AUDIO_CHALLENGE_HISTORY, Array.from(new Set([...(Array.isArray(cur) ? cur : []), ...incoming])));
       }
     }
     if (d.activeTournament && typeof d.activeTournament === "object") {

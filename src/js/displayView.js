@@ -77,6 +77,7 @@
         "wireless-room-modal",
         "bara-salfa-modal",
         "mafia-modal",
+        "audio-challenge-modal",
         "tournament-modal",
         "custom-pack-builder-modal",
         "remote-host-root",
@@ -487,6 +488,11 @@
           <div id="tv-mafia-stage" class="tv-mafia-stage"></div>
         </section>
 
+        <!-- شاشة طور «تحدي الصوت» المستقل على التلفزيون (بدون أي اسم ملف أو تسريب للإجابة!) -->
+        <section id="tv-screen-audio-challenge" class="tv-screen tv-side-mode-screen tv-ac-screen" hidden>
+          <div id="tv-ac-stage" class="tv-ac-stage"></div>
+        </section>
+
         <!-- طبقة شاشة الاستراحة التلفزيونية الكاملة (Intermission Overlay — بدون أي تسريب للسؤال) -->
         <section id="tv-intermission-overlay" class="tv-intermission-overlay" hidden aria-live="polite">
           <div class="tv-intermission-card">
@@ -651,6 +657,8 @@
         tournamentStage: $("tv-tournament-stage"),
         mafiaScreen: $("tv-screen-mafia"),
         mafiaStage: $("tv-mafia-stage"),
+        audioChallengeScreen: $("tv-screen-audio-challenge"),
+        audioChallengeStage: $("tv-ac-stage"),
         csoloTeamName: $("tv-csolo-team-name"),
         csoloRoundPill: $("tv-csolo-round-pill"),
         csoloScore: $("tv-csolo-score"),
@@ -845,6 +853,7 @@
       if (this.dom.baraScreen) this.dom.baraScreen.hidden = screenName !== "bara-salfa";
       if (this.dom.tournamentScreen) this.dom.tournamentScreen.hidden = screenName !== "tournament";
       if (this.dom.mafiaScreen) this.dom.mafiaScreen.hidden = screenName !== "mafia";
+      if (this.dom.audioChallengeScreen) this.dom.audioChallengeScreen.hidden = screenName !== "audio-challenge";
     }
 
     _triggerConfetti(kind = "victory", theme = "default") {
@@ -1055,7 +1064,6 @@
     }
 
     _syncTVAudioUI(st) {
-      if (!this.dom.audioStage || this.dom.audioStage.hidden) return;
       const fmt =
         window.SeenJeemAudioChallengeUtils && window.SeenJeemAudioChallengeUtils.formatMmSs
           ? window.SeenJeemAudioChallengeUtils.formatMmSs
@@ -1063,6 +1071,30 @@
       const cur = Math.max(0, Number(st.currentTime) || 0);
       const dur = Math.max(0, Number(st.duration) || 0);
       const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+
+      // تحديث واجهة طور «تحدي الصوت» المستقل على التلفزيون إذا كان نشطاً
+      if (this.snapshot && this.snapshot.screen === "audio-challenge") {
+        const acViz = document.getElementById("tv-ac-visualizer");
+        const acCur = document.getElementById("tv-ac-cur-time");
+        const acDur = document.getElementById("tv-ac-dur-time");
+        const acBar = document.getElementById("tv-ac-progress-bar");
+        const acStat = document.getElementById("tv-ac-status-label");
+        const acAuto = document.getElementById("tv-ac-autoplay-btn");
+        if (acViz) acViz.classList.toggle("is-playing", Boolean(st.playing));
+        if (acCur) acCur.textContent = fmt(cur);
+        if (acDur) acDur.textContent = dur > 0 ? fmt(dur) : "--:--";
+        if (acBar) acBar.style.width = `${pct}%`;
+        if (acStat) {
+          acStat.textContent = st.autoplayBlocked
+            ? "🔇 انقر لتفعيل الصوت على شاشة التلفزيون"
+            : st.playing
+              ? "🔊 استمع جيداً للمقطع الصوتي..."
+              : "⏸️ المقطع متوقف مؤقتاً / جاهز";
+        }
+        if (acAuto) acAuto.hidden = !st.autoplayBlocked;
+      }
+
+      if (!this.dom.audioStage || this.dom.audioStage.hidden) return;
 
       if (this.dom.audioVisualizer) {
         this.dom.audioVisualizer.classList.toggle("is-playing", Boolean(st.playing));
@@ -1105,8 +1137,8 @@
       this._renderIntermissionOverlay(snap);
       this._renderWirelessOverlays(snap);
 
-      // إيقاف المقطع الصوتي تلقائياً عند مغادرة السؤال أو تفعيل الاستراحة
-      if (snap.screen !== "question" || (snap.intermission && snap.intermission.active)) {
+      // إيقاف المقطع الصوتي تلقائياً عند مغادرة السؤال وطور تحدي الصوت أو تفعيل الاستراحة
+      if ((snap.screen !== "question" && snap.screen !== "audio-challenge") || (snap.intermission && snap.intermission.active)) {
         if (window.SeenJeemAudioChallenge && window.SeenJeemAudioChallenge.getState().hasAudio) {
           window.SeenJeemAudioChallenge.stop();
         }
@@ -1142,6 +1174,9 @@
       } else if (snap.screen === "mafia" && snap.mafiaView) {
         this.lastQuestionRenderKey = "";
         this._renderMafia(snap);
+      } else if (snap.screen === "audio-challenge" && snap.audioChallengeView) {
+        this.lastQuestionRenderKey = "";
+        this._renderAudioChallenge(snap);
       } else {
         this._renderStandby(snap.setupInfo);
       }
@@ -2615,6 +2650,150 @@
       }
 
       this.dom.mafiaStage.innerHTML = html;
+    }
+
+    _renderAudioChallenge(snap) {
+      this._showOnlyScreen("audio-challenge");
+      const ac = snap.audioChallengeView;
+      if (!ac || !this.dom.audioChallengeStage) return;
+
+      const teams = Array.isArray(ac.teams) ? ac.teams : [];
+      const st = ac.audioState || {};
+      const cur = Math.max(0, Number(st.currentTime) || 0);
+      const dur = Math.max(0, Number(st.duration) || 0);
+      const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+      const fmt =
+        window.SeenJeemAudioChallengeUtils && window.SeenJeemAudioChallengeUtils.formatMmSs
+          ? window.SeenJeemAudioChallengeUtils.formatMmSs
+          : (s) => formatTime(s);
+
+      const scoresHtml =
+        !ac.freePlay && teams.length > 0
+          ? `
+            <div class="tv-ac-scores-strip">
+              ${teams
+                .map(
+                  (t, idx) => `
+                <div class="tv-ac-score-pill${ac.roundAwardedTeamIdx === idx ? " is-awarded" : ""}" style="border-color:${escapeHtml(t.color || "#22d3ee")}">
+                  <span class="tv-trn-dot" style="background:${escapeHtml(t.color || "#22d3ee")}"></span>
+                  <span>${escapeHtml(t.name)}</span>
+                  <strong>${Number(t.score) || 0}</strong>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          `
+          : "";
+
+      let html = "";
+      if (ac.phase === "setup") {
+        html = `
+          <div class="tv-bara-card tv-ac-card">
+            <div class="tv-side-mode-tag">🎵 طور تحدي الصوت المستقل</div>
+            <h1 class="tv-bara-title">استعدوا لتحدي المقاطع الصوتية!</h1>
+            <p class="tv-bara-sub">جاري تجهيز المقاطع والفرق على جهاز المقدّم — أنصتوا جيداً!</p>
+          </div>
+        `;
+      } else if (ac.phase === "summary" && ac.summary) {
+        const sm = ac.summary;
+        const standings = Array.isArray(sm.standings) ? sm.standings : [];
+        if (this._lastAcConfettiKey !== `${sm.totalPlayed}:${sm.winnerName || ""}`) {
+          this._lastAcConfettiKey = `${sm.totalPlayed}:${sm.winnerName || ""}`;
+          this._triggerConfetti("victory", "default");
+        }
+        html = `
+          <div class="tv-bara-card tv-ac-card">
+            <div class="tv-side-mode-tag">🏆 نهاية تحدي الصوت (${sm.totalPlayed} مقاطع)</div>
+            <div class="tv-mafia-moon">🎵🏆</div>
+            <h1 class="tv-bara-title">${ac.freePlay ? "جولة صوتية رائعة!" : sm.isDraw ? "تعادل مثير في القمة!" : `الفائز: ${escapeHtml(sm.winnerName || "—")}`}</h1>
+            ${
+              !ac.freePlay
+                ? `
+                  <div class="tv-bara-standings">
+                    ${standings
+                      .map(
+                        (t, idx) => `
+                      <div class="tv-bara-standing-row${idx === 0 ? " is-first" : ""}">
+                        <span>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`} ${escapeHtml(t.name)}</span>
+                        <strong>${t.score} نقطة</strong>
+                      </div>
+                    `
+                      )
+                      .join("")}
+                  </div>
+                `
+                : ""
+            }
+          </div>
+        `;
+      } else {
+        const isProg = ac.playbackMode === "progressive";
+        const stageMeter = isProg
+          ? `
+            <div class="tv-ac-prog-meter">
+              <span class="tv-ac-prog-step${ac.progressiveStage === 0 ? " is-now" : ac.progressiveStage > 0 ? " is-passed" : ""}">3ث • +300</span>
+              <span>⬅️</span>
+              <span class="tv-ac-prog-step${ac.progressiveStage === 1 ? " is-now" : ac.progressiveStage > 1 ? " is-passed" : ""}">7ث • +200</span>
+              <span>⬅️</span>
+              <span class="tv-ac-prog-step${ac.progressiveStage === 2 ? " is-now" : ""}">كامل • +100</span>
+            </div>
+          `
+          : !ac.freePlay
+            ? `<div class="tv-ac-pts-badge">⚡ قيمة الجولة: +${Number(ac.currentPoints) || 100} نقطة</div>`
+            : "";
+
+        html = `
+          <div class="tv-bara-card tv-ac-card">
+            <div class="tv-ac-header-row">
+              <span class="tv-side-mode-tag">🎵 تحدي الصوت — الجولة ${ac.roundNumber || 1} / ${ac.totalRounds || 1}</span>
+              <span class="tv-q-cat-pill"><span>${escapeHtml(ac.categoryIcon || "🎵")}</span><span>${escapeHtml(ac.categoryName || "")}</span></span>
+            </div>
+            ${scoresHtml}
+            ${stageMeter}
+
+            <div class="tv-audio-card tv-ac-viz-card">
+              <div id="tv-ac-visualizer" class="tv-audio-visualizer${st.playing ? " is-playing" : ""}" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div id="tv-ac-status-label" class="tv-audio-status-label">
+                ${st.autoplayBlocked ? "🔇 انقر لتفعيل الصوت على شاشة التلفزيون" : st.playing ? "🔊 استمع جيداً للمقطع الصوتي..." : "⏸️ المقطع جاهز / متوقف مؤقتاً"}
+              </div>
+              <div class="tv-audio-progress-wrap">
+                <span id="tv-ac-cur-time" class="tv-audio-time">${fmt(cur)}</span>
+                <div class="tv-audio-progress-track">
+                  <div id="tv-ac-progress-bar" class="tv-audio-progress-bar" style="width:${pct}%"></div>
+                </div>
+                <span id="tv-ac-dur-time" class="tv-audio-time">${dur > 0 ? fmt(dur) : "--:--"}</span>
+              </div>
+              <button type="button" id="tv-ac-autoplay-btn" class="btn btn-amber btn-lg tv-audio-autoplay-banner" ${st.autoplayBlocked ? "" : "hidden"}>
+                🔊 انقر هنا لتفعيل الصوت على شاشة التلفزيون
+              </button>
+            </div>
+
+            ${
+              ac.phase === "revealed" && ac.revealedAnswer
+                ? `
+                  <div class="tv-ac-answer-reveal">
+                    <div class="tv-ac-answer-eyebrow">✅ الإجابة الصحيحة</div>
+                    <h2 class="tv-ac-answer-text">${escapeHtml(ac.revealedAnswer)}</h2>
+                    ${ac.revealedExplanation ? `<p class="tv-ac-answer-exp">${escapeHtml(ac.revealedExplanation)}</p>` : ""}
+                    ${ac.revealedAnswerImage ? `<img src="${escapeHtml(ac.revealedAnswerImage)}" class="tv-answer-img tv-ac-answer-img" alt="صورة الإجابة" />` : ""}
+                  </div>
+                `
+                : ""
+            }
+          </div>
+        `;
+      }
+
+      this.dom.audioChallengeStage.innerHTML = html;
+      const autoBtn = document.getElementById("tv-ac-autoplay-btn");
+      if (autoBtn) {
+        autoBtn.addEventListener("click", () => {
+          if (window.SeenJeemAudioChallenge) window.SeenJeemAudioChallenge.play();
+        });
+      }
     }
   }
 

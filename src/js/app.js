@@ -7499,6 +7499,11 @@
       typeof window.SeenJeemMafia.isOpen === "function" &&
       window.SeenJeemMafia.isOpen()
     );
+    const isAudioChallengeOpen = Boolean(
+      window.SeenJeemAudioChallengeMode &&
+      typeof window.SeenJeemAudioChallengeMode.isOpen === "function" &&
+      window.SeenJeemAudioChallengeMode.isOpen()
+    );
     const isTournamentOpen = Boolean(
       window.SeenJeemTournament &&
       typeof window.SeenJeemTournament.isOpen === "function" &&
@@ -7525,7 +7530,9 @@
 
     let screen = "setup";
     let customWinnerView = null;
-    if (isMafiaOpen) {
+    if (isAudioChallengeOpen) {
+      screen = "audio-challenge";
+    } else if (isMafiaOpen) {
       screen = "mafia";
     } else if (isBaraOpen) {
       screen = "bara-salfa";
@@ -7558,6 +7565,15 @@
       screen = "board";
     }
 
+    const acPayload =
+      screen === "audio-challenge" &&
+      window.SeenJeemAudioChallengeMode &&
+      typeof window.SeenJeemAudioChallengeMode.buildSanitizedDisplayPayload === "function"
+        ? window.SeenJeemAudioChallengeMode.buildSanitizedDisplayPayload()
+        : null;
+    const effectiveTeams =
+      acPayload && Array.isArray(acPayload.teams) && acPayload.teams.length > 0 ? acPayload.teams : state.teams;
+
     const setupNames = getSetupTeamNames();
     const snapshot = {
       screen,
@@ -7567,7 +7583,7 @@
         teamNames: setupNames,
         selectedCount: state.selectedCategoryIds.length
       },
-      teams: state.teams,
+      teams: effectiveTeams,
       activeTurn: state.activeTurn,
       doubleArmed: state.doubleArmed,
       remainingPlayable: countRemainingPlayableQuestions(),
@@ -7642,6 +7658,7 @@
         typeof window.SeenJeemMafia.buildSanitizedDisplayPayload === "function"
           ? window.SeenJeemMafia.buildSanitizedDisplayPayload()
           : null,
+      audioChallengeView: acPayload,
       tournamentView:
         screen === "tournament" &&
         window.SeenJeemTournament &&
@@ -9980,6 +9997,9 @@
       } else if (customPayload && customPayload.cardType === "mafia" && typeof resultCardGen.generateMafiaResultCard === "function") {
         state.currentResultCardPrefix = "mafia-result";
         canvas = await resultCardGen.generateMafiaResultCard(customPayload.sessionData, state.theme);
+      } else if (customPayload && customPayload.cardType === "audio-challenge" && typeof resultCardGen.generateAudioChallengeResultCard === "function") {
+        state.currentResultCardPrefix = "audio-challenge-result";
+        canvas = await resultCardGen.generateAudioChallengeResultCard(customPayload.sessionData, state.theme);
       } else if (customPayload && customPayload.cardType === "tournament" && typeof resultCardGen.generateTournamentResultCard === "function") {
         state.currentResultCardPrefix = "seen-jeem-tournament";
         canvas = await resultCardGen.generateTournamentResultCard(customPayload.tournamentData, state.theme);
@@ -12231,6 +12251,15 @@
       priv.finalAnswer = state.finalRound.question.answer || "";
     }
 
+    if (
+      window.SeenJeemAudioChallengeMode &&
+      typeof window.SeenJeemAudioChallengeMode.isOpen === "function" &&
+      window.SeenJeemAudioChallengeMode.isOpen() &&
+      typeof window.SeenJeemAudioChallengeMode.buildHostPrivatePayload === "function"
+    ) {
+      priv.audioChallenge = window.SeenJeemAudioChallengeMode.buildHostPrivatePayload();
+    }
+
     return priv;
   }
 
@@ -12400,6 +12429,14 @@
     if (wasOpen) {
       if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playBuzzerWin === "function") {
         window.SeenJeemAudio.playBuzzerWin();
+      }
+      if (
+        window.SeenJeemAudioChallengeMode &&
+        typeof window.SeenJeemAudioChallengeMode.isOpen === "function" &&
+        window.SeenJeemAudioChallengeMode.isOpen() &&
+        typeof window.SeenJeemAudioChallengeMode.onWirelessBuzz === "function"
+      ) {
+        window.SeenJeemAudioChallengeMode.onWirelessBuzz(state.wireless.buzzer);
       }
       showToast(`🔔 الأسرع بالجرس: ${state.wireless.buzzer.winnerTeamName}!`, "success");
     }
@@ -12574,6 +12611,14 @@
         break;
       case "AUDIO_SEEK":
         sendAudioChallengeAction("SEEK", { seconds: Number(p.seconds) || 0 });
+        break;
+      case "AUDIO_CHALLENGE_MODE_ACTION":
+        if (
+          window.SeenJeemAudioChallengeMode &&
+          typeof window.SeenJeemAudioChallengeMode.handleRemoteCommand === "function"
+        ) {
+          window.SeenJeemAudioChallengeMode.handleRemoteCommand(p);
+        }
         break;
       case "TOGGLE_JOIN_LOCK":
         toggleWirelessJoinLock();
@@ -14092,14 +14137,26 @@
       return;
     }
 
-    // جسر خفيف يسمح لوحدتي «برا السالفة» و«المافيا» و«نظام البطولة» بإرسال مشاهد التلفزيون وبطاقة النتيجة وإطلاق المباريات دون المساس بمنطق سين جيم
+    // جسر خفيف يسمح لوحدات «برا السالفة» و«المافيا» و«تحدي الصوت» و«نظام البطولة» بالوصول المنظّم لمشاهد التلفزيون والغرفة اللاسلكية وبطاقة النتيجة
     window.SeenJeemHostBridge = {
-      broadcastTV: () => broadcastLiveDisplayState({ skipWireless: true }),
+      broadcastTV: (opts = { skipWireless: true }) =>
+        broadcastLiveDisplayState(opts && typeof opts === "object" ? opts : { skipWireless: true }),
       triggerConfetti: (kind = "victory", theme = "default") => startVictoryConfetti(kind, theme),
       showToast: (msg, type = "info") => showToast(msg, type),
       openTVDisplayWindow: () => openTVDisplayWindow(),
+      openWirelessRoomModal: () => openWirelessRoomModal(),
+      openSpeedBuzzer: () => openSpeedBuzzer(),
+      lockSpeedBuzzer: () => lockSpeedBuzzer(),
+      isDualScreenConnected: () => Boolean(state.dualScreen && state.dualScreen.connected),
+      getWirelessInfo: () => ({
+        active: Boolean(state.wireless && state.wireless.active),
+        roomCode: (state.wireless && state.wireless.roomCode) || "",
+        buzzer: state.wireless && state.wireless.buzzer ? { ...state.wireless.buzzer } : null
+      }),
+      getAllCategories: () => (Array.isArray(state.allCategories) ? state.allCategories : []),
       openBaraResultCard: (sessionData) => openResultCardModal({ cardType: "bara-salfa", sessionData }),
       openMafiaResultCard: (sessionData) => openResultCardModal({ cardType: "mafia", sessionData }),
+      openAudioChallengeResultCard: (sessionData) => openResultCardModal({ cardType: "audio-challenge", sessionData }),
       openTournamentResultCard: (tournamentData) => openResultCardModal({ cardType: "tournament", tournamentData }),
       refreshCustomPacks: () => refreshCustomPacksFromStore(),
       onCloudDataApplied: ({ silent } = {}) => {
@@ -14160,6 +14217,11 @@
     if (btnLaunchMafia && window.SeenJeemMafia) {
       window.SeenJeemMafia.init();
       btnLaunchMafia.addEventListener("click", () => window.SeenJeemMafia.open());
+    }
+    const btnLaunchAudioChallenge = document.getElementById("btn-launch-audio-challenge");
+    if (btnLaunchAudioChallenge && window.SeenJeemAudioChallengeMode) {
+      window.SeenJeemAudioChallengeMode.init();
+      btnLaunchAudioChallenge.addEventListener("click", () => window.SeenJeemAudioChallengeMode.open());
     }
     const btnLaunchTournament = document.getElementById("btn-launch-tournament");
     if (btnLaunchTournament && window.SeenJeemTournament) {
@@ -14239,6 +14301,15 @@
         if (msg && msg.type === "SYNC_REQUEST") {
           broadcastLiveDisplayState();
         } else if (msg && msg.type === "AUDIO_CHALLENGE_STATUS" && msg.payload) {
+          if (
+            window.SeenJeemAudioChallengeMode &&
+            typeof window.SeenJeemAudioChallengeMode.isOpen === "function" &&
+            window.SeenJeemAudioChallengeMode.isOpen() &&
+            typeof window.SeenJeemAudioChallengeMode.onDisplayAudioStatus === "function"
+          ) {
+            window.SeenJeemAudioChallengeMode.onDisplayAudioStatus(msg.payload);
+            return;
+          }
           const prevPlaying = Boolean(state.audioChallenge.status && state.audioChallenge.status.playing);
           state.audioChallenge.status = { ...state.audioChallenge.status, ...msg.payload };
           renderAudioChallengeHostUI();

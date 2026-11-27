@@ -162,6 +162,13 @@
             <span>الراوي الآلي بالهواتف والتلفزيون (4–16 لاعباً)</span>
           </div>
         </button>
+        <button type="button" id="btn-launch-audio-challenge" class="mode-launch-card mode-audio-challenge">
+          <span class="mode-launch-icon" aria-hidden="true">🎵</span>
+          <div class="mode-launch-text">
+            <strong>تحدي الصوت</strong>
+            <span>مقاطع متتالية بتدرّج زمني (3ث ← 7ث ← كامل) وجرس السرعة</span>
+          </div>
+        </button>
         <button type="button" id="btn-launch-tournament" class="mode-launch-card mode-tournament">
           <span class="mode-launch-icon" aria-hidden="true">🏆</span>
           <div class="mode-launch-text">
@@ -3020,6 +3027,35 @@
   </div>
 
   <!-- =========================================================
+       نافذة طور «تحدي الصوت» المستقل (Standalone Audio Challenge Mode - Pack 15)
+       ========================================================= -->
+  <div id="audio-challenge-modal" class="modal-overlay audio-challenge-overlay" role="dialog" aria-modal="true" aria-labelledby="ac-modal-title" aria-hidden="true">
+    <div class="modal-card audio-challenge-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="ac-modal-title" class="bank-modal-title">
+            <span>🎵</span>
+            طور «تحدي الصوت» المستقل
+          </h2>
+          <p class="bank-sources-summary">
+            مقاطع صوتية متتالية من بنك الأسئلة والفئات الخاصة أو ملفات جهازك مباشرةً — مع التدرّج الزمني (3ث ← 7ث ← كامل) وجرس السرعة!
+          </p>
+        </div>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-ac-open-wireless" class="btn btn-secondary btn-xs" title="فتح الغرفة اللاسلكية لجرس السرعة وريموت المقدّم">
+            📡 جرس السرعة
+          </button>
+          <button type="button" id="btn-ac-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
+            📺 التلفزيون
+          </button>
+          <button type="button" id="btn-close-audio-challenge" class="q-modal-close-btn" aria-label="إغلاق طور تحدي الصوت">✕</button>
+        </div>
+      </div>
+      <div id="audio-challenge-body" class="bank-modal-scroll-body audio-challenge-body"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
        نافذة نظام البطولات والدوري (Tournament & League Mode - Pack 11)
        ========================================================= -->
   <div id="tournament-modal" class="modal-overlay tournament-overlay" role="dialog" aria-modal="true" aria-labelledby="tournament-modal-title" aria-hidden="true">
@@ -3103,6 +3139,7 @@
   <script src="src/js/baraSalfaPlayerView.js"></script>
   <script src="src/js/mafiaMode.js"></script>
   <script src="src/js/mafiaPlayerView.js"></script>
+  <script src="src/js/audioChallengeMode.js"></script>
   <script src="src/js/tournamentMode.js"></script>
   <script src="src/js/customPackBuilder.js"></script>
   <script src="src/js/app.js"></script>
