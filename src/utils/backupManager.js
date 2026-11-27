@@ -27,6 +27,7 @@
     BARA_STATS: "bara-salfa-stats-v1",
     MAFIA_STATS: "mafia-stats-v1",
     AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
+    FAVORITE_CATEGORIES: "seen-jeem-favorites-v1",
     TOURNAMENT: "seen-jeem-tournament-v1"
   });
 
@@ -76,6 +77,10 @@
         ? window.SeenJeemArchiveStore.getAllMafiaSessions()
         : safeReadJSON(KEYS.MAFIA_STATS, []);
     const audioChallengeHistory = safeReadJSON(KEYS.AUDIO_CHALLENGE_HISTORY, []);
+    const favoriteCategories =
+      window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.loadFavorites === "function"
+        ? window.SeenJeemCategoryBrowser.loadFavorites()
+        : safeReadJSON(KEYS.FAVORITE_CATEGORIES, []);
     const activeTournament = safeReadJSON(KEYS.TOURNAMENT, null);
     const matchSettings = window.SeenJeemMatchStore
       ? window.SeenJeemMatchStore.loadSavedSettings()
@@ -154,6 +159,7 @@
         baraSalfaStats: Array.isArray(baraSalfaStats) ? baraSalfaStats : [],
         mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
         audioChallengeHistory: Array.isArray(audioChallengeHistory) ? audioChallengeHistory : [],
+        favoriteCategories: Array.isArray(favoriteCategories) ? favoriteCategories : [],
         activeTournament: activeTournament && typeof activeTournament === "object" ? activeTournament : null,
         matchSettings,
         preferences: {
@@ -387,6 +393,15 @@
       } else {
         const cur = safeReadJSON(KEYS.AUDIO_CHALLENGE_HISTORY, []);
         safeWriteJSON(KEYS.AUDIO_CHALLENGE_HISTORY, Array.from(new Set([...(Array.isArray(cur) ? cur : []), ...incoming])));
+      }
+    }
+    if (Array.isArray(d.favoriteCategories)) {
+      if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.importFavorites === "function") {
+        window.SeenJeemCategoryBrowser.importFavorites(d.favoriteCategories, isReplace ? "replace" : "merge");
+      } else {
+        const incFavs = d.favoriteCategories.filter((x) => typeof x === "string" && x.trim());
+        const curFavs = isReplace ? [] : safeReadJSON(KEYS.FAVORITE_CATEGORIES, []);
+        safeWriteJSON(KEYS.FAVORITE_CATEGORIES, Array.from(new Set([...(Array.isArray(curFavs) ? curFavs : []), ...incFavs])));
       }
     }
     if (d.activeTournament && typeof d.activeTournament === "object") {

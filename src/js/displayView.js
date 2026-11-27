@@ -1251,13 +1251,17 @@
 
           const card = document.createElement("div");
           card.className = `tv-team-card team-${idx + 1}-card${isTurn ? " active-turn" : ""}`;
+          if (team.color) {
+            card.style.setProperty("--team-accent", team.color);
+          }
           card.innerHTML = `
+            ${isTurn ? `<div class="tv-active-turn-pointer">🎯 الدور الآن</div>` : ""}
             <div class="tv-team-top">
               <div class="tv-team-id">
-                <span class="team-badge-dot team-${idx + 1}-dot"></span>
+                <span class="team-badge-dot team-${idx + 1}-dot" style="${team.color ? `background:${escapeHtml(team.color)};box-shadow:0 0 10px ${escapeHtml(team.color)}` : ""}"></span>
                 <h2 class="tv-team-name">${escapeHtml(team.name)}</h2>
               </div>
-              <span class="tv-turn-pill">الدور الآن</span>
+              <span class="tv-turn-pill">🎯 الدور الآن</span>
             </div>
             <div class="tv-team-bottom">
               <div class="tv-team-score${didScoreChange ? " score-pop" : ""}">${team.score}</div>
@@ -1287,11 +1291,11 @@
             [bc.rightColumn[i], bc.leftColumn[i]].forEach((slot) => {
               if (!slot) return;
               const winCls =
-                slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 4
+                slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 6
                   ? ` won-team-${slot.winnerTeam}`
                   : "";
               const cls = `tv-point-tile pts-${slot.points}${slot.played ? " played" : ""}${winCls}`;
-              tilesHtml += `<div class="${cls}">${slot.points}</div>`;
+              tilesHtml += `<div class="${cls}">${slot.played ? `<span class="tile-played-check" aria-hidden="true">✓</span>` : ""}<span>${slot.points}</span></div>`;
             });
           }
 

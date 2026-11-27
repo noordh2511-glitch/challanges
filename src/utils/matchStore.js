@@ -34,7 +34,7 @@
     stealTimerSeconds: 15 // 10 | 15 | 20
   });
 
-  const VALID_TEAM_COUNTS = new Set([2, 3, 4]);
+  const VALID_TEAM_COUNTS = new Set([2, 3, 4, 5, 6]);
   const VALID_FINAL_ROUND_MODES = new Set(["tie-only", "always", "off"]);
   const VALID_DAILY_DOUBLE_COUNTS = new Set([0, 1, 2]);
   const VALID_MAIN_TIMERS = new Set([0, 30, 45, 60, 90]);
@@ -199,9 +199,15 @@
       swapLeft = defaultSwap;
     }
 
+    const color =
+      typeof rawTeam.color === "string" && /^#[0-9a-f]{3,8}$/i.test(rawTeam.color.trim())
+        ? rawTeam.color.trim()
+        : "";
+
     return {
       id,
       name,
+      color,
       score,
       powerups: {
         doubleLeft,

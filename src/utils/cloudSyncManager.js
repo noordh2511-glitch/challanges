@@ -23,6 +23,7 @@
     BARA_CUSTOM: "bara-salfa-custom-v1",
     MAFIA_STATS: "mafia-stats-v1",
     AUDIO_CHALLENGE_HISTORY: "audio-challenge-history-v1",
+    FAVORITE_CATEGORIES: "seen-jeem-favorites-v1",
     FLAGGED: "seen-jeem-flagged-v1",
     TOURNAMENT: "seen-jeem-tournament-v1",
     THEME: "seen_jeem_theme_v1",
@@ -97,6 +98,10 @@
     const baraSalfaHistory = safeReadJSON(LOCAL_KEYS.BARA_HISTORY, {});
     const baraSalfaCustom = safeReadJSON(LOCAL_KEYS.BARA_CUSTOM, []);
     const audioChallengeHistory = safeReadJSON(LOCAL_KEYS.AUDIO_CHALLENGE_HISTORY, []);
+    const favoriteCategories =
+      window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.loadFavorites === "function"
+        ? window.SeenJeemCategoryBrowser.loadFavorites()
+        : safeReadJSON(LOCAL_KEYS.FAVORITE_CATEGORIES, []);
     const flaggedQuestions =
       window.SeenJeemFlaggedStore && typeof window.SeenJeemFlaggedStore.getAll === "function"
         ? window.SeenJeemFlaggedStore.getAll()
@@ -120,6 +125,9 @@
       mafiaStats: Array.isArray(mafiaStats) ? mafiaStats : [],
       audioChallengeHistory: Array.isArray(audioChallengeHistory)
         ? audioChallengeHistory.filter((x) => typeof x === "string" && x.trim())
+        : [],
+      favoriteCategories: Array.isArray(favoriteCategories)
+        ? Array.from(new Set(favoriteCategories.filter((x) => typeof x === "string" && x.trim())))
         : [],
       baraSalfaHistory:
         baraSalfaHistory && typeof baraSalfaHistory === "object" && !Array.isArray(baraSalfaHistory)
@@ -323,6 +331,14 @@
           ].filter((x) => typeof x === "string" && x.trim())
         )
       ).slice(-500),
+      favoriteCategories: Array.from(
+        new Set(
+          [
+            ...(Array.isArray(cloud.favoriteCategories) ? cloud.favoriteCategories : []),
+            ...(Array.isArray(local.favoriteCategories) ? local.favoriteCategories : [])
+          ].filter((x) => typeof x === "string" && x.trim())
+        )
+      ),
       baraSalfaHistory: mergeBaraHistory(local.baraSalfaHistory, cloud.baraSalfaHistory),
       baraSalfaCustom: mergeBaraCustomCategories(local.baraSalfaCustom, cloud.baraSalfaCustom),
       flaggedQuestions: mergeFlaggedQuestions(local.flaggedQuestions, cloud.flaggedQuestions),
@@ -373,6 +389,16 @@
         LOCAL_KEYS.AUDIO_CHALLENGE_HISTORY,
         payload.audioChallengeHistory.filter((x) => typeof x === "string" && x.trim())
       );
+    }
+    if (Array.isArray(payload.favoriteCategories)) {
+      if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.importFavorites === "function") {
+        window.SeenJeemCategoryBrowser.importFavorites(payload.favoriteCategories, "replace");
+      } else {
+        safeWriteJSON(
+          LOCAL_KEYS.FAVORITE_CATEGORIES,
+          Array.from(new Set(payload.favoriteCategories.filter((x) => typeof x === "string" && x.trim())))
+        );
+      }
     }
     if (payload.baraSalfaHistory && typeof payload.baraSalfaHistory === "object") {
       safeWriteJSON(LOCAL_KEYS.BARA_HISTORY, payload.baraSalfaHistory);

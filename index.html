@@ -245,7 +245,7 @@
           </button>
           <div class="sj-subpage-title">
             <span>🎯</span>
-            <strong>إعداد جولة «سين جيم» الكلاسيكية</strong>
+            <strong>إعداد جولة «سين جيم»</strong>
           </div>
           <div class="sj-subpage-actions">
             <button type="button" id="btn-open-wireless-setup" class="btn btn-secondary btn-xs" title="ربط هواتف الفرق وجرس السرعة">
@@ -259,572 +259,505 @@
           </div>
         </div>
 
-      <!-- إدخال عدد وأسماء الفرق (2 إلى 4 فرق - Phase 4 Pack 5) -->
-      <section class="panel teams-setup-panel" aria-label="إعداد الفرق">
-        <div class="panel-header teams-panel-header">
-          <h2 class="panel-title">
-            <span class="panel-icon">👥</span>
-            الفرق المتنافسة
-          </h2>
-          <div id="team-count-selector" class="team-count-selector" role="group" aria-label="اختيار عدد الفرق">
-            <button type="button" class="team-count-pill active" data-team-count="2" aria-pressed="true">2 فرق</button>
-            <button type="button" class="team-count-pill" data-team-count="3" aria-pressed="false">3 فرق</button>
-            <button type="button" class="team-count-pill" data-team-count="4" aria-pressed="false">4 فرق</button>
-          </div>
-        </div>
-        <div id="teams-inputs-grid" class="teams-inputs-grid" data-team-count="2">
-          <div class="team-input-card team-1-accent" data-team-slot="0">
-            <label for="team1-input" class="input-label">
-              <span class="team-color-dot team-1-dot"></span>
-              اسم الفريق الأول
-            </label>
-            <input
-              type="text"
-              id="team1-input"
-              class="text-input team-name-input"
-              data-team-idx="0"
-              placeholder="مثال: فريق الصقور"
-              value="الفريق الأول"
-              maxlength="24"
-              autocomplete="off"
-            />
-          </div>
-
-          <div id="teams-vs-divider" class="vs-divider" aria-hidden="true">VS</div>
-
-          <div class="team-input-card team-2-accent" data-team-slot="1">
-            <label for="team2-input" class="input-label">
-              <span class="team-color-dot team-2-dot"></span>
-              اسم الفريق الثاني
-            </label>
-            <input
-              type="text"
-              id="team2-input"
-              class="text-input team-name-input"
-              data-team-idx="1"
-              placeholder="مثال: فريق النجوم"
-              value="الفريق الثاني"
-              maxlength="24"
-              autocomplete="off"
-            />
-          </div>
-
-          <div id="team-input-card-3" class="team-input-card team-3-accent" data-team-slot="2" hidden>
-            <label for="team3-input" class="input-label">
-              <span class="team-color-dot team-3-dot"></span>
-              اسم الفريق الثالث
-            </label>
-            <input
-              type="text"
-              id="team3-input"
-              class="text-input team-name-input"
-              data-team-idx="2"
-              placeholder="مثال: فريق الزمرد"
-              value="الفريق الثالث"
-              maxlength="24"
-              autocomplete="off"
-            />
-          </div>
-
-          <div id="team-input-card-4" class="team-input-card team-4-accent" data-team-slot="3" hidden>
-            <label for="team4-input" class="input-label">
-              <span class="team-color-dot team-4-dot"></span>
-              اسم الفريق الرابع
-            </label>
-            <input
-              type="text"
-              id="team4-input"
-              class="text-input team-name-input"
-              data-team-idx="3"
-              placeholder="مثال: فريق الملوك"
-              value="الفريق الرابع"
-              maxlength="24"
-              autocomplete="off"
-            />
-          </div>
-        </div>
-      </section>
-
-      <!-- تخصيص وسائل المساعدة واللعب التكتيكي (قابل للطي - Phase 4 Pack 2) -->
-      <section id="tactical-setup-panel" class="panel tactical-setup-panel" aria-label="تخصيص وسائل المساعدة واللعب التكتيكي">
-        <button
-          type="button"
-          id="btn-toggle-tactical-panel"
-          class="tactical-collapse-trigger"
-          aria-expanded="false"
-          aria-controls="tactical-panel-body"
-        >
-          <div class="tactical-trigger-main">
-            <span class="panel-title tactical-panel-title">
-              <span class="panel-icon">⚡</span>
-              وسائل المساعدة وإعدادات الجلسة
-            </span>
-            <div id="tactical-summary-pills" class="tactical-summary-pills">
-              <!-- يتم تحديث ملخص الإعدادات النشطة ديناميكياً -->
-            </div>
-          </div>
-          <span class="tactical-chevron" aria-hidden="true">▾</span>
-        </button>
-
-        <div id="tactical-panel-body" class="tactical-panel-body" hidden>
-          <div class="tactical-cards-grid">
-            <!-- أ) كشف التلميح مقابل خصم نقاط -->
-            <div id="tactical-card-hint" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">💡</span>
-                  <div>
-                    <h3 class="tactical-card-title">كشف التلميح مقابل خصم</h3>
-                    <p class="tactical-card-sub">متاح للأسئلة التي تضم تلميحاً قبل كشف الإجابة</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="toggle-hint-enabled"
-                  class="tactical-switch active"
-                  role="switch"
-                  aria-checked="true"
-                  aria-label="تفعيل أو تعطيل كشف التلميح"
-                >
-                  <span class="tactical-switch-thumb"></span>
-                </button>
-              </div>
-              <div class="tactical-options-group" id="hint-options-group">
-                <span class="tactical-opt-label">نسبة الخصم من قيمة السؤال:</span>
-                <div class="tactical-pills-row" role="group" aria-label="نسبة خصم التلميح">
-                  <button type="button" class="tactical-opt-btn active" data-setting="hintPenalty" data-value="0.25">25% (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0.5">50%</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0">0% (مجاني)</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ب) مضاعفة النقاط (2x) -->
-            <div id="tactical-card-double" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">⚡</span>
-                  <div>
-                    <h3 class="tactical-card-title">مضاعفة النقاط (2x)</h3>
-                    <p class="tactical-card-sub">تُفعَّل من لوحة اللعب قبل اختيار السؤال فقط</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="toggle-double-enabled"
-                  class="tactical-switch active"
-                  role="switch"
-                  aria-checked="true"
-                  aria-label="تفعيل أو تعطيل مضاعفة النقاط"
-                >
-                  <span class="tactical-switch-thumb"></span>
-                </button>
-              </div>
-              <div class="tactical-options-group" id="double-options-group">
-                <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
-                <div class="tactical-pills-row" role="group" aria-label="رصيد مضاعفة النقاط لكل فريق">
-                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="0">0</button>
-                  <button type="button" class="tactical-opt-btn active" data-setting="doubleCount" data-value="1">1 (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="2">2</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="3">3</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ج) تبديل السؤال (Swap) -->
-            <div id="tactical-card-swap" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">🔄</span>
-                  <div>
-                    <h3 class="tactical-card-title">تبديل السؤال (Swap)</h3>
-                    <p class="tactical-card-sub">استبدال السؤال بآخر جديد من نفس الفئة والصعوبة</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="toggle-swap-enabled"
-                  class="tactical-switch active"
-                  role="switch"
-                  aria-checked="true"
-                  aria-label="تفعيل أو تعطيل تبديل السؤال"
-                >
-                  <span class="tactical-switch-thumb"></span>
-                </button>
-              </div>
-              <div class="tactical-options-group" id="swap-options-group">
-                <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
-                <div class="tactical-pills-row" role="group" aria-label="رصيد تبديل السؤال لكل فريق">
-                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="0">0</button>
-                  <button type="button" class="tactical-opt-btn active" data-setting="swapCount" data-value="1">1 (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="2">2</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="3">3</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- د) فرصة السرقة (Steal Mode) -->
-            <div id="tactical-card-steal" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">🔥</span>
-                  <div>
-                    <h3 class="tactical-card-title">فرصة السرقة (Steal Mode)</h3>
-                    <p class="tactical-card-sub">منح المنافس فرصة خطف النقاط عند الإجابة الخاطئة (بدون 2x)</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="toggle-steal-enabled"
-                  class="tactical-switch active"
-                  role="switch"
-                  aria-checked="true"
-                  aria-label="تفعيل أو تعطيل فرصة السرقة"
-                >
-                  <span class="tactical-switch-thumb"></span>
-                </button>
-              </div>
-              <div class="tactical-options-group" id="steal-options-group">
-                <div class="tactical-subrow">
-                  <span class="tactical-opt-label">نسبة نقاط السرقة:</span>
-                  <div class="tactical-pills-row" role="group" aria-label="نسبة نقاط السرقة">
-                    <button type="button" class="tactical-opt-btn active" data-setting="stealMultiplier" data-value="0.5">50% (افتراضي)</button>
-                    <button type="button" class="tactical-opt-btn" data-setting="stealMultiplier" data-value="1">100%</button>
-                  </div>
-                </div>
-                <div class="tactical-subrow">
-                  <span class="tactical-opt-label">مؤقت السرقة:</span>
-                  <div class="tactical-pills-row" role="group" aria-label="مدة مؤقت السرقة">
-                    <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="10">10 ثوانٍ</button>
-                    <button type="button" class="tactical-opt-btn active" data-setting="stealTimerSeconds" data-value="15">15 ثانية (افتراضي)</button>
-                    <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="20">20 ثانية</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- هـ) المؤقت العام للأسئلة (Phase 4 Pack 4) -->
-            <div id="tactical-card-main-timer" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">⏱️</span>
-                  <div>
-                    <h3 class="tactical-card-title">المؤقت العام للأسئلة</h3>
-                    <p class="tactical-card-sub">مدة التفكير للأسئلة العادية والبصرية (يُحفظ تلقائياً مع المباراة)</p>
-                  </div>
-                </div>
-              </div>
-              <div class="tactical-options-group" id="main-timer-options-group">
-                <span class="tactical-opt-label">المدة الافتراضية لكل سؤال:</span>
-                <div class="tactical-pills-row" role="group" aria-label="مدة المؤقت العام للأسئلة">
-                  <button type="button" class="tactical-opt-btn active" data-setting="mainTimerSeconds" data-value="0">معطّل (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="30">30ث</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="45">45ث</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="60">60ث</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- و) إبقاء الشاشة مضاءة (Screen Wake Lock - Phase 4 Pack 4) -->
-            <div id="tactical-card-wakelock" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">☀️</span>
-                  <div>
-                    <h3 class="tactical-card-title">إبقاء الشاشة مضاءة (Wake Lock)</h3>
-                    <p class="tactical-card-sub">يمنع خفوت أو إطفاء الشاشة تلقائياً أثناء اللعب وعرض التلفزيون</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="toggle-wakelock-enabled"
-                  class="tactical-switch active"
-                  role="switch"
-                  aria-checked="true"
-                  aria-label="تفعيل أو تعطيل منع إطفاء الشاشة"
-                >
-                  <span class="tactical-switch-thumb"></span>
-                </button>
-              </div>
-              <div class="tactical-options-group">
-                <span id="wakelock-status-note" class="tactical-opt-label">مفعّل تلقائياً أثناء لوحة اللعب وشاشة التلفزيون</span>
-              </div>
-            </div>
-
-            <!-- ز) جولة الرهان النهائي وكسر التعادل (Phase 4 Pack 5) -->
-            <div id="tactical-card-final-round" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">⚔️</span>
-                  <div>
-                    <h3 class="tactical-card-title">جولة الرهان النهائي</h3>
-                    <p class="tactical-card-sub">سؤال حسم ختامي برهان سري من 0 حتى الحد الأقصى العادل لكل فريق</p>
-                  </div>
-                </div>
-              </div>
-              <div class="tactical-options-group" id="final-round-options-group">
-                <span class="tactical-opt-label">توقيت تفعيل الجولة النهائية:</span>
-                <div class="tactical-pills-row" role="group" aria-label="إعداد جولة الرهان النهائي">
-                  <button type="button" class="tactical-opt-btn active" data-setting="finalRoundMode" data-value="tie-only">تلقائياً عند التعادل (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="always">دائماً بعد اللوحة</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="off">معطّل</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ز2) المربعات الذهبية المخفية (Hidden Daily Double - Phase 4 Pack 7) -->
-            <div id="tactical-card-daily-double" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">🌟</span>
-                  <div>
-                    <h3 class="tactical-card-title">المربعات الذهبية المخفية</h3>
-                    <p class="tactical-card-sub">تُخفى عشوائياً ضمن خلايا 400 و600 وتتيح للفريق الرهان قبل كشف السؤال</p>
-                  </div>
-                </div>
-              </div>
-              <div class="tactical-options-group">
-                <span class="tactical-opt-label">عدد المربعات الذهبية في اللوحة:</span>
-                <div class="tactical-pills-row" role="group" aria-label="عدد المربعات الذهبية المخفية">
-                  <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="0">معطّل</button>
-                  <button type="button" class="tactical-opt-btn active" data-setting="dailyDoubleCount" data-value="1">مربع واحد (افتراضي)</button>
-                  <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="2">مربعان (2)</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ح) الثيمات الجاهزة ومقياس شاشة التلفزيون (Phase 4 Pack 6) -->
-            <div id="tactical-card-appearance" class="tactical-config-card">
-              <div class="tactical-card-head">
-                <div class="tactical-card-title-wrap">
-                  <span class="tactical-card-icon">🎨</span>
-                  <div>
-                    <h3 class="tactical-card-title">الثيمات ومقياس التلفزيون</h3>
-                    <p class="tactical-card-sub">تُحفظ تلقائياً وتُزامَن فورياً مع شاشة العرض (?mode=display)</p>
-                  </div>
-                </div>
-              </div>
-              <div class="tactical-options-group">
-                <div class="tactical-subrow">
-                  <span class="tactical-opt-label">ثيم المظهر العام:</span>
-                  <div class="tactical-pills-row theme-pills-group" role="group" aria-label="اختيار الثيم">
-                    <button type="button" class="theme-choice-btn active" data-theme-choice="dark-glass" aria-pressed="true">🌌 زجاجي داكن</button>
-                    <button type="button" class="theme-choice-btn" data-theme-choice="royal-gold" aria-pressed="false">👑 ملكي ذهبي</button>
-                    <button type="button" class="theme-choice-btn" data-theme-choice="high-contrast" aria-pressed="false">🔆 تباين عالٍ</button>
-                  </div>
-                </div>
-                <div class="tactical-subrow tv-scale-setup-row">
-                  <span class="tactical-opt-label">حجم خط شاشة التلفزيون: <strong id="setup-tv-scale-val">100%</strong></span>
-                  <div class="tv-scale-slider-wrap">
-                    <input
-                      type="range"
-                      id="setup-tv-scale-slider"
-                      class="tv-scale-slider"
-                      min="90"
-                      max="130"
-                      step="5"
-                      value="100"
-                      aria-label="حجم خط شاشة التلفزيون"
-                    />
-                    <button type="button" id="btn-reset-tv-scale-setup" class="btn btn-ghost btn-xxs" title="إعادة ضبط مقياس التلفزيون إلى 100%">
-                      ↺ 100%
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="tactical-panel-footer">
-            <span class="tactical-footer-hint">💡 يمكنك التراجع (Ctrl+Z) عن أي إجراء أثناء المباراة لاسترجاع النقاط ووسائل المساعدة.</span>
-            <button type="button" id="btn-reset-tactical-defaults" class="btn btn-ghost btn-xs">
-              ↺ استعادة الإعدادات الافتراضية
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- اختيار 6 فئات -->
-      <section class="panel categories-setup-panel" aria-label="اختيار فئات الجولة">
-        <div class="categories-toolbar">
-          <div class="categories-heading">
-            <h2 class="panel-title">
-              <span class="panel-icon">🎯</span>
-              اختر 6 فئات للجولة
-            </h2>
-          </div>
-
-          <div class="toolbar-actions">
-            <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm admin-only-el" hidden>
-              <span class="btn-icon">🔄</span>
-              تحديث الأسئلة
-            </button>
-            <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm admin-only-el" hidden>
-              <span class="btn-icon">🛡️</span>
-              لوحة الإدارة
-            </button>
-            <button type="button" id="btn-reset-history" class="btn btn-danger-outline btn-sm">
-              <span class="btn-icon">🔄</span>
-              تصفير السجل
-            </button>
-          </div>
-        </div>
-
-        <!-- مُبدّل ملف المجموعة النشط (Profile Switcher - Phase 4) -->
-        <div id="profile-switcher-bar" class="profile-switcher-bar" aria-label="اختيار ملف مجموعة اللعب">
-          <div class="profile-switcher-main">
-            <span class="profile-switcher-label">👤 المجموعة:</span>
-            <div id="profile-pills-list" class="profile-pills-list" role="group" aria-label="ملفات المجموعات المتاحة">
-              <!-- يتم توليد أزرار المجموعات ديناميكياً -->
-            </div>
-            <button
-              type="button"
-              id="btn-toggle-new-profile"
-              class="profile-add-btn"
-              aria-expanded="false"
-              title="إنشاء ملف مجموعة جديد (مثل: العائلة، الأصدقاء)"
-            >
-              + مجموعة جديدة
-            </button>
-          </div>
-
-          <form id="new-profile-form" class="new-profile-form" hidden>
-            <div class="new-profile-input-row">
-              <input
-                type="text"
-                id="new-profile-input"
-                class="profile-name-input"
-                placeholder="اسم المجموعة (مثال: العائلة، الأصدقاء)..."
-                maxlength="28"
-                autocomplete="off"
-                aria-label="اسم المجموعة الجديدة"
-              />
-              <button type="submit" id="btn-save-new-profile" class="btn btn-primary btn-xs">
-                حفظ وتفعيل
-              </button>
-              <button type="button" id="btn-cancel-new-profile" class="btn btn-ghost btn-xs">
-                إلغاء
-              </button>
-            </div>
-            <div class="profile-presets-row" aria-label="اقتراحات سريعة">
-              <span class="profile-presets-hint">اقتراحات:</span>
-              <button type="button" class="profile-preset-chip" data-preset="العائلة">👨‍👩‍👧‍👦 العائلة</button>
-              <button type="button" class="profile-preset-chip" data-preset="الأصدقاء">🤝 الأصدقاء</button>
-              <button type="button" class="profile-preset-chip" data-preset="العمل">💼 العمل</button>
-              <button type="button" class="profile-preset-chip" data-preset="سهرة الخميس">🌙 سهرة الخميس</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- شريط إحصائيات بنك الأسئلة المدمج -->
-        <div class="bank-stats-strip" id="played-summary" aria-live="polite">
-          <!-- يتم تحديث ملخص الأسئلة الجديدة والملعوبة -->
-        </div>
-
-        <!-- مؤشر حالة المزامنة مع Google Sheets -->
-        <div id="sheets-status-bar" class="sheets-status-bar" hidden aria-live="polite">
-          <span id="sheets-status-spinner" class="sheets-spinner" hidden aria-hidden="true"></span>
-          <span id="sheets-status-text"></span>
-        </div>
-
-        <!-- شريط التصنيفات الرئيسية (Top Bar) -->
-        <nav class="category-groups-bar-wrap" aria-label="التصنيفات الرئيسية">
-          <div
-            id="category-groups-bar"
-            class="category-groups-bar"
-            role="tablist"
-            aria-label="تصفية الفئات حسب التصنيف الرئيسي"
-          >
-            <!-- يتم توليد أزرار التصنيفات الرئيسية ديناميكياً من JavaScript -->
-          </div>
+        <!-- مؤشر خطوات الإعداد التفاعلي (3-Step Setup Flow - Pack 18) -->
+        <nav id="sj-wizard-stepper" class="sj-wizard-stepper" aria-label="خطوات إعداد المباراة">
+          <button type="button" class="sj-step-pill active" data-sj-step="1" aria-current="step">
+            <span class="sj-step-num">1</span>
+            <span class="sj-step-label">اختيار الفئات</span>
+          </button>
+          <span class="sj-step-arrow" aria-hidden="true">←</span>
+          <button type="button" class="sj-step-pill" data-sj-step="2">
+            <span class="sj-step-num">2</span>
+            <span class="sj-step-label">إعداد الفرق والقواعد</span>
+          </button>
+          <span class="sj-step-arrow" aria-hidden="true">←</span>
+          <button type="button" class="sj-step-pill" data-sj-step="3">
+            <span class="sj-step-num">3</span>
+            <span class="sj-step-label">المراجعة والانطلاق</span>
+          </button>
         </nav>
 
-        <!-- شريط البحث والتصفية السريعة والاختيار العشوائي -->
-        <div class="category-quick-toolbar" role="search" aria-label="بحث وتصفية الفئات">
-          <div class="category-search-wrap">
-            <span class="category-search-icon" aria-hidden="true">🔍</span>
-            <input
-              type="search"
-              id="category-search-input"
-              class="category-search-input"
-              placeholder="ابحث عن فئة..."
-              autocomplete="off"
-              aria-label="ابحث عن فئة"
-            />
-            <button
-              type="button"
-              id="btn-clear-search"
-              class="category-search-clear"
-              aria-label="مسح البحث"
-              title="مسح البحث"
-              hidden
-            >
-              ×
+        <!-- الخطوة 1: أوضاع البدء السريع + بطاقات الفئات الرئيسية والفرعية -->
+        <div id="sj-step-1" class="sj-wizard-step">
+          <div id="sj-presets-bar" class="sj-presets-bar" role="group" aria-label="أوضاع البدء السريع">
+            <button type="button" id="btn-preset-quick-4" class="sj-preset-btn" data-preset-mode="quick-4">
+              <span class="sj-preset-ico">⚡</span>
+              <span class="sj-preset-text"><strong>جولة سريعة</strong><small>4 فئات</small></span>
+            </button>
+            <button type="button" id="btn-preset-classic-6" class="sj-preset-btn active" data-preset-mode="classic-6">
+              <span class="sj-preset-ico">🔥</span>
+              <span class="sj-preset-text"><strong>كلاسيكي</strong><small>6 فئات</small></span>
+            </button>
+            <button type="button" id="btn-preset-surprise-6" class="sj-preset-btn is-surprise" data-preset-mode="surprise-6">
+              <span class="sj-preset-ico">🎲</span>
+              <span class="sj-preset-text"><strong>فئات مفاجئة</strong><small>اختيار ذكي فوري</small></span>
             </button>
           </div>
 
-          <button
-            type="button"
-            id="btn-hide-completed"
-            class="quick-filter-pill"
-            aria-pressed="false"
-            title="إخفاء الفئات التي لا تحتوي على أسئلة جديدة"
-          >
-            <span class="quick-filter-dot" aria-hidden="true"></span>
-            <span>إخفاء المكتملة</span>
-          </button>
+          <section class="panel categories-setup-panel" aria-label="اختيار فئات الجولة">
+            <div class="categories-toolbar">
+              <div class="categories-heading">
+                <h2 class="panel-title">
+                  <span class="panel-icon">🎯</span>
+                  <span id="sj-categories-heading-text">اختر 6 فئات للجولة</span>
+                </h2>
+              </div>
 
-          <button
-            type="button"
-            id="btn-balanced-categories"
-            class="quick-balanced-btn"
-            title="اختيار 6 فئات متنوعة تلقائياً من مجالات مختلفة بأكبر عدد من الأسئلة الجديدة"
-          >
-            <span aria-hidden="true">🎲</span>
-            <span>تشكيلة سريعة متوازنة</span>
-          </button>
+              <div class="toolbar-actions">
+                <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm admin-only-el" hidden>
+                  <span class="btn-icon">🔄</span>
+                  تحديث الأسئلة
+                </button>
+                <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm admin-only-el" hidden>
+                  <span class="btn-icon">🛡️</span>
+                  لوحة الإدارة
+                </button>
+                <button type="button" id="btn-reset-history" class="btn btn-danger-outline btn-sm">
+                  <span class="btn-icon">🔄</span>
+                  تصفير السجل
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="button"
-            id="btn-random-categories"
-            class="quick-random-btn"
-            title="اختيار 6 فئات عشوائياً من التصنيف الحالي"
-          >
-            <span aria-hidden="true">🎲</span>
-            <span>عشوائي</span>
-          </button>
+            <div class="bank-stats-strip" id="played-summary" aria-live="polite"></div>
+
+            <div id="sheets-status-bar" class="sheets-status-bar" hidden aria-live="polite">
+              <span id="sheets-status-spinner" class="sheets-spinner" hidden aria-hidden="true"></span>
+              <span id="sheets-status-text"></span>
+            </div>
+
+            <div class="category-quick-toolbar" role="search" aria-label="بحث وتصفية الفئات">
+              <div class="category-search-wrap">
+                <span class="category-search-icon" aria-hidden="true">🔍</span>
+                <input
+                  type="search"
+                  id="category-search-input"
+                  class="category-search-input"
+                  placeholder="ابحث عن أي فئة فرعية أو موضوع..."
+                  autocomplete="off"
+                  aria-label="ابحث عن فئة"
+                />
+                <button type="button" id="btn-clear-search" class="category-search-clear" aria-label="مسح البحث" title="مسح البحث" hidden>×</button>
+              </div>
+
+              <button type="button" id="btn-smart-complete-random" class="quick-balanced-btn" title="إكمال الخانات المتبقية تلقائياً بفئات جديدة ومتنوعة">
+                <span aria-hidden="true">🎲</span>
+                <span>كمّلها عشوائياً</span>
+              </button>
+            </div>
+
+            <div id="category-quick-filters" class="category-quick-filters" role="tablist" aria-label="فلاتر الفئات السريعة">
+              <button type="button" class="quick-filter-chip active" data-quick-filter="all" aria-pressed="true">الكل</button>
+              <button type="button" class="quick-filter-chip" data-quick-filter="new" aria-pressed="false">🟢 جديد لم يُلعب</button>
+              <button type="button" class="quick-filter-chip" data-quick-filter="media" aria-pressed="false">🖼️ بصري وصوتي</button>
+              <button type="button" class="quick-filter-chip" data-quick-filter="custom" aria-pressed="false">✨ فئاتي الخاصة</button>
+              <button type="button" class="quick-filter-chip" data-quick-filter="favorites" aria-pressed="false">⭐ المفضلة <span id="fav-filter-count" class="fav-filter-count" hidden>0</span></button>
+            </div>
+
+            <div id="category-breadcrumb-bar" class="category-breadcrumb-bar" hidden>
+              <button type="button" id="btn-back-to-main-cats" class="btn btn-secondary btn-xs">
+                ⬅️ كل الفئات الرئيسية
+              </button>
+              <span class="breadcrumb-sep" aria-hidden="true">/</span>
+              <span id="category-breadcrumb-current" class="breadcrumb-current"></span>
+            </div>
+
+            <div id="setup-categories-grid" class="setup-categories-grid" role="group" aria-label="قائمة الفئات المتوفرة"></div>
+          </section>
         </div>
 
-        <div id="setup-categories-grid" class="setup-categories-grid" role="group" aria-label="قائمة الفئات المتوفرة">
-          <!-- يتم إنشاء بطاقات الفئات ديناميكياً من JavaScript -->
-        </div>
-      </section>
-    </div>
+        <!-- الخطوة 2: إعداد الفرق (2-6 فرق + ألوان) + ملف المجموعة + القواعد -->
+        <div id="sj-step-2" class="sj-wizard-step" hidden>
+          <section class="panel teams-setup-panel" aria-label="إعداد الفرق">
+            <div class="panel-header teams-panel-header">
+              <h2 class="panel-title">
+                <span class="panel-icon">👥</span>
+                الفرق المتنافسة (2 إلى 6 فرق)
+              </h2>
+              <div id="team-count-selector" class="team-count-selector" role="group" aria-label="اختيار عدد الفرق">
+                <button type="button" class="team-count-pill active" data-team-count="2" aria-pressed="true">2 فرق</button>
+                <button type="button" class="team-count-pill" data-team-count="3" aria-pressed="false">3 فرق</button>
+                <button type="button" class="team-count-pill" data-team-count="4" aria-pressed="false">4 فرق</button>
+                <button type="button" class="team-count-pill" data-team-count="5" aria-pressed="false">5 فرق</button>
+                <button type="button" class="team-count-pill" data-team-count="6" aria-pressed="false">6 فرق</button>
+              </div>
+            </div>
+            <div id="teams-inputs-grid" class="teams-inputs-grid" data-team-count="2">
+              <div id="team-input-card-1" class="team-input-card team-1-accent" data-team-slot="0">
+                <label for="team1-input" class="input-label">
+                  <span class="team-color-dot team-1-dot" data-team-dot="0"></span>
+                  اسم الفريق الأول
+                </label>
+                <input type="text" id="team1-input" class="text-input team-name-input" data-team-idx="0" placeholder="مثال: فريق الصقور" value="الفريق الأول" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="0" aria-label="لون الفريق الأول"></div>
+              </div>
 
-    <!-- الشريط السفلي الثابت لبدء اللعبة (Sticky Bottom Action Dock) -->
-    <div id="setup-action-dock" class="setup-action-dock" role="region" aria-label="ملخص الاختيار وبدء اللعبة">
-      <div class="setup-dock-inner">
-        <div class="setup-dock-status">
-          <div id="selection-counter" class="selection-counter">
-            المختار: <strong id="selected-count">0</strong> / 6
+              <div id="teams-vs-divider" class="vs-divider" aria-hidden="true">VS</div>
+
+              <div id="team-input-card-2" class="team-input-card team-2-accent" data-team-slot="1">
+                <label for="team2-input" class="input-label">
+                  <span class="team-color-dot team-2-dot" data-team-dot="1"></span>
+                  اسم الفريق الثاني
+                </label>
+                <input type="text" id="team2-input" class="text-input team-name-input" data-team-idx="1" placeholder="مثال: فريق النجوم" value="الفريق الثاني" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="1" aria-label="لون الفريق الثاني"></div>
+              </div>
+
+              <div id="team-input-card-3" class="team-input-card team-3-accent" data-team-slot="2" hidden>
+                <label for="team3-input" class="input-label">
+                  <span class="team-color-dot team-3-dot" data-team-dot="2"></span>
+                  اسم الفريق الثالث
+                </label>
+                <input type="text" id="team3-input" class="text-input team-name-input" data-team-idx="2" placeholder="مثال: فريق الزمرد" value="الفريق الثالث" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="2" aria-label="لون الفريق الثالث"></div>
+              </div>
+
+              <div id="team-input-card-4" class="team-input-card team-4-accent" data-team-slot="3" hidden>
+                <label for="team4-input" class="input-label">
+                  <span class="team-color-dot team-4-dot" data-team-dot="3"></span>
+                  اسم الفريق الرابع
+                </label>
+                <input type="text" id="team4-input" class="text-input team-name-input" data-team-idx="3" placeholder="مثال: فريق الملوك" value="الفريق الرابع" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="3" aria-label="لون الفريق الرابع"></div>
+              </div>
+
+              <div id="team-input-card-5" class="team-input-card team-5-accent" data-team-slot="4" hidden>
+                <label for="team5-input" class="input-label">
+                  <span class="team-color-dot team-5-dot" data-team-dot="4"></span>
+                  اسم الفريق الخامس
+                </label>
+                <input type="text" id="team5-input" class="text-input team-name-input" data-team-idx="4" placeholder="مثال: فريق الياقوت" value="الفريق الخامس" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="4" aria-label="لون الفريق الخامس"></div>
+              </div>
+
+              <div id="team-input-card-6" class="team-input-card team-6-accent" data-team-slot="5" hidden>
+                <label for="team6-input" class="input-label">
+                  <span class="team-color-dot team-6-dot" data-team-dot="5"></span>
+                  اسم الفريق السادس
+                </label>
+                <input type="text" id="team6-input" class="text-input team-name-input" data-team-idx="5" placeholder="مثال: فريق الأبطال" value="الفريق السادس" maxlength="24" autocomplete="off" />
+                <div class="team-color-swatches" data-team-swatches="5" aria-label="لون الفريق السادس"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel sj-group-profile-panel" aria-label="ملف مجموعة اللعب">
+            <div id="profile-switcher-bar" class="profile-switcher-bar" aria-label="اختيار ملف مجموعة اللعب">
+              <div class="profile-switcher-main">
+                <span class="profile-switcher-label">👤 مجموعة اللعب (لعدم تكرار الأسئلة):</span>
+                <div id="profile-pills-list" class="profile-pills-list" role="group" aria-label="ملفات المجموعات المتاحة"></div>
+                <button type="button" id="btn-toggle-new-profile" class="profile-add-btn" aria-expanded="false" title="إنشاء ملف مجموعة جديد (مثل: العائلة، الأصدقاء)">
+                  + مجموعة جديدة
+                </button>
+              </div>
+
+              <form id="new-profile-form" class="new-profile-form" hidden>
+                <div class="new-profile-input-row">
+                  <input type="text" id="new-profile-input" class="profile-name-input" placeholder="اسم المجموعة (مثال: العائلة، الأصدقاء)..." maxlength="28" autocomplete="off" aria-label="اسم المجموعة الجديدة" />
+                  <button type="submit" id="btn-save-new-profile" class="btn btn-primary btn-xs">حفظ وتفعيل</button>
+                  <button type="button" id="btn-cancel-new-profile" class="btn btn-ghost btn-xs">إلغاء</button>
+                </div>
+                <div class="profile-presets-row" aria-label="اقتراحات سريعة">
+                  <span class="profile-presets-hint">اقتراحات:</span>
+                  <button type="button" class="profile-preset-chip" data-preset="العائلة">👨‍👩‍👧‍👦 العائلة</button>
+                  <button type="button" class="profile-preset-chip" data-preset="الأصدقاء">🤝 الأصدقاء</button>
+                  <button type="button" class="profile-preset-chip" data-preset="العمل">💼 العمل</button>
+                  <button type="button" class="profile-preset-chip" data-preset="سهرة الخميس">🌙 سهرة الخميس</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section id="tactical-setup-panel" class="panel tactical-setup-panel" aria-label="تخصيص وسائل المساعدة وقواعد الجلسة">
+            <button type="button" id="btn-toggle-tactical-panel" class="tactical-collapse-trigger" aria-expanded="false" aria-controls="tactical-panel-body">
+              <div class="tactical-trigger-main">
+                <span class="panel-title tactical-panel-title">
+                  <span class="panel-icon">⚡</span>
+                  وسائل المساعدة وقواعد الجلسة
+                </span>
+                <div id="tactical-summary-pills" class="tactical-summary-pills"></div>
+              </div>
+              <span class="tactical-chevron" aria-hidden="true">▾</span>
+            </button>
+
+            <div id="tactical-panel-body" class="tactical-panel-body" hidden>
+              <div class="tactical-cards-grid">
+                <div id="tactical-card-hint" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">💡</span>
+                      <div>
+                        <h3 class="tactical-card-title">كشف التلميح مقابل خصم</h3>
+                        <p class="tactical-card-sub">متاح للأسئلة التي تضم تلميحاً قبل كشف الإجابة</p>
+                      </div>
+                    </div>
+                    <button type="button" id="toggle-hint-enabled" class="tactical-switch active" role="switch" aria-checked="true" aria-label="تفعيل أو تعطيل كشف التلميح">
+                      <span class="tactical-switch-thumb"></span>
+                    </button>
+                  </div>
+                  <div class="tactical-options-group" id="hint-options-group">
+                    <span class="tactical-opt-label">نسبة الخصم من قيمة السؤال:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="نسبة خصم التلميح">
+                      <button type="button" class="tactical-opt-btn active" data-setting="hintPenalty" data-value="0.25">25% (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0.5">50%</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="hintPenalty" data-value="0">0% (مجاني)</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-double" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">⚡</span>
+                      <div>
+                        <h3 class="tactical-card-title">مضاعفة النقاط (2x)</h3>
+                        <p class="tactical-card-sub">تُفعَّل من لوحة اللعب قبل اختيار السؤال فقط</p>
+                      </div>
+                    </div>
+                    <button type="button" id="toggle-double-enabled" class="tactical-switch active" role="switch" aria-checked="true" aria-label="تفعيل أو تعطيل مضاعفة النقاط">
+                      <span class="tactical-switch-thumb"></span>
+                    </button>
+                  </div>
+                  <div class="tactical-options-group" id="double-options-group">
+                    <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="رصيد مضاعفة النقاط لكل فريق">
+                      <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="0">0</button>
+                      <button type="button" class="tactical-opt-btn active" data-setting="doubleCount" data-value="1">1 (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="2">2</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="doubleCount" data-value="3">3</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-swap" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">🔄</span>
+                      <div>
+                        <h3 class="tactical-card-title">تبديل السؤال</h3>
+                        <p class="tactical-card-sub">استبدال السؤال بآخر جديد من نفس الفئة والصعوبة</p>
+                      </div>
+                    </div>
+                    <button type="button" id="toggle-swap-enabled" class="tactical-switch active" role="switch" aria-checked="true" aria-label="تفعيل أو تعطيل تبديل السؤال">
+                      <span class="tactical-switch-thumb"></span>
+                    </button>
+                  </div>
+                  <div class="tactical-options-group" id="swap-options-group">
+                    <span class="tactical-opt-label">رصيد البطاقات لكل فريق:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="رصيد تبديل السؤال لكل فريق">
+                      <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="0">0</button>
+                      <button type="button" class="tactical-opt-btn active" data-setting="swapCount" data-value="1">1 (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="2">2</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="swapCount" data-value="3">3</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-steal" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">🔥</span>
+                      <div>
+                        <h3 class="tactical-card-title">فرصة السرقة</h3>
+                        <p class="tactical-card-sub">منح المنافس فرصة خطف النقاط عند الإجابة الخاطئة</p>
+                      </div>
+                    </div>
+                    <button type="button" id="toggle-steal-enabled" class="tactical-switch active" role="switch" aria-checked="true" aria-label="تفعيل أو تعطيل فرصة السرقة">
+                      <span class="tactical-switch-thumb"></span>
+                    </button>
+                  </div>
+                  <div class="tactical-options-group" id="steal-options-group">
+                    <div class="tactical-subrow">
+                      <span class="tactical-opt-label">نسبة نقاط السرقة:</span>
+                      <div class="tactical-pills-row" role="group" aria-label="نسبة نقاط السرقة">
+                        <button type="button" class="tactical-opt-btn active" data-setting="stealMultiplier" data-value="0.5">50% (افتراضي)</button>
+                        <button type="button" class="tactical-opt-btn" data-setting="stealMultiplier" data-value="1">100%</button>
+                      </div>
+                    </div>
+                    <div class="tactical-subrow">
+                      <span class="tactical-opt-label">مؤقت السرقة:</span>
+                      <div class="tactical-pills-row" role="group" aria-label="مدة مؤقت السرقة">
+                        <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="10">10 ثوانٍ</button>
+                        <button type="button" class="tactical-opt-btn active" data-setting="stealTimerSeconds" data-value="15">15 ثانية (افتراضي)</button>
+                        <button type="button" class="tactical-opt-btn" data-setting="stealTimerSeconds" data-value="20">20 ثانية</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-main-timer" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">⏱️</span>
+                      <div>
+                        <h3 class="tactical-card-title">المؤقت العام للأسئلة</h3>
+                        <p class="tactical-card-sub">مدة التفكير للأسئلة العادية والبصرية</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tactical-options-group" id="main-timer-options-group">
+                    <span class="tactical-opt-label">المدة الافتراضية لكل سؤال:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="مدة المؤقت العام للأسئلة">
+                      <button type="button" class="tactical-opt-btn active" data-setting="mainTimerSeconds" data-value="0">معطّل (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="30">30ث</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="45">45ث</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="mainTimerSeconds" data-value="60">60ث</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-daily-double" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">🌟</span>
+                      <div>
+                        <h3 class="tactical-card-title">المربعات الذهبية المخفية</h3>
+                        <p class="tactical-card-sub">تُخفى عشوائياً ضمن خلايا 400 و600 وتتيح الرهان قبل كشف السؤال</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tactical-options-group">
+                    <span class="tactical-opt-label">عدد المربعات الذهبية في اللوحة:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="عدد المربعات الذهبية المخفية">
+                      <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="0">معطّل</button>
+                      <button type="button" class="tactical-opt-btn active" data-setting="dailyDoubleCount" data-value="1">مربع واحد (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="dailyDoubleCount" data-value="2">مربعان (2)</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-final-round" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">⚔️</span>
+                      <div>
+                        <h3 class="tactical-card-title">جولة الرهان النهائي</h3>
+                        <p class="tactical-card-sub">سؤال حسم ختامي برهان سري لكل فريق</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tactical-options-group" id="final-round-options-group">
+                    <span class="tactical-opt-label">توقيت تفعيل الجولة النهائية:</span>
+                    <div class="tactical-pills-row" role="group" aria-label="إعداد جولة الرهان النهائي">
+                      <button type="button" class="tactical-opt-btn active" data-setting="finalRoundMode" data-value="tie-only">تلقائياً عند التعادل (افتراضي)</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="always">دائماً بعد اللوحة</button>
+                      <button type="button" class="tactical-opt-btn" data-setting="finalRoundMode" data-value="off">معطّل</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tactical-card-wakelock" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">☀️</span>
+                      <div>
+                        <h3 class="tactical-card-title">إبقاء الشاشة مضاءة</h3>
+                        <p class="tactical-card-sub">يمنع خفوت أو إطفاء الشاشة تلقائياً أثناء اللعب</p>
+                      </div>
+                    </div>
+                    <button type="button" id="toggle-wakelock-enabled" class="tactical-switch active" role="switch" aria-checked="true" aria-label="تفعيل أو تعطيل منع إطفاء الشاشة">
+                      <span class="tactical-switch-thumb"></span>
+                    </button>
+                  </div>
+                  <div class="tactical-options-group">
+                    <span id="wakelock-status-note" class="tactical-opt-label">مفعّل تلقائياً أثناء لوحة اللعب وشاشة العرض</span>
+                  </div>
+                </div>
+
+                <div id="tactical-card-appearance" class="tactical-config-card">
+                  <div class="tactical-card-head">
+                    <div class="tactical-card-title-wrap">
+                      <span class="tactical-card-icon">🎨</span>
+                      <div>
+                        <h3 class="tactical-card-title">الثيمات وحجم خط شاشة العرض</h3>
+                        <p class="tactical-card-sub">تُحفظ تلقائياً وتُطبّق فوراً على شاشة العرض</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tactical-options-group">
+                    <div class="tactical-subrow">
+                      <span class="tactical-opt-label">ثيم المظهر العام:</span>
+                      <div class="tactical-pills-row theme-pills-group" role="group" aria-label="اختيار الثيم">
+                        <button type="button" class="theme-choice-btn active" data-theme-choice="dark-glass" aria-pressed="true">🌌 زجاجي داكن</button>
+                        <button type="button" class="theme-choice-btn" data-theme-choice="royal-gold" aria-pressed="false">👑 ملكي ذهبي</button>
+                        <button type="button" class="theme-choice-btn" data-theme-choice="high-contrast" aria-pressed="false">🔆 تباين عالٍ</button>
+                      </div>
+                    </div>
+                    <div class="tactical-subrow tv-scale-setup-row">
+                      <span class="tactical-opt-label">حجم خط شاشة العرض: <strong id="setup-tv-scale-val">100%</strong></span>
+                      <div class="tv-scale-slider-wrap">
+                        <input type="range" id="setup-tv-scale-slider" class="tv-scale-slider" min="90" max="130" step="5" value="100" aria-label="حجم خط شاشة العرض" />
+                        <button type="button" id="btn-reset-tv-scale-setup" class="btn btn-ghost btn-xxs" title="إعادة ضبط المقياس إلى 100%">↺ 100%</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tactical-panel-footer">
+                <span class="tactical-footer-hint">💡 يمكنك التراجع في أي وقت أثناء المباراة لاسترجاع النقاط ووسائل المساعدة.</span>
+                <button type="button" id="btn-reset-tactical-defaults" class="btn btn-ghost btn-xs">↺ استعادة الإعدادات الافتراضية</button>
+              </div>
+            </div>
+          </section>
+
+          <div class="sj-step-nav-footer">
+            <button type="button" id="btn-step2-prev" class="btn btn-secondary btn-md">➡️ السابق: اختيار الفئات</button>
+            <button type="button" id="btn-step2-next" class="btn btn-primary btn-lg">التالي: المراجعة والانطلاق ⬅️</button>
           </div>
-          <button
-            type="button"
-            id="btn-clear-selections"
-            class="btn-clear-selections"
-            hidden
-            title="إلغاء جميع الفئات المختارة"
-          >
-            مسح
-          </button>
         </div>
 
-        <button type="button" id="btn-start-game" class="btn btn-primary setup-start-btn" disabled>
-          <span id="btn-start-game-label">اختر 6 فئات إضافية</span>
-        </button>
-      </div>
-    </div>
-    </div> <!-- نهاية #seen-jeem-setup-view -->
+        <!-- الخطوة 3: المراجعة البصرية والانطلاق -->
+        <div id="sj-step-3" class="sj-wizard-step" hidden>
+          <section class="panel sj-review-panel" aria-label="مراجعة إعدادات المباراة">
+            <div class="sj-review-header">
+              <h2 class="panel-title">
+                <span class="panel-icon">🚀</span>
+                كل شيء جاهز للانطلاق!
+              </h2>
+              <p class="sj-review-sub">راجع الفئات والفرق المختارة، ويمكنك فتح غرفة الهواتف أو شاشة العرض المزدوجة قبل البدء.</p>
+            </div>
+
+            <div id="sj-review-summary" class="sj-review-summary"></div>
+
+            <div class="sj-review-companions">
+              <button type="button" id="btn-step3-open-wireless" class="btn btn-secondary btn-md">
+                📱 فتح غرفة الهواتف (رمز QR للفرق والريموت)
+              </button>
+              <button type="button" id="btn-step3-open-tv" class="btn btn-gold-outline btn-md">
+                📺 فتح شاشة العرض المزدوجة (تلفزيون)
+              </button>
+            </div>
+
+            <div class="sj-step-nav-footer sj-launch-footer">
+              <button type="button" id="btn-step3-prev" class="btn btn-secondary btn-md">➡️ تعديل الفرق والقواعد</button>
+              <button type="button" id="btn-start-game" class="btn btn-primary btn-xl setup-start-btn" disabled>
+                <span id="btn-start-game-label">🚀 ابدأ المباراة الآن</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- شريط السلة السفلي الثابت (Sticky Selection Dock - Pack 18) -->
+        <div id="setup-action-dock" class="setup-action-dock" role="region" aria-label="سلة الفئات المختارة">
+          <div class="setup-dock-inner">
+            <div class="setup-dock-status">
+              <div id="selection-counter" class="selection-counter">
+                المختار: <strong id="selected-count">0</strong> / <span id="target-cat-count">6</span>
+              </div>
+              <button type="button" id="btn-clear-selections" class="btn-clear-selections" hidden title="إلغاء جميع الفئات المختارة">
+                مسح الكل
+              </button>
+            </div>
+
+            <div id="dock-selected-chips" class="dock-selected-chips" aria-label="الفئات المختارة حالياً"></div>
+
+            <button type="button" id="btn-step1-next" class="btn btn-primary setup-start-btn" disabled>
+              <span id="btn-step1-next-label">اختر 6 فئات إضافية</span>
+            </button>
+          </div>
+        </div>
+      </div> <!-- نهاية #seen-jeem-setup-view -->
   </main>
 
   <!-- =========================================================
@@ -3276,6 +3209,7 @@
   <script src="src/utils/baraSalfaSync.js"></script>
   <script src="src/utils/mafiaSync.js"></script>
   <script src="src/utils/quickGamesSync.js"></script>
+  <script src="src/utils/categoryBrowser.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/audioChallengePlayer.js"></script>

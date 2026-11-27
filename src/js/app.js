@@ -1535,21 +1535,66 @@
     });
   }
 
+  const TEAM_COLOR_PALETTE = [
+    "#06b6d4",
+    "#f59e0b",
+    "#10b981",
+    "#a855f7",
+    "#f43f5e",
+    "#3b82f6",
+    "#f97316",
+    "#ec4899"
+  ];
+
+  state.requiredCategories = REQUIRED_CATEGORIES;
+  state.setupPresetMode = "classic-6"; // "quick-4" | "classic-6" | "surprise-6"
+  state.setupWizardStep = 1; // 1 | 2 | 3
+  state.activeMainCategoryId = null; // null = Level 1 (Main Cards), string = Level 2 (Subcategories)
+  state.quickFilter = "all"; // "all" | "new" | "media" | "custom" | "favorites"
+  state.teamColors = TEAM_COLOR_PALETTE.slice(0, 6);
+
+  function getTargetCategoriesCount() {
+    return state.requiredCategories === 4 ? 4 : REQUIRED_CATEGORIES;
+  }
+
   function getConfiguredTeamCount() {
     const raw = Number(state.setupSettings && state.setupSettings.teamCount);
-    return raw === 3 || raw === 4 ? raw : 2;
+    return Number.isInteger(raw) && raw >= 2 && raw <= 6 ? raw : 2;
   }
 
   function getSetupTeamNames() {
     const count = getConfiguredTeamCount();
-    const defaults = ["الفريق الأول", "الفريق الثاني", "الفريق الثالث", "الفريق الرابع"];
-    const inputs = [dom.team1Input, dom.team2Input, dom.team3Input, dom.team4Input];
+    const defaults = [
+      "الفريق الأول",
+      "الفريق الثاني",
+      "الفريق الثالث",
+      "الفريق الرابع",
+      "الفريق الخامس",
+      "الفريق السادس"
+    ];
+    const inputs = [
+      dom.team1Input,
+      dom.team2Input,
+      dom.team3Input,
+      dom.team4Input,
+      document.getElementById("team5-input"),
+      document.getElementById("team6-input")
+    ];
     const names = [];
     for (let i = 0; i < count; i++) {
       const val = inputs[i] && typeof inputs[i].value === "string" ? inputs[i].value.trim() : "";
       names.push(val || defaults[i]);
     }
     return names;
+  }
+
+  function getSetupTeamColors() {
+    const count = getConfiguredTeamCount();
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      out.push(state.teamColors[i] || TEAM_COLOR_PALETTE[i % TEAM_COLOR_PALETTE.length]);
+    }
+    return out;
   }
 
   function renderTeamCountSetupUI() {
@@ -1560,8 +1605,10 @@
     if (dom.teamsVsDivider) {
       dom.teamsVsDivider.hidden = count !== 2;
     }
-    if (dom.teamInputCard3) dom.teamInputCard3.hidden = count < 3;
-    if (dom.teamInputCard4) dom.teamInputCard4.hidden = count < 4;
+    for (let i = 3; i <= 6; i++) {
+      const cardEl = document.getElementById(`team-input-card-${i}`);
+      if (cardEl) cardEl.hidden = count < i;
+    }
 
     if (dom.teamCountSelector) {
       dom.teamCountSelector.querySelectorAll(".team-count-pill").forEach((pill) => {
@@ -1570,6 +1617,27 @@
         pill.classList.toggle("active", isActive);
         pill.setAttribute("aria-pressed", String(isActive));
       });
+    }
+
+    // رسم لوحة ألوان لكل فريق (2-6 فرق)
+    for (let idx = 0; idx < 6; idx++) {
+      const chosen = state.teamColors[idx] || TEAM_COLOR_PALETTE[idx % TEAM_COLOR_PALETTE.length];
+      const dot = document.querySelector(`[data-team-dot="${idx}"]`);
+      if (dot) {
+        dot.style.background = chosen;
+        dot.style.boxShadow = `0 0 10px ${chosen}`;
+      }
+      const cardEl = document.getElementById(`team-input-card-${idx + 1}`);
+      if (cardEl) {
+        cardEl.style.borderColor = `${chosen}66`;
+      }
+      const swatchesWrap = document.querySelector(`[data-team-swatches="${idx}"]`);
+      if (swatchesWrap) {
+        swatchesWrap.innerHTML = TEAM_COLOR_PALETTE.map(
+          (hex) =>
+            `<button type="button" class="team-color-swatch${hex.toLowerCase() === chosen.toLowerCase() ? " active" : ""}" data-pick-team-idx="${idx}" data-pick-color="${hex}" style="background:${hex};" title="اختيار لون للفريق ${idx + 1}" aria-label="لون ${hex}"></button>`
+        ).join("");
+      }
     }
   }
 
@@ -1604,110 +1672,354 @@
     showToast("تمت استعادة الإعدادات التكتيكية المتوازنة ⚡", "info");
   }
 
+  function getCustomCategoryIdsSet() {
+    const ids = new Set();
+    (state.customCategories || []).forEach((c) => {
+      if (c && c.id) ids.add(c.id);
+    });
+    if (window.SeenJeemCustomPacksStore && typeof window.SeenJeemCustomPacksStore.getAllSync === "function") {
+      window.SeenJeemCustomPacksStore.getAllSync().forEach((c) => {
+        if (c && c.id) ids.add(c.id);
+      });
+    }
+    return ids;
+  }
+
+  function setSetupWizardStep(stepNum) {
+    const targetStep = stepNum === 3 ? 3 : stepNum === 2 ? 2 : 1;
+    const reqCount = getTargetCategoriesCount();
+    if (targetStep === 3 && state.selectedCategoryIds.length !== reqCount) {
+      showToast(`يرجى إكمال اختيار ${reqCount} فئات أولاً قبل المراجعة والانطلاق`, "warning");
+      return;
+    }
+    state.setupWizardStep = targetStep;
+
+    for (let i = 1; i <= 3; i++) {
+      const el = document.getElementById(`sj-step-${i}`);
+      if (el) el.hidden = i !== targetStep;
+    }
+
+    const stepper = document.getElementById("sj-wizard-stepper");
+    if (stepper) {
+      stepper.querySelectorAll("[data-sj-step]").forEach((btn) => {
+        const sVal = Number(btn.dataset.sjStep);
+        btn.classList.toggle("active", sVal === targetStep);
+        btn.classList.toggle("is-done", sVal < targetStep || (sVal === 1 && state.selectedCategoryIds.length === reqCount));
+        if (sVal === targetStep) btn.setAttribute("aria-current", "step");
+        else btn.removeAttribute("aria-current");
+      });
+    }
+
+    const dock = document.getElementById("setup-action-dock");
+    if (dock) {
+      const sjVisible = document.getElementById("seen-jeem-setup-view") && !document.getElementById("seen-jeem-setup-view").hidden;
+      dock.hidden = !sjVisible || targetStep !== 1;
+    }
+
+    if (targetStep === 2) {
+      renderTeamCountSetupUI();
+      renderProfileSwitcher();
+      renderTacticalSetupPanel();
+    } else if (targetStep === 3) {
+      renderStep3ReviewSummary();
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function applySetupPreset(presetMode) {
+    const browser = window.SeenJeemCategoryBrowser;
+    state.setupPresetMode = presetMode;
+
+    document.querySelectorAll("#sj-presets-bar .sj-preset-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.presetMode === presetMode);
+    });
+
+    if (presetMode === "quick-4") {
+      state.requiredCategories = 4;
+      if (state.selectedCategoryIds.length > 4) {
+        state.selectedCategoryIds = state.selectedCategoryIds.slice(0, 4);
+      }
+      renderSetupScreen();
+      showToast("⚡ تم اختيار وضع «جولة سريعة» (4 فئات)", "info");
+    } else if (presetMode === "surprise-6") {
+      state.requiredCategories = 6;
+      if (browser && typeof browser.completeRandomSelection === "function") {
+        const res = browser.completeRandomSelection(state.allCategories, [], 6, {
+          resolveGroupFn: resolveCategoryGroup,
+          customIdsSet: getCustomCategoryIdsSet(),
+          getNewCountFn: getCategoryNewCount,
+          hasMinQuestionsFn: hasMinimumBoardQuestions
+        });
+        state.selectedCategoryIds = res.selectedIds;
+      } else {
+        selectBalancedCategories();
+      }
+      renderSetupScreen();
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
+      showToast("🎲 تم اختيار 6 فئات مفاجئة متنوعة تلقائياً — خصّص فرقك الآن!", "success");
+      setSetupWizardStep(2);
+    } else {
+      state.requiredCategories = 6;
+      renderSetupScreen();
+      showToast("🔥 تم اختيار الوضع «الكلاسيكي» (6 فئات)", "info");
+    }
+  }
+
+  function completeRemainingCategoriesRandomly() {
+    const browser = window.SeenJeemCategoryBrowser;
+    const reqCount = getTargetCategoriesCount();
+    if (state.selectedCategoryIds.length >= reqCount) {
+      showToast(`اكتمل بالفعل اختيار ${reqCount} فئات! اضغط «التالي» لإعداد الفرق.`, "info");
+      return;
+    }
+    if (browser && typeof browser.completeRandomSelection === "function") {
+      const res = browser.completeRandomSelection(state.allCategories, state.selectedCategoryIds, reqCount, {
+        resolveGroupFn: resolveCategoryGroup,
+        customIdsSet: getCustomCategoryIdsSet(),
+        getNewCountFn: getCategoryNewCount,
+        hasMinQuestionsFn: hasMinimumBoardQuestions
+      });
+      state.selectedCategoryIds = res.selectedIds;
+      renderSetupScreen();
+      if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
+      showToast(
+        res.addedCount > 0
+          ? `🎲 تمت إضافة ${res.addedCount} فئات جديدة ومتنوعة لإكمال التشكيلة!`
+          : "اكتمل اختيار الفئات المطلوبة!",
+        "success"
+      );
+    } else {
+      selectBalancedCategories();
+    }
+  }
+
+  function renderStep3ReviewSummary() {
+    const container = document.getElementById("sj-review-summary");
+    if (!container) return;
+    const reqCount = getTargetCategoriesCount();
+    const chosenCats = state.selectedCategoryIds
+      .map((id) => state.allCategories.find((c) => c.id === id))
+      .filter(Boolean);
+    const teamNames = getSetupTeamNames();
+    const teamColors = getSetupTeamColors();
+    const cfg = state.setupSettings || {};
+    const activeProfile = historyStore.getActiveProfile();
+
+    container.innerHTML = `
+      <div class="sj-review-box">
+        <h3>🎯 الفئات المختارة (${chosenCats.length} / ${reqCount})</h3>
+        <div class="sj-review-chips">
+          ${chosenCats
+            .map(
+              (c) => `<span class="sj-review-chip"><span>${escapeHtml(c.icon || "🎯")}</span><span>${escapeHtml(c.name)}</span></span>`
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <div class="sj-review-box">
+        <h3>👥 الفرق المشاركة (${teamNames.length} فرق)</h3>
+        <div class="sj-review-chips">
+          ${teamNames
+            .map(
+              (name, i) =>
+                `<span class="sj-review-chip" style="border-color:${escapeHtml(teamColors[i])}">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${escapeHtml(teamColors[i])};display:inline-block;"></span>
+                  <span>${escapeHtml(name)}</span>
+                </span>`
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <div class="sj-review-box">
+        <h3>⚙️ قواعد الجلسة النشطة</h3>
+        <div class="sj-review-chips">
+          <span class="sj-review-chip">👤 المجموعة: ${escapeHtml(activeProfile.name)}</span>
+          <span class="sj-review-chip">⏱️ المؤقت: ${cfg.mainTimerSeconds ? `${cfg.mainTimerSeconds}ث` : "معطّل"}</span>
+          <span class="sj-review-chip">⚡ 2x: ${cfg.doubleEnabled ? cfg.doubleCount : 0}</span>
+          <span class="sj-review-chip">🔄 تبديل: ${cfg.swapEnabled ? cfg.swapCount : 0}</span>
+          <span class="sj-review-chip">🌟 المربعات الذهبية: ${cfg.dailyDoubleCount || 0}</span>
+        </div>
+      </div>
+    `;
+  }
+
   function renderSetupScreen() {
     renderProfileSwitcher();
     renderTeamCountSetupUI();
     renderTacticalSetupPanel();
 
-    const groupStats = buildCategoryGroupStats();
-
-    if (
-      state.activeCategoryGroup !== "all" &&
-      (groupStats.totalByGroup.get(state.activeCategoryGroup) || 0) === 0
-    ) {
-      state.activeCategoryGroup = "all";
+    const browser = window.SeenJeemCategoryBrowser;
+    const reqCount = getTargetCategoriesCount();
+    const headingText = document.getElementById("sj-categories-heading-text");
+    if (headingText) {
+      headingText.textContent = `اختر ${reqCount} فئات للجولة`;
     }
-
-    renderCategoryGroupsBar(groupStats);
+    const targetSpan = document.getElementById("target-cat-count");
+    if (targetSpan) targetSpan.textContent = String(reqCount);
 
     const rawSearch = typeof state.searchQuery === "string" ? state.searchQuery : "";
-    const normQuery = normalizeArabicText(rawSearch).toLowerCase();
-
+    const trimmedSearch = rawSearch.trim();
     if (dom.btnClearSearch) {
-      dom.btnClearSearch.hidden = rawSearch.trim().length === 0;
-    }
-    if (dom.btnHideCompleted) {
-      dom.btnHideCompleted.classList.toggle("active", state.hideCompleted);
-      dom.btnHideCompleted.setAttribute("aria-pressed", String(state.hideCompleted));
+      dom.btnClearSearch.hidden = trimmedSearch.length === 0;
     }
 
-    const groupCategories = groupStats.categoriesByGroup.get(state.activeCategoryGroup) || [];
-    const visibleCategories = groupCategories.filter((cat) => {
-      if (state.hideCompleted && getCategoryNewCount(cat) === 0) {
-        return false;
-      }
-      if (normQuery) {
-        const hayName = normalizeArabicText(cat.name || "").toLowerCase();
-        const hayDesc = normalizeArabicText(cat.description || "").toLowerCase();
-        if (!hayName.includes(normQuery) && !hayDesc.includes(normQuery)) {
-          return false;
-        }
-      }
-      return true;
-    });
+    const customIdsSet = getCustomCategoryIdsSet();
+    const favList = browser ? browser.loadFavorites() : [];
+    const favSet = new Set(favList);
+
+    // تحديث شريط الفلاتر السريعة وعداد المفضلة
+    const favCountEl = document.getElementById("fav-filter-count");
+    if (favCountEl) {
+      favCountEl.textContent = String(favList.length);
+      favCountEl.hidden = favList.length === 0;
+    }
+    const quickFiltersBar = document.getElementById("category-quick-filters");
+    if (quickFiltersBar) {
+      quickFiltersBar.querySelectorAll("[data-quick-filter]").forEach((chip) => {
+        const isAct = chip.dataset.quickFilter === state.quickFilter;
+        chip.classList.toggle("active", isAct);
+        chip.setAttribute("aria-pressed", String(isAct));
+      });
+    }
+
+    const breadcrumbBar = document.getElementById("category-breadcrumb-bar");
+    const breadcrumbCurrent = document.getElementById("category-breadcrumb-current");
+    const isGlobalFlatView = Boolean(trimmedSearch) || state.quickFilter !== "all";
+    const mainGroups = browser
+      ? browser.buildMainCategoryGroups(state.allCategories, {
+          resolveGroupFn: resolveCategoryGroup,
+          customIdsSet,
+          selectedIds: state.selectedCategoryIds,
+          getNewCountFn: getCategoryNewCount
+        })
+      : [];
+
+    // التأكد أن الفئة الرئيسية المفتوحة ما زالت موجودة
+    if (state.activeMainCategoryId && !mainGroups.some((g) => g.id === state.activeMainCategoryId)) {
+      state.activeMainCategoryId = null;
+    }
 
     dom.setupCategoriesGrid.innerHTML = "";
 
-    if (visibleCategories.length === 0) {
+    // المستوى الأول: بطاقات الفئات الرئيسية (عند عدم البحث وعدم تفعيل فلتر وعدم الدخول لفئة رئيسية)
+    if (!isGlobalFlatView && !state.activeMainCategoryId && browser) {
+      if (breadcrumbBar) breadcrumbBar.hidden = true;
+      dom.setupCategoriesGrid.classList.add("is-main-level");
+
+      mainGroups.forEach((group) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = `main-cat-card${group.selectedCount > 0 ? " has-selections" : ""}`;
+        card.style.setProperty("--main-color", group.color || "#38bdf8");
+        card.dataset.mainCatId = group.id;
+        card.innerHTML = `
+          ${group.selectedCount > 0 ? `<span class="main-cat-sel-badge">✓ ${group.selectedCount} مختارة</span>` : ""}
+          <div class="main-cat-icon" aria-hidden="true">${escapeHtml(group.icon || "📚")}</div>
+          <div class="main-cat-title">${escapeHtml(group.label)}</div>
+          <div class="main-cat-meta">
+            <span>${group.subCount} فئة فرعية</span>
+            <span>🟢 ${group.newQuestionsTotal} سؤال جديد</span>
+          </div>
+        `;
+        card.addEventListener("click", () => {
+          state.activeMainCategoryId = group.id;
+          renderSetupScreen();
+        });
+        dom.setupCategoriesGrid.appendChild(card);
+      });
+
+      updateSetupControls();
+      return;
+    }
+
+    // المستوى الثاني أو نتائج البحث/الفلاتر السريعة: بطاقات الفئات الفرعية
+    dom.setupCategoriesGrid.classList.remove("is-main-level");
+    if (breadcrumbBar) {
+      if (!isGlobalFlatView && state.activeMainCategoryId) {
+        const activeGroupObj = mainGroups.find((g) => g.id === state.activeMainCategoryId);
+        breadcrumbBar.hidden = false;
+        if (breadcrumbCurrent && activeGroupObj) {
+          breadcrumbCurrent.textContent = `${activeGroupObj.icon || "📂"} ${activeGroupObj.label}`;
+        }
+      } else {
+        breadcrumbBar.hidden = true;
+      }
+    }
+
+    const filteredItems = browser
+      ? browser.filterSubcategories(state.allCategories, {
+          query: rawSearch,
+          quickFilter: state.quickFilter,
+          activeMainId: isGlobalFlatView ? null : state.activeMainCategoryId,
+          favoritesList: favList,
+          customIdsSet,
+          resolveGroupFn: resolveCategoryGroup,
+          getNewCountFn: getCategoryNewCount
+        })
+      : state.allCategories.map((c) => ({ category: c, mainMeta: { id: "general", label: "", icon: "🎯", color: "#06b6d4" } }));
+
+    if (filteredItems.length === 0) {
       const emptyBox = document.createElement("div");
       emptyBox.className = "categories-empty-state";
       emptyBox.innerHTML = `
         <div class="categories-empty-icon" aria-hidden="true">🔍</div>
         <div class="categories-empty-title">لا توجد فئات مطابقة للتصفية الحالية</div>
-        <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو إظهار الفئات المكتملة أو الانتقال لتبويب «الكل».</div>
+        <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو اختيار فلتر آخر أو العودة لكل الفئات الرئيسية.</div>
       `;
-
       const resetBtn = document.createElement("button");
       resetBtn.type = "button";
       resetBtn.className = "btn btn-secondary btn-sm";
-      resetBtn.textContent = "عرض جميع الفئات";
+      resetBtn.textContent = "عرض كل الفئات الرئيسية";
       resetBtn.addEventListener("click", () => {
         state.searchQuery = "";
-        state.hideCompleted = false;
-        state.activeCategoryGroup = "all";
-        if (dom.categorySearchInput) {
-          dom.categorySearchInput.value = "";
-        }
+        state.quickFilter = "all";
+        state.activeMainCategoryId = null;
+        if (dom.categorySearchInput) dom.categorySearchInput.value = "";
         renderSetupScreen();
       });
-
       emptyBox.appendChild(resetBtn);
       dom.setupCategoriesGrid.appendChild(emptyBox);
       updateSetupControls();
       return;
     }
 
-    visibleCategories.forEach((cat) => {
+    filteredItems.forEach(({ category: cat, mainMeta }) => {
       const isSelected = state.selectedCategoryIds.includes(cat.id);
-      const totalCount = cat.questions.length;
+      const isFav = favSet.has(cat.id);
+      const totalCount = Array.isArray(cat.questions) ? cat.questions.length : 0;
       const newCount = getCategoryNewCount(cat);
+      const isCompleted = newCount === 0 && totalCount > 0;
       const playedCount = Math.max(0, totalCount - newCount);
       const hasPartialProgress = playedCount > 0 && newCount > 0;
       const playedPercent = totalCount > 0 ? Math.min(100, Math.round((playedCount / totalCount) * 100)) : 0;
-      const groupId = resolveCategoryGroup(cat);
-      const accentColor = getCategoryAccentColor(cat, groupId);
+      const accentColor = getCategoryAccentColor(cat, mainMeta ? mainMeta.id : undefined);
+      const contentBadges = browser ? browser.getCategoryContentBadges(cat) : [];
 
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = `setup-cat-card${isSelected ? " selected" : ""}`;
+      const card = document.createElement("div");
+      card.role = "button";
+      card.tabIndex = 0;
+      card.className = `setup-cat-card${isSelected ? " selected" : ""}${isCompleted ? " is-completed-cat" : ""}`;
       card.style.setProperty("--cat-color", accentColor);
       card.setAttribute("aria-pressed", String(isSelected));
       card.dataset.categoryId = cat.id;
-      card.dataset.categoryGroup = groupId;
 
-      let countClass = "";
-      const countText = `${newCount} / ${totalCount} جديد`;
-      if (newCount === 0) {
-        countClass = "empty";
-      } else if (newCount < totalCount) {
-        countClass = "low";
-      }
+      const countClass = isCompleted ? "empty" : newCount < totalCount ? "low" : "";
+      const countText = isCompleted ? "مكتملة ✓" : `🟢 ${newCount} سؤال جديد`;
 
       card.innerHTML = `
+        <button type="button" class="setup-cat-fav-btn${isFav ? " is-fav" : ""}" data-fav-cat-id="${escapeHtml(cat.id)}" title="${isFav ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}" aria-label="${isFav ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}">
+          ${isFav ? "⭐" : "☆"}
+        </button>
         <span class="setup-cat-check" aria-hidden="true">✓</span>
         <div class="setup-cat-icon">${escapeHtml(cat.icon || "🎯")}</div>
         <div class="setup-cat-name">${escapeHtml(cat.name)}</div>
-        <div class="setup-cat-desc">${escapeHtml(cat.description || "")}</div>
+        ${isGlobalFlatView && mainMeta && mainMeta.label ? `<div class="setup-cat-parent-tag">${escapeHtml(mainMeta.icon || "📂")} ${escapeHtml(mainMeta.label)}</div>` : ""}
+        <div class="setup-cat-badges-row">
+          ${contentBadges.map((b) => `<span class="cat-content-badge">${b.icon} ${b.label}</span>`).join("")}
+        </div>
         <div class="setup-cat-count ${countClass}">${countText}</div>
         ${
           hasPartialProgress
@@ -1716,7 +2028,25 @@
         }
       `;
 
+      const favBtn = card.querySelector(".setup-cat-fav-btn");
+      if (favBtn) {
+        favBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (browser) {
+            const res = browser.toggleFavorite(cat.id);
+            showToast(res.isFav ? `⭐ تمت إضافة «${cat.name}» إلى المفضلة` : `تمت إزالة «${cat.name}» من المفضلة`, "info");
+            renderSetupScreen();
+          }
+        });
+      }
+
       card.addEventListener("click", () => toggleCategorySelection(cat.id));
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleCategorySelection(cat.id);
+        }
+      });
       dom.setupCategoriesGrid.appendChild(card);
     });
 
@@ -1724,49 +2054,92 @@
   }
 
   function updateSetupControls() {
+    const reqCount = getTargetCategoriesCount();
     const count = state.selectedCategoryIds.length;
-    const isReady = count === REQUIRED_CATEGORIES;
-    const remaining = Math.max(0, REQUIRED_CATEGORIES - count);
+    const isReady = count === reqCount;
+    const remaining = Math.max(0, reqCount - count);
 
-    dom.selectedCount.textContent = String(count);
-    dom.selectionCounter.classList.toggle("ready", isReady);
-    dom.btnStartGame.disabled = !isReady;
+    if (dom.selectedCount) dom.selectedCount.textContent = String(count);
+    if (dom.selectionCounter) dom.selectionCounter.classList.toggle("ready", isReady);
+    if (dom.btnStartGame) dom.btnStartGame.disabled = !isReady;
+    if (dom.btnClearSelections) dom.btnClearSelections.hidden = count === 0;
 
-    if (dom.btnClearSelections) {
-      dom.btnClearSelections.hidden = count === 0;
+    // تحديث زر الخطوة التالية في السلة السفلية
+    const btnStep1Next = document.getElementById("btn-step1-next");
+    const btnStep1NextLabel = document.getElementById("btn-step1-next-label");
+    if (btnStep1Next) btnStep1Next.disabled = !isReady;
+    if (btnStep1NextLabel) {
+      btnStep1NextLabel.textContent = isReady
+        ? "التالي: إعداد الفرق ⬅️"
+        : formatRemainingCategoriesHint(remaining);
     }
 
     if (dom.btnStartGameLabel) {
       dom.btnStartGameLabel.textContent = isReady
-        ? "🚀 ابدأ اللعبة"
+        ? "🚀 ابدأ المباراة الآن"
         : formatRemainingCategoriesHint(remaining);
     }
 
+    // تحديث رقائق الفئات المختارة في الشريط السفلي الثابت مع زر حذف × سريع
+    const chipsWrap = document.getElementById("dock-selected-chips");
+    if (chipsWrap) {
+      chipsWrap.innerHTML = "";
+      state.selectedCategoryIds.forEach((catId) => {
+        const cat = state.allCategories.find((c) => c.id === catId);
+        if (!cat) return;
+        const chip = document.createElement("span");
+        chip.className = "dock-cat-chip";
+        chip.innerHTML = `<span>${escapeHtml(cat.icon || "🎯")} ${escapeHtml(cat.name)}</span><button type="button" class="dock-chip-remove" aria-label="إزالة ${escapeHtml(cat.name)}" title="إزالة">×</button>`;
+        const rm = chip.querySelector(".dock-chip-remove");
+        if (rm) {
+          rm.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleCategorySelection(catId);
+          });
+        }
+        chipsWrap.appendChild(chip);
+      });
+    }
+
+    // تحديث حالة مؤشر الخطوة 1 في الـ Stepper
+    const step1Pill = document.querySelector('#sj-wizard-stepper [data-sj-step="1"]');
+    if (step1Pill) step1Pill.classList.toggle("is-done", isReady);
+
+    if (state.setupWizardStep === 3) {
+      renderStep3ReviewSummary();
+    }
+
     const stats = getTotalBankStats();
-    dom.playedSummary.innerHTML = `
-      <span>المجموعة: <strong>${escapeHtml(stats.profileName)}</strong></span>
-      <span class="bank-stat-sep" aria-hidden="true">•</span>
-      <span>إجمالي البنك: <strong>${stats.total}</strong></span>
-      <span class="bank-stat-sep" aria-hidden="true">•</span>
-      <span>جديد متبقٍّ: <strong>${stats.unplayed}</strong></span>
-      <span class="bank-stat-sep" aria-hidden="true">•</span>
-      <span>ملعوب سابقاً: <strong>${stats.played}</strong></span>
-    `;
+    if (dom.playedSummary) {
+      dom.playedSummary.innerHTML = `
+        <span>المجموعة: <strong>${escapeHtml(stats.profileName)}</strong></span>
+        <span class="bank-stat-sep" aria-hidden="true">•</span>
+        <span>إجمالي الأسئلة: <strong>${stats.total}</strong></span>
+        <span class="bank-stat-sep" aria-hidden="true">•</span>
+        <span>جديد متبقٍّ: <strong>${stats.unplayed}</strong></span>
+        <span class="bank-stat-sep" aria-hidden="true">•</span>
+        <span>ملعوب سابقاً: <strong>${stats.played}</strong></span>
+      `;
+    }
     if (state.dualScreen.connected) {
       broadcastLiveDisplayState();
     }
   }
 
   function toggleCategorySelection(categoryId) {
+    const reqCount = getTargetCategoriesCount();
     const idx = state.selectedCategoryIds.indexOf(categoryId);
     if (idx !== -1) {
       state.selectedCategoryIds.splice(idx, 1);
     } else {
-      if (state.selectedCategoryIds.length >= REQUIRED_CATEGORIES) {
-        showToast("تم اختيار 6 فئات بالفعل — ألغِ فئة أولاً لاختيار بديلها", "warning");
+      if (state.selectedCategoryIds.length >= reqCount) {
+        showToast(`اكتمل اختيار ${reqCount} فئات — ألغِ فئة أولاً لاختيار بديلها`, "warning");
         return;
       }
       state.selectedCategoryIds.push(categoryId);
+      if (state.selectedCategoryIds.length === reqCount) {
+        showToast(`✅ اكتمل اختيار ${reqCount} فئات! اضغط «التالي: إعداد الفرق» للمتابعة.`, "success");
+      }
     }
     renderSetupScreen();
   }
@@ -2288,10 +2661,9 @@
   function showSeenJeemSetup() {
     const hub = document.getElementById("game-hub-view");
     const sj = document.getElementById("seen-jeem-setup-view");
-    const dock = document.getElementById("setup-action-dock");
     if (hub) hub.hidden = true;
     if (sj) sj.hidden = false;
-    if (dock) dock.hidden = false;
+    setSetupWizardStep(state.setupWizardStep || 1);
     renderSetupScreen();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -2999,6 +3371,7 @@
       return {
         id: typeof t.id === "string" && t.id.trim() ? t.id.trim() : `team-${idx}`,
         name: t.name,
+        color: typeof t.color === "string" ? t.color : (state.teamColors && state.teamColors[idx]) || "",
         score: t.score,
         powerups: {
           doubleLeft: Math.max(0, Math.min(3, Math.round(doubleLeft))),
@@ -3459,7 +3832,7 @@
     const reqCount =
       options && Number.isInteger(options.requiredCategories) && options.requiredCategories > 0
         ? options.requiredCategories
-        : REQUIRED_CATEGORIES;
+        : getTargetCategoriesCount();
     if (state.selectedCategoryIds.length !== reqCount) return;
 
     if (!options || !options.keepTournamentMatch) {
@@ -3470,6 +3843,7 @@
     stopFinalRoundTimer();
     closeRefereePopover();
     const teamNames = getSetupTeamNames();
+    const teamColors = getSetupTeamColors();
 
     state.matchId = archiveStore ? archiveStore.generateMatchId("classic") : `classic_${Date.now()}`;
     state.matchSettings = matchStore.sanitizeSettings(state.setupSettings);
@@ -3479,6 +3853,7 @@
     state.teams = teamNames.map((name, idx) => ({
       id: `team-${idx}`,
       name,
+      color: teamColors[idx] || TEAM_COLOR_PALETTE[idx % TEAM_COLOR_PALETTE.length],
       score: 0,
       powerups: { doubleLeft: initialDouble, swapLeft: initialSwap },
       lifelines: { double: initialDouble === 0, twoAnswers: false, callFriend: false }
@@ -3584,14 +3959,17 @@
         const card = document.createElement("div");
         card.id = `scoreboard-team-${idx + 1}`;
         card.className = `score-team-card team-${idx + 1}-card${isActive ? " active-turn" : ""}`;
+        const teamColor = team.color || TEAM_COLOR_PALETTE[idx % TEAM_COLOR_PALETTE.length];
+        if (teamColor) card.style.setProperty("--team-accent", teamColor);
         card.innerHTML = `
+          ${isActive ? `<div class="active-turn-pointer">🎯 الدور الآن</div>` : ""}
           <div class="score-team-top">
             <div class="score-team-identity">
-              <span class="team-badge-dot team-${idx + 1}-dot"></span>
+              <span class="team-badge-dot team-${idx + 1}-dot" style="background:${escapeHtml(teamColor)};box-shadow:0 0 10px ${escapeHtml(teamColor)};"></span>
               <h2 class="score-team-name" title="${escapeHtml(team.name)}">${escapeHtml(team.name)}</h2>
             </div>
             <div class="score-team-top-actions">
-              <span class="turn-pill">الدور الآن</span>
+              <span class="turn-pill">🎯 الدور الآن</span>
               <button
                 type="button"
                 class="team-mini-action-btn btn-set-turn-direct"
@@ -3741,6 +4119,7 @@
 
   function renderGameBoard() {
     dom.gameBoardGrid.innerHTML = "";
+    dom.gameBoardGrid.dataset.catCount = String(state.boardCategories.length || 6);
 
     state.boardCategories.forEach((bc, catIdx) => {
       const cat = bc.category;
@@ -3782,12 +4161,14 @@
     const btn = document.createElement("button");
     btn.type = "button";
     const winnerClass =
-      slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 4
+      slot.played && Number.isInteger(slot.winnerTeam) && slot.winnerTeam >= 0 && slot.winnerTeam < 6
         ? ` won-team-${slot.winnerTeam}`
         : "";
     const recycledClass = !slot.played && slot.recycled ? " recycled-slot" : "";
     btn.className = `q-point-btn pts-${slot.points}${slot.played ? " played" : ""}${winnerClass}${recycledClass}`;
-    btn.textContent = String(slot.points);
+    btn.innerHTML = slot.played
+      ? `<span class="tile-played-check" aria-hidden="true">✓</span><span>${slot.points}</span>`
+      : `<span>${slot.points}</span>`;
     btn.disabled = slot.played || !slot.question;
 
     if (slot.played) {
@@ -7515,7 +7896,7 @@
       leaderIndices,
       eyebrow,
       title,
-      teams: state.teams.map((t) => ({ id: t.id, name: t.name, score: t.score })),
+      teams: state.teams.map((t) => ({ id: t.id, name: t.name, color: t.color || "", score: t.score })),
       analytics: computeMatchAnalytics()
     };
   }
@@ -13910,13 +14291,72 @@
       dom.teamCountSelector.querySelectorAll(".team-count-pill").forEach((pill) => {
         pill.addEventListener("click", () => {
           const count = Number(pill.dataset.teamCount);
-          if (count === 2 || count === 3 || count === 4) {
+          if (count >= 2 && count <= 6) {
             updateSetupSetting({ teamCount: count });
             renderTeamCountSetupUI();
             if (state.dualScreen.connected) broadcastLiveDisplayState();
           }
         });
       });
+    }
+    if (dom.teamsInputsGrid) {
+      dom.teamsInputsGrid.addEventListener("click", (e) => {
+        const sw = e.target && e.target.closest ? e.target.closest(".team-color-swatch") : null;
+        if (!sw) return;
+        const idx = Number(sw.dataset.pickTeamIdx);
+        const col = sw.dataset.pickColor;
+        if (Number.isInteger(idx) && idx >= 0 && idx < 6 && col) {
+          state.teamColors[idx] = col;
+          renderTeamCountSetupUI();
+        }
+      });
+    }
+
+    // أحداث الحزمة الثامنة عشرة: خطوات الإعداد الـ 3 + أوضاع البدء السريع + الفلاتر + المسار + الاختيار العشوائي الذكي
+    const wizardStepper = document.getElementById("sj-wizard-stepper");
+    if (wizardStepper) {
+      wizardStepper.querySelectorAll("[data-sj-step]").forEach((btn) => {
+        btn.addEventListener("click", () => setSetupWizardStep(Number(btn.dataset.sjStep) || 1));
+      });
+    }
+    const btnStep1Next = document.getElementById("btn-step1-next");
+    const btnStep2Prev = document.getElementById("btn-step2-prev");
+    const btnStep2Next = document.getElementById("btn-step2-next");
+    const btnStep3Prev = document.getElementById("btn-step3-prev");
+    const btnStep3Wireless = document.getElementById("btn-step3-open-wireless");
+    const btnStep3Tv = document.getElementById("btn-step3-open-tv");
+    if (btnStep1Next) btnStep1Next.addEventListener("click", () => setSetupWizardStep(2));
+    if (btnStep2Prev) btnStep2Prev.addEventListener("click", () => setSetupWizardStep(1));
+    if (btnStep2Next) btnStep2Next.addEventListener("click", () => setSetupWizardStep(3));
+    if (btnStep3Prev) btnStep3Prev.addEventListener("click", () => setSetupWizardStep(2));
+    if (btnStep3Wireless) btnStep3Wireless.addEventListener("click", openWirelessRoomModal);
+    if (btnStep3Tv) btnStep3Tv.addEventListener("click", openTVDisplayWindow);
+
+    document.querySelectorAll("#sj-presets-bar [data-preset-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => applySetupPreset(btn.dataset.presetMode || "classic-6"));
+    });
+
+    const quickFiltersBar = document.getElementById("category-quick-filters");
+    if (quickFiltersBar) {
+      quickFiltersBar.querySelectorAll("[data-quick-filter]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          state.quickFilter = chip.dataset.quickFilter || "all";
+          renderSetupScreen();
+        });
+      });
+    }
+
+    const btnBackToMainCats = document.getElementById("btn-back-to-main-cats");
+    if (btnBackToMainCats) {
+      btnBackToMainCats.addEventListener("click", () => {
+        state.activeMainCategoryId = null;
+        renderSetupScreen();
+      });
+    }
+
+    const btnSmartComplete = document.getElementById("btn-smart-complete-random");
+    if (btnSmartComplete) {
+      btnSmartComplete.addEventListener("click", completeRemainingCategoriesRandomly);
     }
     if (dom.btnResetTacticalDefaults) {
       dom.btnResetTacticalDefaults.addEventListener("click", resetTacticalSettingsToDefaults);
@@ -13944,11 +14384,11 @@
       });
     });
 
-    dom.btnSyncSheets.addEventListener("click", () => syncFromGoogleSheets(true));
-    dom.btnOpenBankManager.addEventListener("click", openBankManagerModal);
-    dom.btnRandomCategories.addEventListener("click", selectRandomCategories);
-    dom.btnResetHistory.addEventListener("click", openResetConfirmModal);
-    dom.btnStartGame.addEventListener("click", startNewGame);
+    if (dom.btnSyncSheets) dom.btnSyncSheets.addEventListener("click", () => syncFromGoogleSheets(true));
+    if (dom.btnOpenBankManager) dom.btnOpenBankManager.addEventListener("click", openBankManagerModal);
+    if (dom.btnRandomCategories) dom.btnRandomCategories.addEventListener("click", selectRandomCategories);
+    if (dom.btnResetHistory) dom.btnResetHistory.addEventListener("click", openResetConfirmModal);
+    if (dom.btnStartGame) dom.btnStartGame.addEventListener("click", () => startNewGame());
 
     if (dom.categorySearchInput) {
       dom.categorySearchInput.addEventListener("input", (e) => {
