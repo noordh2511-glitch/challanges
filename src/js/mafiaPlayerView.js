@@ -33,7 +33,10 @@
     constructor() {
       this.root = null;
       this.roomCode = "";
-      this.playerName = this._loadSession(NAME_KEY);
+      this.playerName =
+        this._loadSession(NAME_KEY) ||
+        (window.SeenJeemProfile && window.SeenJeemProfile.getRoomIdentity().name) ||
+        "";
       this.joined = false;
       this.preApproved = false;
       this.connected = false;
@@ -171,7 +174,7 @@
       }
       const sync = window.SeenJeemMafiaSync;
       if (!sync || !sync.isConfigured()) {
-        this.errorMessage = "إعدادات Firebase غير مُهيّأة في هذا المتصفح.";
+        this.errorMessage = "تعذّر الاتصال بغرفة اللعب حالياً — تأكد من الإنترنت وحاول مجدداً.";
         this._render();
         return;
       }

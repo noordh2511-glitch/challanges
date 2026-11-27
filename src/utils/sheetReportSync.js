@@ -51,7 +51,7 @@
       if (clean.webhookUrl && !isValidWebhookUrl(clean.webhookUrl)) {
         return {
           ok: false,
-          error: "يرجى إدخال رابط Google Apps Script Web App صحيح يبدأ بـ https://script.google.com/macros/s/..."
+          error: "يرجى إدخال رابط استقبال البلاغات الصحيح."
         };
       }
       this._cfg = clean;
@@ -66,7 +66,7 @@
 
     async _postPayload(payload) {
       if (!this.isConfigured()) {
-        return { ok: false, reason: "not-configured", error: "رابط Google Apps Script غير مُعدّ بعد." };
+        return { ok: false, reason: "not-configured", error: "رابط استقبال البلاغات غير مُعدّ بعد." };
       }
       if (!navigator.onLine) {
         return { ok: false, reason: "offline", error: "لا يوجد اتصال بالإنترنت — تم حفظ البلاغ كمعلّق." };
@@ -111,7 +111,7 @@
           reason: isAbort ? "timeout" : "network-error",
           error: isAbort
             ? "انتهت مهلة الاتصال بالخادم (10 ثوانٍ) — تم حفظ البلاغ كمعلّق."
-            : "تعذّر الاتصال برابط Google Apps Script — تحقق من الرابط وصلاحية الوصول (Anyone)."
+            : "تعذّر إرسال البلاغ حالياً — تحقق من الرابط والاتصال بالإنترنت."
         };
       }
     }
@@ -155,7 +155,7 @@
       const flaggedStore = window.SeenJeemFlaggedStore;
       if (!flaggedStore) return { ok: false, total: 0, sent: 0, failed: 0, error: "مخزن البلاغات غير متاح." };
       if (!this.isConfigured()) {
-        return { ok: false, total: 0, sent: 0, failed: 0, error: "يرجى إدخال وحفظ رابط Google Apps Script أولاً." };
+        return { ok: false, total: 0, sent: 0, failed: 0, error: "يرجى إدخال وحفظ رابط استقبال البلاغات أولاً." };
       }
       const pending = flaggedStore.getAll().filter((item) => item.sheetSyncStatus !== "sent" && !item.reportedToSheet);
       if (pending.length === 0) {
@@ -186,7 +186,7 @@
         categoryName: "اختبار اتصال سين جيم",
         points: 200,
         visualType: "normal",
-        questionText: "صف تجريبي للتحقق من ربط البلاغات التلقائي مع Google Sheets",
+        questionText: "صف تجريبي للتحقق من ربط إرسال البلاغات التلقائي",
         answerText: "الاتصال يعمل بنجاح ✅",
         reason: "other",
         reasonLabel: "اختبار اتصال",

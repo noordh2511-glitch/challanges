@@ -37,7 +37,10 @@
       this.publicState = null;
       this.playersMap = {};
       this.selectedTeamIdx = null;
-      this.deviceLabel = this._loadSavedLabel();
+      this.deviceLabel =
+        this._loadSavedLabel() ||
+        (window.SeenJeemProfile && window.SeenJeemProfile.getRoomIdentity().name) ||
+        "";
       this.preApproved = false;
       this.hasJoinedThisRoom = false;
       this.kicked = false;
@@ -265,7 +268,7 @@
 
       const rt = window.SeenJeemRealtimeSync;
       if (!rt || !rt.isConfigured()) {
-        this.errorMessage = "الاتصال اللاسلكي (Firebase) غير مُهيّأ في هذا المتصفح. تأكد من تفعيل الغرفة عبر إعدادات Firebase.";
+        this.errorMessage = "تعذّر الاتصال بغرفة اللعب حالياً — تأكد من الإنترنت وحاول مجدداً.";
         this._render();
         return;
       }

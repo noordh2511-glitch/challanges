@@ -253,10 +253,14 @@
           .filter((p) => p && p.uid && p.name)
           .sort((a, b) => (Number(a.joinedAt) || 0) - (Number(b.joinedAt) || 0))
           .slice(0, MAX_PLAYERS)
-          .map((p) => ({ id: p.uid, name: String(p.name).trim() }));
+          .map((p) => ({
+            id: p.uid,
+            name: String(p.name).trim(),
+            avatar: typeof p.avatar === "string" ? p.avatar.trim() : ""
+          }));
       }
       return this.localNames
-        .map((name, idx) => ({ id: `lp_${idx}`, name: name.trim() }))
+        .map((name, idx) => ({ id: `lp_${idx}`, name: name.trim(), avatar: "" }))
         .filter((p) => p.name)
         .slice(0, MAX_PLAYERS);
     }
@@ -280,7 +284,7 @@
       if (!sync) return;
       if (!sync.isConfigured()) {
         this.wireless.feedbackKind = "warning";
-        this.wireless.feedback = "⚠️ يرجى ضبط إعدادات Firebase أولاً من زر «📡 الغرفة اللاسلكية» في الشاشة الرئيسية.";
+        this.wireless.feedback = "⚠️ خدمة اللعب عبر الهواتف غير متاحة حالياً — تأكد من الاتصال بالإنترنت.";
         this._render();
         return;
       }
@@ -1234,7 +1238,7 @@
                                   <div class="wireless-device-row${isVip ? " is-vip-row" : ""}">
                                     <div class="wireless-device-meta">
                                       <span class="wireless-device-online-dot"></span>
-                                      <strong>${isVip ? "👑 " : ""}${escapeHtml(p.name)}</strong>
+                                      <strong>${isVip ? "👑 " : ""}${p.avatar ? `${escapeHtml(p.avatar)} ` : ""}${escapeHtml(p.name)}</strong>
                                       ${isVip ? `<span class="bs-vip-tag">VIP</span>` : ""}
                                       <span class="bs-mini-score">${Number(this.scoresById[p.id]) || 0} نقطة</span>
                                     </div>
@@ -1309,7 +1313,7 @@
               📱 جهاز واحد (أوفلاين)
             </button>
             <button type="button" class="bs-mode-tab${this.playMode === "wireless" ? " active" : ""}" data-bs-mode="wireless">
-              📡 لاسلكي بهواتف اللاعبين (Firebase)
+              📱 اللعب عبر الهواتف
             </button>
           </div>
 

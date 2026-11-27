@@ -496,7 +496,7 @@
     async _ensureFirebase() {
       const cfg = window.SeenJeemFirebaseConfig ? window.SeenJeemFirebaseConfig.getConfig() : null;
       if (!window.SeenJeemFirebaseConfig || !window.SeenJeemFirebaseConfig.isValidConfig(cfg)) {
-        throw new Error("إعدادات Firebase غير مكتملة — تأكد من ضبط firebaseConfig.js.");
+        throw new Error("خدمة تسجيل الدخول غير متوفرة حالياً — يمكنك الاستمرار باللعب محلياً.");
       }
       const sdk = await this._loadFirebaseSdk();
       const hostAppName = `seen-jeem-host-${sanitizeKey(cfg.projectId || "default")}`;
@@ -504,7 +504,51 @@
       this._app = existing || sdk.appMod.initializeApp(cfg, hostAppName);
       this._auth = sdk.authMod.getAuth(this._app);
       this._db = sdk.dbMod.getDatabase(this._app);
+      if (!this._authObserverBound && typeof sdk.authMod.onAuthStateChanged === "function") {
+        this._authObserverBound = true;
+        sdk.authMod.onAuthStateChanged(this._auth, (fbUser) => {
+          const nextUser = fbUser && !fbUser.isAnonymous ? fbUser : null;
+          const prevUid = this._user ? this._user.uid : "";
+          const nextUid = nextUser ? nextUser.uid : "";
+          this._user = nextUser;
+          if (!nextUser) {
+            this._status = "signed-out";
+          } else if (this._status === "signed-out") {
+            this._status = "synced";
+          }
+          if (prevUid !== nextUid) {
+            this._emit();
+          }
+        });
+      }
       return { sdk, auth: this._auth, db: this._db };
+    }
+
+    async saveUserProfile(profileObj) {
+      if (!this.isSignedIn() || !navigator.onLine || !profileObj) return { ok: false };
+      try {
+        const { sdk, db } = await this._ensureFirebase();
+        const clean = stripUndefinedAndHeavyMedia(profileObj);
+        await sdk.dbMod.set(sdk.dbMod.ref(db, `users/${this._user.uid}/profile`), clean);
+        return { ok: true };
+      } catch (_err) {
+        return { ok: false };
+      }
+    }
+
+    async syncUserProfile() {
+      if (!this.isSignedIn() || !navigator.onLine || !window.SeenJeemProfile) return { ok: false };
+      try {
+        const { sdk, db } = await this._ensureFirebase();
+        const profRef = sdk.dbMod.ref(db, `users/${this._user.uid}/profile`);
+        const snap = await sdk.dbMod.get(profRef);
+        const remoteProf = snap && snap.exists() ? snap.val() : null;
+        const merged = window.SeenJeemProfile.mergeRemoteProfile(remoteProf, this._user);
+        await sdk.dbMod.set(profRef, stripUndefinedAndHeavyMedia(merged));
+        return { ok: true, profile: merged };
+      } catch (_err) {
+        return { ok: false };
+      }
     }
 
     /**
@@ -538,6 +582,7 @@
         this._user = auth.currentUser;
         this._status = "synced";
         this._emit();
+        await this.syncUserProfile();
         await this._checkRemoteAndAutoSync();
       } else {
         localStorage.removeItem(SIGNED_IN_HINT_KEY);
@@ -586,23 +631,23 @@
         }
         localStorage.setItem(SIGNED_IN_HINT_KEY, "1");
         this._emit();
+        await this.syncUserProfile();
         const syncRes = await this.syncNow({ silent: false });
         return { ok: true, user: this.getState().user, synced: syncRes.ok };
       } catch (err) {
         const code = String((err && err.code) || "");
-        let friendly = (err && err.message) || "تعذّر تسجيل الدخول بحساب Google.";
+        let friendly = "تعذّر تسجيل الدخول حالياً، تأكد من الإنترنت وحاول مجدداً.";
         let suggestRedirect = false;
 
         if (code === "auth/popup-blocked") {
-          friendly = "المتصفح حظر النافذة المنبثقة — اسمح بالنوافذ المنبثقة أو استخدم خيار تسجيل الدخول المباشر (Redirect).";
+          friendly = "يرجى السماح بالنوافذ المنبثقة لإتمام تسجيل الدخول، أو استخدم خيار تسجيل الدخول المباشر.";
           suggestRedirect = true;
         } else if (code === "auth/unauthorized-domain") {
-          const host = window.location.hostname || "localhost";
-          friendly = `الدومين الحالي (${host}) غير مضاف في Firebase Console ← Authentication ← Settings ← Authorized domains.`;
+          friendly = "تعذّر إتمام تسجيل الدخول من هذا الرابط حالياً — يرجى التواصل مع إدارة الموقع.";
         } else if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
           friendly = "تم إلغاء نافذة تسجيل الدخول.";
         } else if (code === "auth/operation-not-allowed") {
-          friendly = "يرجى تفعيل مزوّد Google داخل Firebase Console ← Authentication ← Sign-in method.";
+          friendly = "تسجيل الدخول بحساب Google غير مفعّل حالياً.";
         }
 
         this._lastError = friendly;
@@ -702,7 +747,7 @@
         return { ok: true, merged };
       } catch (err) {
         this._status = "error";
-        this._lastError = (err && err.message) || "تعذّرت المزامنة السحابية.";
+        this._lastError = "تعذّر حفظ بياناتك حالياً، تأكد من الإنترنت وحاول مجدداً.";
         this._emit();
         return { ok: false, error: this._lastError };
       }

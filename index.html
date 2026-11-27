@@ -45,19 +45,20 @@
   <div id="mafia-player-root" class="player-view-root mafia-player-root" hidden aria-hidden="true"></div>
 
   <!-- =========================================================
-       الشاشة الأولى: شاشة إعداد الجولة (Setup Screen)
+       الشاشة الأولى: بوابة الألعاب الرئيسية + شاشة إعداد «سين جيم» المنفصلة (Pack 16)
        ========================================================= -->
   <main id="setup-screen" class="screen setup-screen active">
     <div class="container setup-container">
-      <header class="hero-header">
-        <div class="hero-top-row">
+      <!-- الشريط العلوي النظيف للمنصة -->
+      <header class="hero-header hub-header">
+        <div class="hero-top-row hub-top-row">
           <div class="hero-badges-group">
-            <div class="brand-badge">
-              <span class="brand-dot"></span>
-              مسابقة ثقافية جماعية تفاعلية
+            <div class="hub-brand-lockup" id="btn-hub-logo-home" role="button" tabindex="0" title="العودة للقائمة الرئيسية">
+              <span class="hub-logo-icon" aria-hidden="true">🎯</span>
+              <span class="hub-logo-name"><span class="brand-highlight">سين</span> جيم</span>
             </div>
             <span id="offline-status-badge" class="offline-status-badge" hidden aria-live="polite">
-              📡 وضع عدم الاتصال
+              📡 بدون إنترنت
             </span>
           </div>
           <div class="hero-utility-actions">
@@ -66,10 +67,19 @@
               id="btn-install-pwa"
               class="btn btn-gold-outline btn-xs pwa-install-btn"
               hidden
-              title="تثبيت «سين جيم» كتطبيق مستقل يعمل دون إنترنت"
+              title="تثبيت التطبيق على جهازك للعب بدون إنترنت"
             >
               <span>📲</span>
               <span>تثبيت التطبيق</span>
+            </button>
+            <button
+              type="button"
+              id="btn-hub-cycle-theme"
+              class="btn btn-icon-only btn-sm hero-sound-btn"
+              title="تبديل مظهر التطبيق"
+              aria-label="تبديل مظهر التطبيق"
+            >
+              🎨
             </button>
             <div class="inline-volume-control" title="التحكم بمستوى الصوت">
               <button
@@ -90,100 +100,164 @@
                 max="100"
                 step="5"
                 value="75"
-                aria-label="مستوى الصوت في شاشة الإعداد"
+                aria-label="مستوى الصوت"
               />
               <span id="setup-volume-pct" class="inline-volume-pct">75%</span>
             </div>
             <button
               type="button"
-              id="btn-cloud-sync-pill"
-              class="btn btn-secondary btn-xs cloud-header-pill"
-              title="المزامنة السحابية لحساب المقدّم (Google Auth)"
-            >
-              <span id="cloud-pill-icon">☁️</span>
-              <span id="cloud-pill-label">المزامنة السحابية</span>
-            </button>
-            <button
-              type="button"
-              id="btn-open-wireless-setup"
-              class="btn btn-secondary btn-xs"
-              title="الغرفة اللاسلكية عبر QR Code (ريموت المقدّم وجرس السرعة)"
-            >
-              <span>📡</span>
-              <span>الغرفة اللاسلكية</span>
-            </button>
-            <button
-              type="button"
               id="btn-audio-mixer-setup"
               class="btn btn-icon-only btn-sm hero-sound-btn"
-              title="تخصيص فئات المؤثرات الصوتية"
-              aria-label="فتح إعدادات الصوت"
+              title="إعدادات الصوت"
+              aria-label="إعدادات الصوت"
               aria-expanded="false"
             >
               🎚️
             </button>
+            <button
+              type="button"
+              id="btn-open-admin-panel"
+              class="btn btn-gold-outline btn-xs admin-header-btn"
+              hidden
+              title="لوحة إدارة المنصة (للمالك فقط)"
+            >
+              <span>🛡️</span>
+              <span>لوحة الإدارة</span>
+            </button>
+            <button
+              type="button"
+              id="btn-cloud-sync-pill"
+              class="btn btn-primary btn-xs cloud-header-pill hub-account-btn"
+              title="تسجيل الدخول أو عرض ملفك الشخصي"
+            >
+              <span id="cloud-pill-icon" class="hub-pill-avatar">👤</span>
+              <span id="cloud-pill-label">تسجيل الدخول</span>
+              <span id="cloud-pill-online-dot" class="hub-online-dot" hidden aria-hidden="true"></span>
+            </button>
           </div>
         </div>
-        <h1 class="brand-title">
-          <span class="brand-highlight">سين</span> جيم
-        </h1>
-        <p class="brand-subtitle">
-          أدخل أسماء الفريقين، خصّص وسائل المساعدة التكتيكية، واختر <strong>6 فئات</strong> لتبدأ جولة التحدي من 36 سؤالاً
-        </p>
       </header>
 
-      <!-- شريط إطلاق الأطوار السريعة وقاعة المشاهير (Phase 4 Pack 7) -->
-      <section id="mode-launcher-bar" class="mode-launcher-bar" aria-label="أطوار اللعب السريعة وقاعة المشاهير">
-        <button type="button" id="btn-launch-blitz-mode" class="mode-launch-card mode-blitz">
-          <span class="mode-launch-icon" aria-hidden="true">⚡</span>
-          <div class="mode-launch-text">
-            <strong>جولة البرق السريعة (60ث)</strong>
-            <span>تحدي سرعة وسلسلة إجابات لـ 1–4 فرق</span>
+      <!-- =========================================================
+           1) بوابة الألعاب بالبطاقات المنفصلة (Clean Game Hub)
+           ========================================================= -->
+      <section id="game-hub-view" class="game-hub-view" aria-label="بوابة الألعاب الرئيسية">
+        <div class="hub-hero-welcome">
+          <div class="brand-badge">
+            <span class="brand-dot"></span>
+            منصة المسابقات والسهرات الجماعية
           </div>
-        </button>
-        <button type="button" id="btn-launch-charades-mode" class="mode-launch-card mode-charades">
-          <span class="mode-launch-icon" aria-hidden="true">🎭</span>
-          <div class="mode-launch-text">
-            <strong>طور «من غير كلام» المستقل</strong>
-            <span>تمثيل صامت مباشر بـ 13 فئة ومؤقت حيّ</span>
-          </div>
-        </button>
-        <button type="button" id="btn-launch-bara-salfa" class="mode-launch-card mode-bara-salfa">
-          <span class="mode-launch-icon" aria-hidden="true">🕵️</span>
-          <div class="mode-launch-text">
-            <strong>برا السالفة</strong>
-            <span>اكتشف المخادع (3–12 لاعباً • محلي أو بالهواتف)</span>
-          </div>
-        </button>
-        <button type="button" id="btn-launch-mafia" class="mode-launch-card mode-mafia">
-          <span class="mode-launch-icon" aria-hidden="true">🎭</span>
-          <div class="mode-launch-text">
-            <strong>المافيا</strong>
-            <span>الراوي الآلي بالهواتف والتلفزيون (4–16 لاعباً)</span>
-          </div>
-        </button>
-        <button type="button" id="btn-launch-audio-challenge" class="mode-launch-card mode-audio-challenge">
-          <span class="mode-launch-icon" aria-hidden="true">🎵</span>
-          <div class="mode-launch-text">
-            <strong>تحدي الصوت</strong>
-            <span>مقاطع متتالية بتدرّج زمني (3ث ← 7ث ← كامل) وجرس السرعة</span>
-          </div>
-        </button>
-        <button type="button" id="btn-launch-tournament" class="mode-launch-card mode-tournament">
-          <span class="mode-launch-icon" aria-hidden="true">🏆</span>
-          <div class="mode-launch-text">
-            <strong>نظام البطولة</strong>
-            <span>خروج المغلوب (4/8 فرق) أو دوري نقاط كامل</span>
-          </div>
-        </button>
-        <button type="button" id="btn-open-hall-of-fame" class="mode-launch-card mode-hof">
-          <span class="mode-launch-icon" aria-hidden="true">🏆</span>
-          <div class="mode-launch-text">
-            <strong>قاعة المشاهير والأرشيف</strong>
-            <span>الأرقام القياسية، المتصدرون، وآخر 50 مباراة</span>
-          </div>
-        </button>
+          <h1 class="brand-title">
+            <span class="brand-highlight">سين</span> جيم
+          </h1>
+          <p class="brand-subtitle">
+            اختر لعبتك المفضّلة للبدء فوراً — بالهواتف، على التلفزيون، أو على جهاز واحد
+          </p>
+        </div>
+
+        <!-- شبكة البطاقات السبع المنفصلة -->
+        <div id="mode-launcher-bar" class="game-hub-grid" aria-label="قائمة الألعاب والأطوار">
+          <button type="button" id="btn-launch-seen-jeem" class="hub-game-card mode-seen-jeem">
+            <span class="hub-card-badge">فرق</span>
+            <span class="hub-card-icon" aria-hidden="true">🎯</span>
+            <strong class="hub-card-title">سين جيم</strong>
+            <span class="hub-card-desc">اللوحة الكلاسيكية وتحدي الفئات</span>
+          </button>
+
+          <button type="button" id="btn-launch-blitz-mode" class="hub-game-card mode-blitz">
+            <span class="hub-card-badge">فرق • سرعة</span>
+            <span class="hub-card-icon" aria-hidden="true">⚡</span>
+            <strong class="hub-card-title">جولة البرق</strong>
+            <span class="hub-card-desc">تحدي السرعة والإجابات المتتالية</span>
+          </button>
+
+          <button type="button" id="btn-launch-charades-mode" class="hub-game-card mode-charades">
+            <span class="hub-card-badge">فرق • تمثيل</span>
+            <span class="hub-card-icon" aria-hidden="true">🎭</span>
+            <strong class="hub-card-title">من غير كلام</strong>
+            <span class="hub-card-desc">التمثيل الصامت وتخمين الكلمات</span>
+          </button>
+
+          <button type="button" id="btn-launch-audio-challenge" class="hub-game-card mode-audio-challenge">
+            <span class="hub-card-badge">فرق • صوت</span>
+            <span class="hub-card-icon" aria-hidden="true">🎵</span>
+            <strong class="hub-card-title">تحدي الصوت</strong>
+            <span class="hub-card-desc">خمّن المقطع الصوتي وتحدّى الفرق</span>
+          </button>
+
+          <button type="button" id="btn-launch-bara-salfa" class="hub-game-card mode-bara-salfa">
+            <span class="hub-card-badge">بالهواتف / محلي</span>
+            <span class="hub-card-icon" aria-hidden="true">🕵️</span>
+            <strong class="hub-card-title">برا السالفة</strong>
+            <span class="hub-card-desc">اكشف المتسلّل بينكم بالهواتف أو بجهاز واحد</span>
+          </button>
+
+          <button type="button" id="btn-launch-mafia" class="hub-game-card mode-mafia">
+            <span class="hub-card-badge">بالهواتف</span>
+            <span class="hub-card-icon" aria-hidden="true">🕶️</span>
+            <strong class="hub-card-title">المافيا</strong>
+            <span class="hub-card-desc">لعبة الغموض والليل والنهار بالهواتف</span>
+          </button>
+
+          <button type="button" id="btn-launch-tournament" class="hub-game-card mode-tournament">
+            <span class="hub-card-badge">بطولة فرق</span>
+            <span class="hub-card-icon" aria-hidden="true">🏆</span>
+            <strong class="hub-card-title">نظام البطولة</strong>
+            <span class="hub-card-desc">دوري وتصفيات للفرق حتى التتويج</span>
+          </button>
+        </div>
+
+        <!-- شريط الوصول السريع أسفل البطاقات -->
+        <div id="hub-quick-access" class="hub-quick-access" aria-label="روابط سريعة">
+          <button type="button" id="btn-open-hall-of-fame" class="hub-quick-card">
+            <span class="hub-quick-icon" aria-hidden="true">🏅</span>
+            <div class="hub-quick-text">
+              <strong>قاعة المشاهير</strong>
+              <span>الأرقام القياسية والمتصدرون</span>
+            </div>
+          </button>
+
+          <button type="button" id="btn-open-player-profile" class="hub-quick-card">
+            <span class="hub-quick-icon" aria-hidden="true">👤</span>
+            <div class="hub-quick-text">
+              <strong>ملفي الشخصي</strong>
+              <span>الأفاتار، الأوسمة، وإحصائياتك</span>
+            </div>
+          </button>
+
+          <button type="button" id="btn-open-custom-pack-builder" class="hub-quick-card">
+            <span class="hub-quick-icon" aria-hidden="true">✨</span>
+            <div class="hub-quick-text">
+              <strong>فئاتي الخاصة</strong>
+              <span>اصنع أسئلتك وصورك وأصواتك على جهازك</span>
+            </div>
+          </button>
+        </div>
       </section>
+
+      <!-- =========================================================
+           2) شاشة إعداد لعبة «سين جيم» المنفصلة (تظهر عند اختيار بطاقة سين جيم فقط)
+           ========================================================= -->
+      <div id="seen-jeem-setup-view" class="seen-jeem-setup-view" hidden>
+        <div class="sj-subpage-bar">
+          <button type="button" id="btn-back-to-hub-from-sj" class="btn btn-secondary btn-sm">
+            ⬅️ العودة للقائمة الرئيسية
+          </button>
+          <div class="sj-subpage-title">
+            <span>🎯</span>
+            <strong>إعداد جولة «سين جيم» الكلاسيكية</strong>
+          </div>
+          <div class="sj-subpage-actions">
+            <button type="button" id="btn-open-wireless-setup" class="btn btn-secondary btn-xs" title="ربط هواتف الفرق وجرس السرعة">
+              <span>📱</span>
+              <span>اللعب عبر الهواتف</span>
+            </button>
+            <button type="button" id="btn-open-custom-pack-builder-sj" class="btn btn-amber btn-xs" title="صنع فئاتك الخاصة على جهازك">
+              <span>✨</span>
+              <span>فئاتي الخاصة</span>
+            </button>
+          </div>
+        </div>
 
       <!-- إدخال عدد وأسماء الفرق (2 إلى 4 فرق - Phase 4 Pack 5) -->
       <section class="panel teams-setup-panel" aria-label="إعداد الفرق">
@@ -581,17 +655,13 @@
           </div>
 
           <div class="toolbar-actions">
-            <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm">
-              <span class="btn-icon">☁️</span>
-              تحديث الشيت
+            <button type="button" id="btn-sync-sheets" class="btn btn-secondary btn-sm admin-only-el" hidden>
+              <span class="btn-icon">🔄</span>
+              تحديث الأسئلة
             </button>
-            <button type="button" id="btn-open-custom-pack-builder" class="btn btn-amber btn-sm" title="إنشاء فئات خاصة بأسئلة صور وفروقات وتحديات صوتية">
-              <span class="btn-icon">✨</span>
-              صانع الفئات
-            </button>
-            <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm">
-              <span class="btn-icon">📚</span>
-              إدارة البنك
+            <button type="button" id="btn-open-bank-manager" class="btn btn-gold-outline btn-sm admin-only-el" hidden>
+              <span class="btn-icon">🛡️</span>
+              لوحة الإدارة
             </button>
             <button type="button" id="btn-reset-history" class="btn btn-danger-outline btn-sm">
               <span class="btn-icon">🔄</span>
@@ -754,6 +824,7 @@
         </button>
       </div>
     </div>
+    </div> <!-- نهاية #seen-jeem-setup-view -->
   </main>
 
   <!-- =========================================================
@@ -1594,35 +1665,40 @@
       <div class="bank-modal-header">
         <div class="bank-modal-title-group">
           <h2 id="bank-manager-title" class="bank-modal-title">
-            <span>📚</span>
-            إدارة بنك الأسئلة
+            <span>🛡️</span>
+            لوحة الإدارة — إدارة الأسئلة والبلاغات
           </h2>
           <p id="bank-sources-summary" class="bank-sources-summary"></p>
         </div>
-        <button type="button" id="btn-close-bank-manager" class="q-modal-close-btn" aria-label="إغلاق نافذة إدارة بنك الأسئلة" title="إغلاق (Esc)">
-          ✕
-        </button>
+        <div class="bara-header-actions">
+          <button type="button" id="btn-admin-sync-sheets" class="btn btn-primary btn-xs">
+            🔄 تحديث الأسئلة من الشيت الآن
+          </button>
+          <button type="button" id="btn-close-bank-manager" class="q-modal-close-btn" aria-label="إغلاق لوحة الإدارة" title="إغلاق (Esc)">
+            ✕
+          </button>
+        </div>
       </div>
 
       <!-- محتوى قابل للتمرير -->
       <div class="bank-modal-scroll-body">
-        <!-- المزامنة السحابية لحساب المقدّم (Pack 13 - Google Auth + Smart Merge) -->
-        <section id="bank-cloud-sync-section" class="bank-section cloud-sync-section" aria-label="المزامنة السحابية لحساب المقدّم">
+        <!-- حفظ الحساب التلقائي (مخفي هنا للمالك مع نقله إلى نافذة «ملفي الشخصي») -->
+        <section id="bank-cloud-sync-section" class="bank-section cloud-sync-section" aria-label="حفظ الحساب التلقائي">
           <div class="bank-section-header">
-            <h3 class="bank-section-title">☁️ المزامنة السحابية لحساب المقدّم</h3>
+            <h3 class="bank-section-title">👤 حالة حساب الإدارة</h3>
             <span id="cloud-sync-status-badge" class="bank-count-pill">⚪ وضع محلي فقط</span>
           </div>
 
           <div id="cloud-signed-out-box" class="cloud-signed-out-box">
             <p class="cloud-sync-desc">
-              سجّل دخولك اختيارياً بحساب Google لمزامنة سجل الأسئلة الملعوبة، قاعة المشاهير، إحصائيات وفئات «برا السالفة» النصية، البلاغات، والبطولة بين أجهزتك تلقائياً — ويبقى التطبيق يعمل 100% أوفلاين بدون تسجيل دخول.
+              سجّل دخولك بحساب Google لحفظ ملفك الشخصي وإحصائياتك وأرقامك القياسية ومتابعة لعبك من أي جهاز.
             </p>
             <div class="cloud-auth-actions">
               <button type="button" id="btn-cloud-google-signin" class="btn btn-primary btn-sm">
-                🔐 تسجيل الدخول بحساب Google
+                المتابعة بحساب Google
               </button>
               <button type="button" id="btn-cloud-google-redirect" class="btn btn-secondary btn-xs" hidden>
-                ↪️ تسجيل الدخول المباشر (Redirect)
+                ↪️ تسجيل الدخول المباشر
               </button>
             </div>
           </div>
@@ -1631,9 +1707,9 @@
             <div class="cloud-user-card">
               <img id="cloud-user-avatar" class="cloud-user-avatar" alt="صورة الحساب" hidden />
               <div class="cloud-user-info">
-                <strong id="cloud-user-name">المقدّم</strong>
+                <strong id="cloud-user-name">المالك</strong>
                 <span id="cloud-user-email" class="cloud-user-email"></span>
-                <span id="cloud-last-sync-text" class="cloud-last-sync-text">آخر مزامنة: —</span>
+                <span id="cloud-last-sync-text" class="cloud-last-sync-text">آخر حفظ: —</span>
               </div>
               <button type="button" id="btn-cloud-signout" class="btn btn-ghost btn-xs">
                 🚪 تسجيل الخروج
@@ -1642,20 +1718,20 @@
 
             <div class="cloud-manual-actions">
               <button type="button" id="btn-cloud-sync-now" class="btn btn-steal-win btn-xs">
-                🔄 مزامنة الآن (دمج ذكي)
+                🔄 حفظ وتحديث بياناتي الآن
               </button>
               <button type="button" id="btn-cloud-push-local" class="btn btn-secondary btn-xs">
-                ⬆️ اعتماد نسخة هذا الجهاز على السحابة
+                ⬆️ اعتماد نسخة هذا الجهاز
               </button>
               <button type="button" id="btn-cloud-pull-cloud" class="btn btn-gold-outline btn-xs">
-                ⬇️ استرجاع نسخة السحابة على هذا الجهاز
+                ⬇️ استرجاع النسخة المحفوظة
               </button>
             </div>
           </div>
 
           <div id="cloud-sync-feedback" class="bank-feedback-box" hidden aria-live="polite"></div>
           <p class="cloud-quota-note">
-            💡 <strong>حماية المساحة المجانية:</strong> صور وصوتيات «فئاتي الخاصة» (IndexedDB) تبقى محلية في المتصفح وتُنسخ عبر تصدير JSON فقط ولا تُرفع إلى Firebase RTDB.
+            💡 صور وصوتيات فئاتك الخاصة تُحفظ على هذا الجهاز فقط.
           </p>
         </section>
 
@@ -2184,8 +2260,8 @@
           <h2 id="blitz-modal-title" class="final-title">جولة البرق السريعة</h2>
         </div>
         <div class="side-mode-header-actions">
-          <button type="button" id="btn-blitz-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 TV</button>
-          <button type="button" id="btn-close-blitz" class="q-modal-close-btn" aria-label="إغلاق جولة البرق">✕</button>
+          <button type="button" id="btn-blitz-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 التلفزيون</button>
+          <button type="button" id="btn-close-blitz" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
 
@@ -2320,8 +2396,8 @@
           <h2 id="charades-solo-title" class="final-title">طور «من غير كلام» المستقل</h2>
         </div>
         <div class="side-mode-header-actions">
-          <button type="button" id="btn-charades-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 TV</button>
-          <button type="button" id="btn-close-charades-solo" class="q-modal-close-btn" aria-label="إغلاق طور من غير كلام">✕</button>
+          <button type="button" id="btn-charades-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 التلفزيون</button>
+          <button type="button" id="btn-close-charades-solo" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
 
@@ -2625,53 +2701,53 @@
               <button type="button" id="btn-close-wireless-room" class="btn btn-danger-outline btn-sm" hidden>
                 🔴 إغلاق وحذف الغرفة الآن
               </button>
-              <button type="button" id="btn-toggle-wireless-settings" class="btn btn-secondary btn-sm" aria-expanded="false">
-                ⚙️ إعدادات الاتصال اللاسلكي
+              <button type="button" id="btn-toggle-wireless-settings" class="btn btn-secondary btn-sm admin-only-el" hidden aria-expanded="false">
+                ⚙️ إعدادات الاتصال
               </button>
             </div>
           </div>
 
-          <div id="wireless-diagnostics-bar" class="wireless-diagnostics-bar" hidden>
+          <div id="wireless-diagnostics-bar" class="wireless-diagnostics-bar admin-only-el" hidden>
             <span>📊 استهلاك الجلسة: <strong id="wireless-diag-kb">0 KB</strong></span>
             <span aria-hidden="true">•</span>
             <span>عمليات الكتابة: <strong id="wireless-diag-writes">0</strong></span>
             <span aria-hidden="true">•</span>
-            <span>مُوفَّرة (Diff): <strong id="wireless-diag-skipped">0</strong></span>
+            <span>مُوفَّرة: <strong id="wireless-diag-skipped">0</strong></span>
           </div>
 
           <div id="wireless-room-feedback" class="wireless-feedback-box" hidden aria-live="polite"></div>
 
-          <!-- لوحة إعدادات Firebase القابلة للطي -->
-          <div id="wireless-settings-panel" class="wireless-settings-panel" hidden>
+          <!-- لوحة إعدادات الاتصال (للمالك فقط) -->
+          <div id="wireless-settings-panel" class="wireless-settings-panel admin-only-el" hidden>
             <div class="wireless-settings-head">
-              <strong>⚙️ إعدادات مشروع Firebase Realtime Database</strong>
-              <span class="wireless-settings-hint">تُحفظ محلياً في المتصفح فقط (أو في ملف firebaseConfig.js)</span>
+              <strong>⚙️ إعدادات الاتصال بالخادم (للمالك فقط)</strong>
+              <span class="wireless-settings-hint">تُحفظ على هذا الجهاز فقط</span>
             </div>
-            <label for="fb-paste-snippet" class="input-label">لصق سريع لإعدادات Firebase (JSON أو كود JS من Firebase Console):</label>
+            <label for="fb-paste-snippet" class="input-label">لصق سريع لإعدادات الربط:</label>
             <div class="wireless-paste-row">
-              <textarea id="fb-paste-snippet" class="text-input wireless-snippet-input" rows="2" placeholder='الصق هنا: const firebaseConfig = { apiKey: "...", databaseURL: "...", ... }'></textarea>
+              <textarea id="fb-paste-snippet" class="text-input wireless-snippet-input" rows="2" placeholder="الصق نص الإعدادات هنا..."></textarea>
               <button type="button" id="btn-fb-parse-snippet" class="btn btn-secondary btn-xs">✨ استخراج تلقائي</button>
             </div>
             <div class="wireless-cfg-grid">
               <div>
-                <label for="fb-api-key" class="input-label">apiKey</label>
-                <input type="text" id="fb-api-key" class="text-input" placeholder="AIza..." autocomplete="off" />
+                <label for="fb-api-key" class="input-label">مفتاح الربط</label>
+                <input type="text" id="fb-api-key" class="text-input" placeholder="المفتاح..." autocomplete="off" />
               </div>
               <div>
-                <label for="fb-auth-domain" class="input-label">authDomain</label>
-                <input type="text" id="fb-auth-domain" class="text-input" placeholder="project.firebaseapp.com" autocomplete="off" />
+                <label for="fb-auth-domain" class="input-label">نطاق الدخول</label>
+                <input type="text" id="fb-auth-domain" class="text-input" placeholder="النطاق..." autocomplete="off" />
               </div>
               <div>
-                <label for="fb-database-url" class="input-label">databaseURL (إلزامي)</label>
-                <input type="url" id="fb-database-url" class="text-input" placeholder="https://project-default-rtdb.firebaseio.com" autocomplete="off" />
+                <label for="fb-database-url" class="input-label">رابط القاعدة (إلزامي)</label>
+                <input type="url" id="fb-database-url" class="text-input" placeholder="https://..." autocomplete="off" />
               </div>
               <div>
-                <label for="fb-project-id" class="input-label">projectId</label>
-                <input type="text" id="fb-project-id" class="text-input" placeholder="my-seen-jeem" autocomplete="off" />
+                <label for="fb-project-id" class="input-label">معرّف المشروع</label>
+                <input type="text" id="fb-project-id" class="text-input" placeholder="المعرّف..." autocomplete="off" />
               </div>
               <div class="wireless-cfg-span-2">
-                <label for="fb-app-id" class="input-label">appId</label>
-                <input type="text" id="fb-app-id" class="text-input" placeholder="1:123456:web:abcdef" autocomplete="off" />
+                <label for="fb-app-id" class="input-label">معرّف التطبيق</label>
+                <input type="text" id="fb-app-id" class="text-input" placeholder="المعرّف..." autocomplete="off" />
               </div>
             </div>
             <div class="wireless-settings-actions">
@@ -2692,12 +2768,12 @@
                 <p class="wireless-qr-sub">يعرض الإجابات ويتحكّم باللعبة — لا تُظهره للاعبين!</p>
               </div>
               <button type="button" id="btn-toggle-host-qr-privacy" class="btn btn-secondary btn-xxs">
-                🙈 إخفاء QR المقدّم
+                🙈 إخفاء رمز المقدّم
               </button>
             </div>
             <div id="wireless-host-qr-box" class="wireless-qr-svg-wrap"></div>
             <div id="wireless-host-qr-masked" class="wireless-qr-masked" hidden>
-              <span>🔒 تم إخفاء QR المقدّم حمايةً لـ hostToken</span>
+              <span>🔒 تم إخفاء رمز المقدّم حفاظاً على الخصوصية</span>
             </div>
             <div class="wireless-qr-actions">
               <button type="button" id="btn-copy-remote-url" class="btn btn-ghost btn-xxs">📋 نسخ رابط الريموت</button>
@@ -2963,7 +3039,7 @@
   </div>
 
   <!-- =========================================================
-       نافذة لعبة «برا السالفة» (الوضع المحلي + الوضع اللاسلكي عبر Firebase + التلفزيون)
+       نافذة لعبة «برا السالفة» (الوضع المحلي + اللعب عبر الهواتف + التلفزيون)
        ========================================================= -->
   <div id="bara-salfa-modal" class="modal-overlay bara-salfa-overlay" role="dialog" aria-modal="true" aria-labelledby="bara-salfa-title" aria-hidden="true">
     <div class="modal-card bara-salfa-modal-card">
@@ -2974,17 +3050,17 @@
             لعبة «برا السالفة»
           </h2>
           <p class="bank-sources-summary">
-            12 فئة عربية/أردنية مدمجة (336 كلمة) + فئات خاصة — العب محلياً على جهاز واحد أو لاسلكياً عبر هواتف اللاعبين!
+            12 فئة عربية/أردنية مدمجة + فئات خاصة — العب على جهاز واحد أو عبر هواتف اللاعبين!
           </p>
         </div>
         <div class="bara-header-actions">
-          <button type="button" id="btn-bara-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة عند التحكم من هاتف VIP">
-            📺 وضع العرض الكامل (بدون أزرار)
+          <button type="button" id="btn-bara-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة">
+            📺 العرض الكامل
           </button>
           <button type="button" id="btn-bara-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
             📺 التلفزيون
           </button>
-          <button type="button" id="btn-close-bara-salfa" class="q-modal-close-btn" aria-label="إغلاق لعبة برا السالفة">✕</button>
+          <button type="button" id="btn-close-bara-salfa" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
       <div id="bara-salfa-body" class="bank-modal-scroll-body bara-salfa-body"></div>
@@ -2995,28 +3071,28 @@
   </div>
 
   <!-- =========================================================
-       نافذة لعبة «المافيا» اللاسلكية بالهواتف والتلفزيون (الراوي الآلي - Pack 14)
+       نافذة لعبة «المافيا» بالهواتف والتلفزيون (الراوي الآلي - Pack 14)
        ========================================================= -->
   <div id="mafia-modal" class="modal-overlay mafia-overlay" role="dialog" aria-modal="true" aria-labelledby="mafia-modal-title" aria-hidden="true">
     <div class="modal-card mafia-modal-card">
       <div class="bank-modal-header">
         <div class="bank-modal-title-group">
           <h2 id="mafia-modal-title" class="bank-modal-title">
-            <span>🎭</span>
+            <span>🕶️</span>
             لعبة «المافيا» — الراوي الآلي
           </h2>
           <p class="bank-sources-summary">
-            4 إلى 16 لاعباً بالهواتف والتلفزيون — توزيع سري، تمويه ليلي ذكي، طبيب ومحقق ومهرج، وتحكم VIP دون كشف أي دور!
+            4 إلى 16 لاعباً بالهواتف والتلفزيون — توزيع سري، تمويه ليلي ذكي، طبيب ومحقق ومهرج دون كشف أي دور!
           </p>
         </div>
         <div class="bara-header-actions">
-          <button type="button" id="btn-mafia-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة عند التحكم من هاتف VIP">
-            📺 وضع العرض الكامل (بدون أزرار)
+          <button type="button" id="btn-mafia-clean-tv" class="btn btn-secondary btn-xs" title="وضع العرض الكامل النظيف للشاشة">
+            📺 العرض الكامل
           </button>
           <button type="button" id="btn-mafia-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
             📺 التلفزيون
           </button>
-          <button type="button" id="btn-close-mafia" class="q-modal-close-btn" aria-label="إغلاق لعبة المافيا">✕</button>
+          <button type="button" id="btn-close-mafia" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
       <div id="mafia-body" class="bank-modal-scroll-body mafia-body"></div>
@@ -3038,17 +3114,17 @@
             طور «تحدي الصوت» المستقل
           </h2>
           <p class="bank-sources-summary">
-            مقاطع صوتية متتالية من بنك الأسئلة والفئات الخاصة أو ملفات جهازك مباشرةً — مع التدرّج الزمني (3ث ← 7ث ← كامل) وجرس السرعة!
+            مقاطع صوتية متتالية من الأسئلة وفئاتك الخاصة أو ملفات جهازك مباشرةً — مع التدرّج الزمني وجرس السرعة!
           </p>
         </div>
         <div class="bara-header-actions">
-          <button type="button" id="btn-ac-open-wireless" class="btn btn-secondary btn-xs" title="فتح الغرفة اللاسلكية لجرس السرعة وريموت المقدّم">
-            📡 جرس السرعة
+          <button type="button" id="btn-ac-open-wireless" class="btn btn-secondary btn-xs" title="فتح غرفة جرس السرعة للهواتف">
+            📱 جرس السرعة
           </button>
           <button type="button" id="btn-ac-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
             📺 التلفزيون
           </button>
-          <button type="button" id="btn-close-audio-challenge" class="q-modal-close-btn" aria-label="إغلاق طور تحدي الصوت">✕</button>
+          <button type="button" id="btn-close-audio-challenge" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
       <div id="audio-challenge-body" class="bank-modal-scroll-body audio-challenge-body"></div>
@@ -3074,7 +3150,7 @@
           <button type="button" id="btn-tournament-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
             📺 التلفزيون
           </button>
-          <button type="button" id="btn-close-tournament" class="q-modal-close-btn" aria-label="إغلاق نظام البطولة">✕</button>
+          <button type="button" id="btn-close-tournament" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
       <div id="tournament-body" class="bank-modal-scroll-body tournament-body"></div>
@@ -3090,10 +3166,10 @@
         <div class="bank-modal-title-group">
           <h2 id="cpb-modal-title" class="bank-modal-title">
             <span>✨</span>
-            صانع الفئات الخاصة (بصري / فروقات / صوتي)
+            فئاتي الخاصة (صور، فروقات، وأصوات)
           </h2>
           <p class="bank-sources-summary">
-            حفظ تلقائي بسعة كبيرة في IndexedDB مع ضغط الصور ودعم صورة الإجابة والمقاطع الصوتية حتى 2MB.
+            اصنع فئاتك الخاصة واحفظها تلقائياً على جهازك مع ضغط الصور ودعم صورة الإجابة والمقاطع الصوتية.
           </p>
         </div>
         <button type="button" id="btn-close-custom-pack-builder" class="q-modal-close-btn" aria-label="إغلاق صانع الفئات الخاصة">✕</button>
@@ -3102,11 +3178,68 @@
     </div>
   </div>
 
+  <!-- =========================================================
+       نافذة تسجيل الدخول الودية (Pack 16)
+       ========================================================= -->
+  <div id="auth-login-modal" class="modal-overlay auth-login-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-login-title" aria-hidden="true">
+    <div class="modal-card auth-login-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="auth-login-title" class="bank-modal-title">
+            <span>👤</span>
+            تسجيل الدخول
+          </h2>
+        </div>
+        <button type="button" id="btn-close-auth-login" class="q-modal-close-btn" aria-label="إغلاق نافذة تسجيل الدخول">✕</button>
+      </div>
+      <div class="auth-login-body">
+        <div class="auth-hero-avatar" aria-hidden="true">🎯</div>
+        <h3 class="auth-welcome-heading">أهلاً بك في سين جيم!</h3>
+        <p class="auth-welcome-desc">
+          سجّل دخولك لحفظ ملفك الشخصي وإحصائياتك وأرقامك القياسية ومتابعة لعبك من أي جهاز.
+        </p>
+        <button type="button" id="btn-auth-google-signin" class="btn btn-primary btn-lg auth-google-btn">
+          <span>🔐</span>
+          <span>المتابعة بحساب Google</span>
+        </button>
+        <button type="button" id="btn-auth-google-redirect" class="btn btn-secondary btn-sm" hidden>
+          ↪️ تسجيل الدخول المباشر
+        </button>
+        <div id="auth-login-feedback" class="bank-feedback-box" hidden aria-live="polite"></div>
+        <button type="button" id="btn-auth-continue-guest" class="btn btn-ghost btn-sm">
+          المتابعة كزائر (الحفظ على هذا الجهاز فقط)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       نافذة «ملفي الشخصي» وإحصائيات اللاعب والأوسمة (Pack 16)
+       ========================================================= -->
+  <div id="profile-modal" class="modal-overlay profile-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" aria-hidden="true">
+    <div class="modal-card profile-modal-card">
+      <div class="bank-modal-header">
+        <div class="bank-modal-title-group">
+          <h2 id="profile-modal-title" class="bank-modal-title">
+            <span>👤</span>
+            ملفي الشخصي
+          </h2>
+          <p class="bank-sources-summary">
+            خصّص اسمك وصورتك الرمزية ولقبك، وتابع مستواك وأوسمتك وإحصائياتك في جميع الألعاب.
+          </p>
+        </div>
+        <button type="button" id="btn-close-profile-modal" class="q-modal-close-btn" aria-label="إغلاق ملفي الشخصي">✕</button>
+      </div>
+      <div id="profile-modal-body" class="bank-modal-scroll-body profile-modal-body"></div>
+    </div>
+  </div>
+
   <!-- ربط ملفات البيانات والإعدادات والوحدات المستقلة والمنطق بالترتيب الصحيح -->
   <script src="src/data/questions.js"></script>
   <script src="src/data/extra-questions.js"></script>
   <script src="sheets-config.js"></script>
   <script src="firebaseConfig.js"></script>
+  <script src="adminConfig.js"></script>
   <script src="src/utils/historyStore.js"></script>
   <script src="src/utils/sheetSanitizer.js"></script>
   <script src="src/utils/matchStore.js"></script>
@@ -3128,6 +3261,7 @@
   <script src="src/utils/audioChallengePlayer.js"></script>
   <script src="src/utils/customPacksStore.js"></script>
   <script src="src/utils/cloudSyncManager.js"></script>
+  <script src="src/utils/playerProfileManager.js"></script>
   <script src="src/utils/sheetReportSync.js"></script>
   <script src="src/utils/pwaManager.js"></script>
   <script src="src/js/audio.js"></script>

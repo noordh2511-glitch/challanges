@@ -5,7 +5,7 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.16.0";
+const CACHE_VERSION = "seen-jeem-v4.17.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
@@ -17,6 +17,7 @@ const APP_SHELL_URLS = [
   "./manifest.webmanifest",
   "./sheets-config.js",
   "./firebaseConfig.js",
+  "./adminConfig.js",
   "./src/css/styles.css",
   "./src/data/questions.js",
   "./src/data/extra-questions.js",
@@ -41,6 +42,7 @@ const APP_SHELL_URLS = [
   "./src/utils/audioChallengePlayer.js",
   "./src/utils/customPacksStore.js",
   "./src/utils/cloudSyncManager.js",
+  "./src/utils/playerProfileManager.js",
   "./src/utils/sheetReportSync.js",
   "./src/utils/pwaManager.js",
   "./src/js/audio.js",

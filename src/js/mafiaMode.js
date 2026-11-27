@@ -523,6 +523,7 @@
           return {
             uid,
             name: String(p.name).trim(),
+            avatar: typeof p.avatar === "string" && p.avatar.trim() ? p.avatar.trim() : "👤",
             joinedAt: Number(p.joinedAt) || 0,
             online: p.online !== false
           };
@@ -551,7 +552,7 @@
       const sync = window.SeenJeemMafiaSync;
       if (!sync) return;
       if (!sync.isConfigured()) {
-        this._toast("⚠️ يرجى ضبط إعدادات Firebase أولاً من زر «📡 الغرفة اللاسلكية»", "warning");
+        this._toast("⚠️ تعذّر فتح غرفة اللعب حالياً — تأكد من الاتصال بالإنترنت", "warning");
         return;
       }
       try {
@@ -1493,7 +1494,7 @@
               !this.room.active
                 ? `
                   <div class="mafia-open-room-box">
-                    <p>${fbReady ? "افتح غرفة لاسلكية فورية ليمسح اللاعبون رمز QR بهواتفهم وينضمّوا مباشرة." : "⚠️ إعدادات Firebase غير مكتملة — اضبطها أولاً من زر «📡 الغرفة اللاسلكية» في الشاشة الرئيسية."}</p>
+                    <p>${fbReady ? "افتح غرفة لعب فورية ليمسح اللاعبون رمز QR بهواتفهم وينضمّوا مباشرة." : "⚠️ خدمة اللعب عبر الهواتف غير متاحة حالياً — تأكد من الاتصال بالإنترنت."}</p>
                     <button type="button" class="btn btn-primary btn-lg" data-mafia-act="create-room" ${!fbReady ? "disabled" : ""}>
                       🎭 فتح غرفة المافيا وإنشاء QR Code
                     </button>
@@ -1533,7 +1534,7 @@
                                   const isVip = this.room.vipUid === p.uid;
                                   return `
                                     <div class="mafia-lobby-player${isVip ? " is-vip" : ""}">
-                                      <span class="mafia-player-name">${idx + 1}. ${escapeHtml(p.name)} ${isVip ? `<span class="mafia-vip-tag">👑 VIP</span>` : ""}</span>
+                                      <span class="mafia-player-name">${escapeHtml(p.avatar || "👤")} ${escapeHtml(p.name)} ${isVip ? `<span class="mafia-vip-tag">👑 VIP</span>` : ""}</span>
                                       <div class="mafia-player-tools">
                                         ${!isVip ? `<button type="button" class="btn btn-ghost btn-xxs" data-mafia-act="set-vip" data-uid="${escapeHtml(p.uid)}" title="تعيين كمتحكم VIP">👑 VIP</button>` : ""}
                                         <button type="button" class="btn btn-danger-outline btn-xxs" data-mafia-act="kick-player" data-uid="${escapeHtml(p.uid)}" title="طرد اللاعب">🚫 طرد</button>

@@ -174,7 +174,7 @@
                 </div>
                 <div class="cpb-pack-actions">
                   <button type="button" class="btn btn-secondary btn-xs" data-cpb-edit="${escapeHtml(p.id)}">✏️ تعديل</button>
-                  <button type="button" class="btn btn-gold-outline btn-xs" data-cpb-export="${escapeHtml(p.id)}">⬇️ تصدير JSON</button>
+                  <button type="button" class="btn btn-gold-outline btn-xs" data-cpb-export="${escapeHtml(p.id)}">⬇️ تصدير الفئة</button>
                   <button type="button" class="btn btn-danger-outline btn-xs" data-cpb-del="${escapeHtml(p.id)}">🗑️</button>
                 </div>
               </article>
@@ -185,7 +185,7 @@
       this.bodyEl.innerHTML = `
         <div class="cpb-toolbar">
           <button type="button" id="cpb-btn-new-pack" class="btn btn-primary btn-sm">➕ إنشاء فئة خاصة جديدة</button>
-          <label for="cpb-import-file" class="btn btn-secondary btn-sm cpb-file-label">⬆️ استيراد فئة خاصة (JSON)</label>
+          <label for="cpb-import-file" class="btn btn-secondary btn-sm cpb-file-label">⬆️ استيراد فئة خاصة</label>
           <input type="file" id="cpb-import-file" accept=".json,application/json" hidden />
         </div>
         <div id="cpb-feedback-box" class="bank-feedback-box ${this.feedback.type ? `is-${this.feedback.type}` : ""}" ${this.feedback.text ? "" : "hidden"}>${escapeHtml(this.feedback.text)}</div>
@@ -226,7 +226,7 @@
             this._setFeedback("error", `❌ ${res.error || "تعذّر استيراد الملف."}`);
           }
         } catch (_err) {
-          this._setFeedback("error", "❌ ملف JSON غير صالح.");
+          this._setFeedback("error", "❌ الملف المختار غير صالح.");
         }
         e.target.value = "";
       });
@@ -248,7 +248,7 @@
         btn.addEventListener("click", () => {
           const store = window.SeenJeemCustomPacksStore;
           if (store && store.downloadPackJson(btn.dataset.cpbExport)) {
-            this._toast("⬇️ تم تنزيل ملف الفئة الخاصة (JSON)", "success");
+            this._toast("⬇️ تم تنزيل ملف الفئة الخاصة", "success");
           }
         });
       });
@@ -475,7 +475,7 @@
 
             <!-- حقل صورة الإجابة (answerImage) متاح اختيارياً لكل أنواع الأسئلة -->
             <div class="cpb-media-box cpb-span-full is-answer-media">
-              <label for="cpb-a-img-url" class="input-label">✅ صورة الإجابة (answerImage — اختياري وتظهر عند الكشف فقط):</label>
+              <label for="cpb-a-img-url" class="input-label">✅ صورة الإجابة (اختياري وتظهر عند الكشف فقط):</label>
               <div class="cpb-media-input-row">
                 <input type="text" id="cpb-a-img-url" class="text-input" dir="ltr" value="${escapeHtml(q.answerImage || "")}" placeholder="رابط صورة الإجابة أو الحل المعلّم..." />
                 <label for="cpb-a-img-file" class="btn btn-gold-outline btn-xs cpb-file-label">📁 رفع صورة إجابة</label>

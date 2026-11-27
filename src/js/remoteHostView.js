@@ -70,12 +70,12 @@
     async _attemptConnect() {
       const rt = window.SeenJeemRealtimeSync;
       if (!this.roomCode || !this.hostToken) {
-        this.errorMessage = "الرابط ينقصه رمز الغرفة أو توكن المقدّم. امسح رمز QR من نافذة «📡 الغرفة اللاسلكية» على شاشة الجهاز الرئيسي.";
+        this.errorMessage = "الرابط ينقصه رمز الغرفة أو رمز الدخول السري. امسح رمز QR من نافذة «📡 اللعب عبر الهواتف» على الشاشة الرئيسية.";
         this._renderBody();
         return;
       }
       if (!rt || !rt.isConfigured()) {
-        this.errorMessage = "إعدادات Firebase غير مُهيّأة على هذا المتصفح. أدخل إعدادات مشروعك في ملف firebaseConfig.js أو من الجهاز الرئيسي ثم أعد المحاولة.";
+        this.errorMessage = "خدمة الربط بالهواتف غير متوفرة حالياً — تأكد من الاتصال بالإنترنت ثم أعد المحاولة.";
         this._renderBody();
         return;
       }
@@ -107,7 +107,7 @@
             this._updateConnPill(isConn ? "online" : "reconnecting");
           },
           onError: (err) => {
-            this.errorMessage = (err && err.message) || "تعذّرت قراءة بيانات الغرفة — تحقّق من صلاحية التوكن أو أن الغرفة ما زالت مفتوحة.";
+            this.errorMessage = (err && err.message) || "تعذّرت قراءة بيانات الغرفة — تحقّق من صلاحية الرابط أو أن الغرفة ما زالت مفتوحة.";
             this._renderBody();
           }
         });

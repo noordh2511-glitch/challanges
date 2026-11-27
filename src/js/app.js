@@ -2249,7 +2249,59 @@
     return `${url}${sep}_t=${Date.now()}`;
   }
 
+  function isAdminAllowed() {
+    return Boolean(window.SeenJeemAdminConfig && typeof window.SeenJeemAdminConfig.isCurrentUserAdmin === "function" && window.SeenJeemAdminConfig.isCurrentUserAdmin());
+  }
+
+  function applyAdminVisibility() {
+    const allowed = isAdminAllowed();
+    const adminHeaderBtn = document.getElementById("btn-open-admin-panel");
+    if (adminHeaderBtn) adminHeaderBtn.hidden = !allowed;
+    document.querySelectorAll(".admin-only-el").forEach((el) => {
+      if (el.id === "wireless-settings-panel") {
+        el.hidden = !allowed || !state.wireless.settingsOpen;
+      } else if (el.id === "wireless-diagnostics-bar") {
+        el.hidden = !allowed || !state.wireless.active;
+      } else {
+        el.hidden = !allowed;
+      }
+    });
+    if (!allowed) {
+      if (dom.sheetsStatusBar) dom.sheetsStatusBar.hidden = true;
+      state.wireless.settingsOpen = false;
+      if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
+        closeBankManagerModal();
+      }
+    }
+  }
+
+  function showGameHub() {
+    const hub = document.getElementById("game-hub-view");
+    const sj = document.getElementById("seen-jeem-setup-view");
+    const dock = document.getElementById("setup-action-dock");
+    if (hub) hub.hidden = false;
+    if (sj) sj.hidden = true;
+    if (dock) dock.hidden = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function showSeenJeemSetup() {
+    const hub = document.getElementById("game-hub-view");
+    const sj = document.getElementById("seen-jeem-setup-view");
+    const dock = document.getElementById("setup-action-dock");
+    if (hub) hub.hidden = true;
+    if (sj) sj.hidden = false;
+    if (dock) dock.hidden = false;
+    renderSetupScreen();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function setSheetsStatus(variant, text, showSpinner = false) {
+    if (!dom.sheetsStatusBar) return;
+    if (!isAdminAllowed()) {
+      dom.sheetsStatusBar.hidden = true;
+      return;
+    }
     dom.sheetsStatusBar.className = `sheets-status-bar${variant ? ` status-${variant}` : ""}`;
     dom.sheetsStatusSpinner.hidden = !showSpinner;
     dom.sheetsStatusText.textContent = text;
@@ -2265,24 +2317,25 @@
   }
 
   async function syncFromGoogleSheets(isManual = false) {
+    if (isManual && !isAdminAllowed()) return;
     const cfg = window.SEEN_JEEM_SHEETS_CONFIG;
     if (!cfg || !cfg.categoriesCsvUrl || !cfg.questionsCsvUrl) {
       if (isManual) {
-        showToast("لم يتم إعداد روابط Google Sheets في sheets-config.js", "warning");
+        showToast("لم يتم إعداد روابط الشيت بعد.", "warning");
       }
       return;
     }
 
     if (state.sheetsLoading) return;
     state.sheetsLoading = true;
-    dom.btnSyncSheets.disabled = true;
+    if (dom.btnSyncSheets) dom.btnSyncSheets.disabled = true;
 
     const hadCachedSheets = state.sheetsCategories.length > 0;
     setSheetsStatus(
       "loading",
       hadCachedSheets
-        ? "⚡ البنك جاهز من الكاش المحلي — جاري التحقق من تحديثات Google Sheets بالخلفية..."
-        : "جاري جلب وتنقية الأسئلة من Google Sheets...",
+        ? "⚡ جاري التحقق من تحديثات الأسئلة..."
+        : "جاري جلب وتحديث الأسئلة...",
       true
     );
 
@@ -2309,7 +2362,6 @@
       state.lastSheetsSyncAt = syncedAt;
       state.sheetsSourceState = "live";
 
-      // حفظ النسخة الصالحة والمنقّاة في الكاش المحلي (Stale-While-Revalidate)
       sanitizer.saveCachedSheetsBank(parsed.categories, parsed.diagnostics, syncedAt);
 
       rebuildMergedCategories();
@@ -2324,55 +2376,36 @@
       }
 
       if (parsed.realCategoriesCount === 0 && parsed.questionsCount === 0) {
+        setSheetsStatus("success", "✅ تم التحقق — لا توجد صفوف إضافية حالياً", false);
+        if (isManual) {
+          showToast("تم التحقق من الشيت بنجاح — لا توجد أسئلة إضافية بعد", "info");
+        }
+      } else {
         setSheetsStatus(
           "success",
-          "☁️ متصل بـ Google Sheets (لا توجد صفوف مضافة بعد — تعمل الأسئلة المحلية)",
+          `✅ محدّث (${parsed.realCategoriesCount} فئة • ${parsed.questionsCount} سؤالاً صالحاً)`,
           false
         );
         if (isManual) {
-          showToast("تم الاتصال بالشيت بنجاح — الشيت لا يحتوي على أسئلة بعد ☁️", "info");
+          showToast(`تم تحديث ${parsed.questionsCount} سؤالاً بنجاح ✅`, "success");
         }
-      } else {
-        const cleanedNote =
-          parsed.diagnostics.cleanedRowsCount > 0
-            ? ` • نُظّف ${parsed.diagnostics.cleanedRowsCount} صف تلقائياً`
-            : "";
-        setSheetsStatus(
-          "success",
-          `☁️ محدّث من Google Sheets (${parsed.realCategoriesCount} فئة • ${parsed.questionsCount} سؤالاً صالحاً${cleanedNote})`,
-          false
-        );
-        showToast(
-          isManual
-            ? `تم تحديث وتنقية ${parsed.questionsCount} سؤالاً من Google Sheets ✅`
-            : `☁️ اكتمل تحديث البنك في الخلفية (${parsed.questionsCount} سؤالاً صالحاً)`,
-          "success"
-        );
       }
     } catch (_err) {
       if (hadCachedSheets) {
         state.sheetsSourceState = "offline-cache";
-        setSheetsStatus(
-          "warning",
-          `📴 وضع عدم الاتصال — تعمل اللعبة فوراً من النسخة المحفوظة محلياً (آخر مزامنة: ${formatTimestampArabic(state.lastSheetsSyncAt)})`,
-          false
-        );
+        setSheetsStatus("warning", "📴 تعمل اللعبة بالأسئلة المحفوظة على الجهاز", false);
         if (isManual) {
-          showToast("تعذر الاتصال حالياً — تعمل اللعبة بكامل كفاءتها من الكاش المحلي المحفوظ", "warning");
+          showToast("تعذّر الاتصال حالياً — تعمل اللعبة بالأسئلة المحفوظة على الجهاز", "warning");
         }
       } else {
-        setSheetsStatus(
-          "warning",
-          "⚠️ تعذر الاتصال بـ Google Sheets — تعمل اللعبة تلقائياً بالأسئلة المحلية",
-          false
-        );
+        setSheetsStatus("warning", "⚠️ تعمل اللعبة بالأسئلة المدمجة حالياً", false);
         if (isManual) {
-          showToast("تعذر جلب البيانات من Google Sheets — الأسئلة المحلية تعمل بشكل طبيعي", "warning");
+          showToast("تعذّر تحديث الأسئلة حالياً — الأسئلة المدمجة تعمل بشكل طبيعي", "warning");
         }
       }
     } finally {
       state.sheetsLoading = false;
-      dom.btnSyncSheets.disabled = false;
+      if (dom.btnSyncSheets) dom.btnSyncSheets.disabled = false;
     }
   }
 
@@ -2924,6 +2957,7 @@
   }
 
   function openBankManagerModal() {
+    if (!isAdminAllowed()) return;
     dom.bankImportFeedback.hidden = true;
     if (dom.backupFeedbackBox) dom.backupFeedbackBox.hidden = true;
     clearPendingBackupImport();
@@ -7717,7 +7751,7 @@
 
   function openTVDisplayWindow() {
     if (!liveSync || !liveSync.isSupported()) {
-      showToast("المتصفح الحالي لا يدعم المزامنة عبر BroadcastChannel", "warning");
+      showToast("المتصفح الحالي لا يدعم فتح شاشة عرض متصلة", "warning");
       return;
     }
     const res = liveSync.openDisplayWindow();
@@ -8701,7 +8735,7 @@
 
     if (isTransition) {
       if (!isOnline) {
-        showToast("📡 انقطع الاتصال بالإنترنت — التطبيق يعمل الآن في وضع عدم الاتصال من الكاش المحلي", "warning");
+        showToast("📡 انقطع الاتصال بالإنترنت — تعمل اللعبة الآن دون اتصال من بيانات جهازك", "warning");
       } else {
         showToast("🌐 عاد الاتصال بالإنترنت بنجاح!", "success");
       }
@@ -8838,13 +8872,13 @@
       const reasonMeta = flaggedStore.getReasonMeta(saved.reason);
       const reportSync = window.SeenJeemSheetReportSync;
       if (reportSync && reportSync.isConfigured() && navigator.onLine) {
-        showToast(`🚩 تم تسجيل البلاغ (${reasonMeta.label}) — جاري إرساله تلقائياً للشيت...`, "info");
+        showToast(`🚩 تم تسجيل الملاحظة (${reasonMeta.label}) — جاري إرسالها...`, "info");
         reportSync.sendFlagRecord(saved).then((res) => {
           if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
             renderBankFlaggedSection();
           }
           if (res.ok) {
-            showToast("✅ تم إرسال بلاغ السؤال إلى Google Sheets تلقائياً!", "success");
+            showToast("✅ تم إرسال الملاحظة بنجاح! شكراً لمساعدتك", "success");
           } else {
             showToast(`⏳ تم حفظ البلاغ محلياً كمعلّق (${res.error || "سيُرسل لاحقاً"})`, "warning");
           }
@@ -8881,32 +8915,424 @@
     dom.sheetReportFeedback.textContent = text || "";
   }
 
+  function setAuthLoginFeedback(type, text) {
+    const box = document.getElementById("auth-login-feedback");
+    if (!box) return;
+    box.hidden = !text;
+    box.className = `bank-feedback-box ${type ? `is-${type}` : ""}`;
+    box.textContent = text || "";
+  }
+
+  function openAuthLoginModal() {
+    const modal = document.getElementById("auth-login-modal");
+    if (!modal) return;
+    setAuthLoginFeedback("", "");
+    const redirectBtn = document.getElementById("btn-auth-google-redirect");
+    if (redirectBtn) redirectBtn.hidden = true;
+    openModal(modal);
+  }
+
+  function closeAuthLoginModal() {
+    const modal = document.getElementById("auth-login-modal");
+    if (!modal) return;
+    closeModal(modal);
+  }
+
+  function openProfileModal() {
+    const modal = document.getElementById("profile-modal");
+    if (!modal) return;
+    renderProfileModal();
+    openModal(modal);
+  }
+
+  function closeProfileModal() {
+    const modal = document.getElementById("profile-modal");
+    if (!modal) return;
+    closeModal(modal);
+  }
+
+  function renderProfileModal() {
+    const body = document.getElementById("profile-modal-body");
+    if (!body) return;
+    const pm = window.SeenJeemProfile;
+    const pmUtils = window.SeenJeemProfileUtils || {};
+    const cs = window.SeenJeemCloudSync;
+    const profile = pm
+      ? pm.getProfile()
+      : {
+          displayName: "لاعب جديد",
+          title: "اللاعب الذكي",
+          avatarType: "emoji",
+          avatarEmoji: "🎯",
+          avatarPhotoUrl: "",
+          accentColor: "#22d3ee",
+          preferredTheme: "dark-glass",
+          soundEnabled: true
+        };
+    const cloudSt = cs ? cs.getState() : { signedIn: false, status: "signed-out", user: null, lastSyncedAt: null };
+    const stats = pm
+      ? pm.computePlayerStats()
+      : {
+          totalSessions: 0,
+          totalWins: 0,
+          level: 1,
+          levelTitle: "مبتدئ السهرات",
+          progressPct: 0,
+          nextLevelRemaining: 3,
+          games: {
+            seenJeem: { matches: 0, wins: 0, topScore: 0 },
+            baraSalfa: { rounds: 0, detectRate: 0, guessRate: 0 },
+            mafia: { sessions: 0, winRate: 0 },
+            audioChallenge: { clipsPlayed: 0 }
+          },
+          badges: []
+        };
+
+    const g = stats.games || {};
+    const sjStats = g.seenJeem || { matches: 0, wins: 0, topScore: 0 };
+    const bsStats = g.baraSalfa || { rounds: 0, detectRate: 0, guessRate: 0 };
+    const mfStats = g.mafia || { sessions: 0, winRate: 0 };
+    const acStats = g.audioChallenge || { clipsPlayed: 0 };
+
+    const accent = profile.accentColor || "#22d3ee";
+    const googlePhoto =
+      (cloudSt.signedIn && cloudSt.user && cloudSt.user.photoURL) || profile.avatarPhotoUrl || "";
+    const showPhoto = Boolean(profile.avatarType === "google" && googlePhoto);
+    const currentEmoji = profile.avatarEmoji || "🎯";
+    const progressPct = Math.min(100, Math.max(0, Number(stats.progressPct) || 0));
+    const currentSoundOn = window.SeenJeemAudio ? !window.SeenJeemAudio.isMuted() : profile.soundEnabled !== false;
+    const activeTheme = state.theme || profile.preferredTheme || "dark-glass";
+
+    const avatars = Array.isArray(pmUtils.AVATAR_PRESETS) ? pmUtils.AVATAR_PRESETS : ["🎯", "🦁", "🦊", "🐺", "🦅", "🐉", "👑", "🎭"];
+    const colorHexes = Array.isArray(pmUtils.COLOR_PRESETS) ? pmUtils.COLOR_PRESETS : ["#22d3ee", "#fbbf24", "#34d399", "#e879f9", "#fb7185", "#60a5fa", "#f97316", "#a78bfa"];
+    const presetTitles = Array.isArray(pmUtils.TITLE_PRESETS) ? pmUtils.TITLE_PRESETS : ["اللاعب الذكي", "المحقق", "ملك السهرة", "قناص النقاط"];
+
+    body.innerHTML = `
+      <div class="profile-hero-card" style="--profile-accent: ${escapeHtml(accent)};">
+        <div class="profile-hero-avatar">
+          ${showPhoto ? `<img src="${escapeHtml(googlePhoto)}" alt="${escapeHtml(profile.displayName)}" />` : `<span>${escapeHtml(currentEmoji)}</span>`}
+        </div>
+        <div class="profile-hero-info">
+          <div class="profile-hero-top">
+            <h3 class="profile-hero-name">${escapeHtml(profile.displayName)}</h3>
+            <span class="profile-title-badge">${escapeHtml(profile.title || "اللاعب الذكي")}</span>
+            <span class="profile-level-pill">⭐ المستوى ${Number(stats.level) || 1} • ${escapeHtml(stats.levelTitle || "مبتدئ السهرات")}</span>
+          </div>
+          <div class="profile-xp-wrap">
+            <div class="profile-xp-bar"><div class="profile-xp-fill" style="width:${progressPct}%;"></div></div>
+            <span class="profile-xp-text">${progressPct}% نحو المستوى ${(Number(stats.level) || 1) + 1} (متبقي ${Number(stats.nextLevelRemaining) || 3} جلسات • إجمالي ${Number(stats.totalSessions) || 0} جلسة)</span>
+          </div>
+          <div class="profile-account-line">
+            ${
+              cloudSt.signedIn && cloudSt.user
+                ? `<span class="profile-status-online">🟢 مسجّل الدخول (${escapeHtml(cloudSt.user.email || cloudSt.user.displayName || "Google")})</span>
+                   <span class="profile-last-save">${cloudSt.lastSyncedAt ? `آخر حفظ: ${escapeHtml(formatTimestampArabic(cloudSt.lastSyncedAt))}` : "الحفظ التلقائي مفعّل"}</span>`
+                : `<span class="profile-status-guest">👤 وضع الزائر (محفوظ على هذا الجهاز)</span>
+                   <button type="button" id="btn-profile-open-signin" class="btn btn-primary btn-xxs">🔐 تسجيل الدخول بحساب Google</button>`
+            }
+          </div>
+        </div>
+      </div>
+
+      <section class="profile-section">
+        <h4 class="profile-section-title">📊 إحصائياتي في جميع الألعاب</h4>
+        <div class="profile-stats-grid">
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(stats.totalSessions) || 0}</div><div class="profile-stat-lbl">إجمالي الجلسات</div></div>
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(sjStats.matches) || 0}</div><div class="profile-stat-lbl">🎯 سين جيم والبرق</div></div>
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(bsStats.rounds) || 0}</div><div class="profile-stat-lbl">🕵️ برا السالفة</div></div>
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(mfStats.sessions) || 0}</div><div class="profile-stat-lbl">🕶️ المافيا</div></div>
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(acStats.clipsPlayed) || 0}</div><div class="profile-stat-lbl">🎵 مقاطع تحدي الصوت</div></div>
+          <div class="profile-stat-card"><div class="profile-stat-val">${Number(sjStats.topScore) || 0}</div><div class="profile-stat-lbl">🔥 أعلى نقاط</div></div>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <h4 class="profile-section-title">🏅 الأوسمة والإنجازات (${(stats.badges || []).filter((b) => b.unlocked).length} / ${(stats.badges || []).length})</h4>
+        <div class="profile-badges-grid">
+          ${(stats.badges || [])
+            .map(
+              (b) => `
+            <div class="profile-badge-card ${b.unlocked ? "is-unlocked" : "is-locked"}">
+              <div class="profile-badge-ico">${escapeHtml(b.icon)}</div>
+              <div class="profile-badge-meta">
+                <strong>${escapeHtml(b.name)}</strong>
+                <span>${escapeHtml(b.desc)}</span>
+              </div>
+              <span class="profile-badge-state">${b.unlocked ? "✅" : "🔒"}</span>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <h4 class="profile-section-title">🎨 تخصيص الملف الشخصي (يُستخدم تلقائياً عند الانضمام للغرف)</h4>
+        <div class="profile-edit-grid">
+          <div class="profile-field">
+            <label for="profile-input-name" class="input-label">الاسم المعروض:</label>
+            <input type="text" id="profile-input-name" class="text-input" maxlength="26" value="${escapeHtml(profile.displayName)}" placeholder="اكتب اسمك..." autocomplete="off" />
+          </div>
+          <div class="profile-field">
+            <label for="profile-input-title" class="input-label">اللقب:</label>
+            <input type="text" id="profile-input-title" class="text-input" maxlength="26" value="${escapeHtml(profile.title || "")}" placeholder="مثال: قناص النقاط" autocomplete="off" />
+            <div class="profile-title-chips">
+              ${presetTitles
+                .map(
+                  (t) => `<button type="button" class="profile-chip-btn${profile.title === t ? " active" : ""}" data-profile-title="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+                )
+                .join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-field" style="margin-top:0.75rem;">
+          <label class="input-label">الصورة الرمزية:</label>
+          <div class="profile-avatars-grid">
+            ${
+              googlePhoto
+                ? `<button type="button" class="profile-avatar-btn${showPhoto ? " active" : ""}" id="btn-profile-use-gphoto" title="استخدام صورة حساب Google">
+                    <img src="${escapeHtml(googlePhoto)}" alt="Google" />
+                  </button>`
+                : ""
+            }
+            ${avatars
+              .map(
+                (ico) => `<button type="button" class="profile-avatar-btn${!showPhoto && currentEmoji === ico ? " active" : ""}" data-profile-avatar="${escapeHtml(ico)}">${escapeHtml(ico)}</button>`
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="profile-field" style="margin-top:0.75rem;">
+          <label class="input-label">اللون المميّز:</label>
+          <div class="profile-colors-row">
+            ${colorHexes
+              .map(
+                (hex) => `<button type="button" class="profile-color-dot${accent.toLowerCase() === hex.toLowerCase() ? " active" : ""}" data-profile-color="${escapeHtml(hex)}" style="background:${escapeHtml(hex)};" title="${escapeHtml(hex)}" aria-label="لون ${escapeHtml(hex)}"></button>`
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="profile-prefs-row">
+          <div class="profile-pref-group">
+            <span class="input-label">الثيم المفضّل:</span>
+            <div class="profile-title-chips">
+              <button type="button" class="profile-chip-btn${activeTheme === "dark-glass" ? " active" : ""}" data-profile-theme="dark-glass">🌌 زجاجي داكن</button>
+              <button type="button" class="profile-chip-btn${activeTheme === "royal-gold" ? " active" : ""}" data-profile-theme="royal-gold">👑 ملكي ذهبي</button>
+              <button type="button" class="profile-chip-btn${activeTheme === "high-contrast" ? " active" : ""}" data-profile-theme="high-contrast">🔆 تباين عالٍ</button>
+            </div>
+          </div>
+          <div class="profile-pref-group">
+            <span class="input-label">المؤثرات الصوتية:</span>
+            <button type="button" id="btn-profile-toggle-sound" class="btn btn-secondary btn-xs">
+              ${currentSoundOn ? "🔊 الصوت مفعّل" : "🔇 الصوت مكتوم"}
+            </button>
+          </div>
+        </div>
+
+        <div class="profile-save-bar">
+          <button type="button" id="btn-profile-save" class="btn btn-primary btn-sm">💾 حفظ تغييرات الملف الشخصي</button>
+          ${
+            cloudSt.signedIn
+              ? `<button type="button" id="btn-profile-sync-now" class="btn btn-secondary btn-sm">🔄 حفظ وتحديث بياناتي الآن</button>
+                 <button type="button" id="btn-profile-signout" class="btn btn-danger-outline btn-sm">🚪 تسجيل الخروج</button>`
+              : ""
+          }
+        </div>
+        <div id="profile-modal-feedback" class="bank-feedback-box" hidden aria-live="polite"></div>
+      </section>
+    `;
+
+    // ربط الأحداث داخل نافذة الملف الشخصي
+    let draftAvatar = currentEmoji;
+    let draftAvatarType = showPhoto ? "google" : "emoji";
+    let draftColor = accent;
+    let draftTheme = activeTheme;
+
+    const btnOpenSignin = body.querySelector("#btn-profile-open-signin");
+    if (btnOpenSignin) {
+      btnOpenSignin.addEventListener("click", () => {
+        closeProfileModal();
+        openAuthLoginModal();
+      });
+    }
+
+    body.querySelectorAll("[data-profile-title]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const inp = body.querySelector("#profile-input-title");
+        if (inp) inp.value = btn.dataset.profileTitle || "";
+        body.querySelectorAll("[data-profile-title]").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+
+    const btnUseGphoto = body.querySelector("#btn-profile-use-gphoto");
+    if (btnUseGphoto) {
+      btnUseGphoto.addEventListener("click", () => {
+        draftAvatarType = "google";
+        body.querySelectorAll(".profile-avatar-btn").forEach((b) => b.classList.toggle("active", b === btnUseGphoto));
+      });
+    }
+
+    body.querySelectorAll("[data-profile-avatar]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        draftAvatarType = "emoji";
+        draftAvatar = btn.dataset.profileAvatar || "🎯";
+        body.querySelectorAll(".profile-avatar-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+
+    body.querySelectorAll("[data-profile-color]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        draftColor = btn.dataset.profileColor || "#22d3ee";
+        body.querySelectorAll("[data-profile-color]").forEach((b) => b.classList.toggle("active", b === btn));
+        const hero = body.querySelector(".profile-hero-card");
+        if (hero) hero.style.setProperty("--profile-accent", draftColor);
+      });
+    });
+
+    body.querySelectorAll("[data-profile-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        draftTheme = btn.dataset.profileTheme || "dark-glass";
+        applyTheme(draftTheme, true);
+        body.querySelectorAll("[data-profile-theme]").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+
+    const btnSound = body.querySelector("#btn-profile-toggle-sound");
+    if (btnSound) {
+      btnSound.addEventListener("click", () => {
+        toggleSoundMuted();
+        const isOn = window.SeenJeemAudio ? !window.SeenJeemAudio.isMuted() : true;
+        btnSound.textContent = isOn ? "🔊 الصوت مفعّل" : "🔇 الصوت مكتوم";
+        if (pm) pm.updateProfile({ soundEnabled: isOn });
+      });
+    }
+
+    const btnSave = body.querySelector("#btn-profile-save");
+    if (btnSave) {
+      btnSave.addEventListener("click", async () => {
+        const nameInp = body.querySelector("#profile-input-name");
+        const titleInp = body.querySelector("#profile-input-title");
+        const nextName = nameInp && nameInp.value.trim() ? nameInp.value.trim() : "لاعب جديد";
+        const nextTitle = titleInp && titleInp.value.trim() ? titleInp.value.trim() : "اللاعب الذكي";
+        const isSoundOn = window.SeenJeemAudio ? !window.SeenJeemAudio.isMuted() : true;
+        if (pm) {
+          pm.updateProfile({
+            displayName: nextName,
+            title: nextTitle,
+            avatarType: draftAvatarType,
+            avatarEmoji: draftAvatar,
+            avatarPhotoUrl: googlePhoto,
+            accentColor: draftColor,
+            preferredTheme: draftTheme,
+            soundEnabled: isSoundOn
+          });
+        }
+        if (cs && cs.isSignedIn() && typeof cs.saveUserProfile === "function") {
+          await cs.saveUserProfile(pm ? pm.getProfile() : null);
+        }
+        renderCloudSyncUI();
+        renderProfileModal();
+        showToast("✅ تم حفظ ملفك الشخصي بنجاح!", "success");
+      });
+    }
+
+    const btnSyncNow = body.querySelector("#btn-profile-sync-now");
+    if (btnSyncNow) {
+      btnSyncNow.addEventListener("click", async () => {
+        const fb = body.querySelector("#profile-modal-feedback");
+        if (fb) {
+          fb.hidden = false;
+          fb.className = "bank-feedback-box is-info";
+          fb.textContent = "🔄 جاري حفظ وتحديث بياناتك الآن...";
+        }
+        if (cs) {
+          if (typeof cs.syncUserProfile === "function") await cs.syncUserProfile();
+          const res = await cs.syncNow({ silent: false });
+          if (fb) {
+            fb.className = `bank-feedback-box ${res.ok ? "is-success" : "is-warning"}`;
+            fb.textContent = res.ok ? "✅ تم حفظ وتحديث جميع بياناتك وإحصائياتك بنجاح!" : `⚠️ ${res.error || "تعذّر التحديث حالياً."}`;
+          }
+          if (res.ok) showToast("✅ تم حفظ وتحديث بياناتك بنجاح!", "success");
+        }
+      });
+    }
+
+    const btnSignout = body.querySelector("#btn-profile-signout");
+    if (btnSignout) {
+      btnSignout.addEventListener("click", async () => {
+        if (!cs) return;
+        await cs.signOut();
+        renderCloudSyncUI();
+        renderProfileModal();
+        showToast("🚪 تم تسجيل الخروج بنجاح — جميع بياناتك محفوظة على هذا الجهاز.", "info");
+      });
+    }
+  }
+
   function renderCloudSyncUI(cloudState = null) {
     const cs = window.SeenJeemCloudSync;
+    const pm = window.SeenJeemProfile;
     const st = cloudState || (cs ? cs.getState() : { signedIn: false, status: "signed-out", user: null });
+    const profile = pm ? pm.getProfile() : { displayName: "لاعب جديد", avatarEmoji: "🎯", avatarType: "emoji", avatarPhotoUrl: "" };
 
     const statusMeta = {
-      "signed-out": { pill: "☁️ المزامنة السحابية", badge: "⚪ وضع محلي فقط", cls: "" },
-      synced: { pill: "🟢 متزامن", badge: "🟢 متزامن", cls: "is-synced" },
-      syncing: { pill: "🔄 جاري المزامنة", badge: "🔄 جاري المزامنة...", cls: "" },
-      "pending-offline": { pill: "🟡 بانتظار الاتصال", badge: "🟡 تغييرات محلية بانتظار الاتصال", cls: "is-pending" },
-      error: { pill: "⚠️ تنبيه المزامنة", badge: "⚠️ تعذّرت آخر مزامنة", cls: "is-pending" }
+      "signed-out": { pill: "👤 تسجيل الدخول", badge: "⚪ وضع الزائر", cls: "" },
+      synced: { pill: "🟢 محفوظ", badge: "🟢 متصل ومحفوظ تلقائياً", cls: "is-synced" },
+      syncing: { pill: "🔄 جاري الحفظ", badge: "🔄 جاري حفظ البيانات...", cls: "" },
+      "pending-offline": { pill: "🟡 بانتظار الاتصال", badge: "🟡 تغييرات بانتظار الاتصال", cls: "is-pending" },
+      error: { pill: "⚠️ تنبيه الحفظ", badge: "⚠️ تعذّر آخر تحديث", cls: "is-pending" }
     };
     const meta = statusMeta[st.status] || statusMeta["signed-out"];
 
     if (dom.btnCloudSyncPill) {
       dom.btnCloudSyncPill.classList.remove("is-synced", "is-pending");
       if (meta.cls) dom.btnCloudSyncPill.classList.add(meta.cls);
+      dom.btnCloudSyncPill.title = st.signedIn
+        ? "ملفي الشخصي — اضغط لتخصيص حسابك وعرض إحصائياتك"
+        : "تسجيل الدخول لحفظ ملفك الشخصي وإحصائياتك";
     }
-    if (dom.cloudPillIcon) dom.cloudPillIcon.textContent = st.signedIn ? (st.status === "synced" ? "🟢" : st.status === "syncing" ? "🔄" : "🟡") : "☁️";
-    if (dom.cloudPillLabel) dom.cloudPillLabel.textContent = st.signedIn ? (st.user && st.user.displayName ? st.user.displayName.split(" ")[0] : "متزامن") : "المزامنة";
+
+    const avatarImg = document.getElementById("cloud-pill-avatar-img");
+    const onlineDot = document.getElementById("cloud-pill-online-dot");
+
+    if (st.signedIn) {
+      const displayName = (profile && profile.displayName) || (st.user && st.user.displayName) || "ملفي";
+      const shortName = displayName.trim().split(/\s+/)[0] || "ملفي";
+      const gPhoto = (st.user && st.user.photoURL) || (profile && profile.avatarPhotoUrl) || "";
+      const showGooglePhoto = Boolean(profile && profile.avatarType === "google" && gPhoto);
+      if (avatarImg) {
+        if (showGooglePhoto) {
+          avatarImg.src = gPhoto;
+          avatarImg.hidden = false;
+        } else {
+          avatarImg.hidden = true;
+        }
+      }
+      if (dom.cloudPillIcon) {
+        dom.cloudPillIcon.hidden = showGooglePhoto;
+        dom.cloudPillIcon.textContent = (profile && profile.avatarEmoji) || "🎯";
+      }
+      if (dom.cloudPillLabel) dom.cloudPillLabel.textContent = shortName;
+      if (onlineDot) onlineDot.hidden = false;
+    } else {
+      if (avatarImg) avatarImg.hidden = true;
+      if (dom.cloudPillIcon) {
+        dom.cloudPillIcon.hidden = false;
+        dom.cloudPillIcon.textContent = "👤";
+      }
+      if (dom.cloudPillLabel) dom.cloudPillLabel.textContent = "تسجيل الدخول";
+      if (onlineDot) onlineDot.hidden = true;
+    }
 
     if (dom.cloudSyncStatusBadge) dom.cloudSyncStatusBadge.textContent = meta.badge;
     if (dom.cloudSignedOutBox) dom.cloudSignedOutBox.hidden = Boolean(st.signedIn);
     if (dom.cloudSignedInBox) dom.cloudSignedInBox.hidden = !st.signedIn;
 
     if (st.signedIn && st.user) {
-      if (dom.cloudUserName) dom.cloudUserName.textContent = st.user.displayName || "المقدّم";
+      if (dom.cloudUserName) dom.cloudUserName.textContent = (profile && profile.displayName) || st.user.displayName || "المستخدم";
       if (dom.cloudUserEmail) dom.cloudUserEmail.textContent = st.user.email || "";
       if (dom.cloudUserAvatar) {
         if (st.user.photoURL) {
@@ -8918,13 +9344,20 @@
       }
       if (dom.cloudLastSyncText) {
         dom.cloudLastSyncText.textContent = st.lastSyncedAt
-          ? `آخر مزامنة: ${formatTimestampArabic(st.lastSyncedAt)}`
-          : "آخر مزامنة: الآن";
+          ? `آخر حفظ: ${formatTimestampArabic(st.lastSyncedAt)}`
+          : "آخر حفظ: الآن";
       }
     }
 
     if (st.error) {
       setCloudSyncFeedback("warning", st.error);
+    }
+
+    applyAdminVisibility();
+
+    const profileModal = document.getElementById("profile-modal");
+    if (profileModal && profileModal.classList.contains("open")) {
+      renderProfileModal();
     }
   }
 
@@ -11547,26 +11980,26 @@
   }
 
   function saveFirebaseSettingsFromForm() {
-    if (!firebaseCfgStore) return;
+    if (!isAdminAllowed() || !firebaseCfgStore) return;
     const res = firebaseCfgStore.saveOverrideConfig(readFirebaseSettingsFromForm());
     if (!res.ok) {
       setWirelessFeedback("error", `❌ ${res.error}`);
       return;
     }
-    setWirelessFeedback("success", "✅ تم حفظ إعدادات Firebase محلياً — يمكنك الآن اختبار الاتصال أو إنشاء غرفة لاسلكية.");
-    showToast("💾 تم حفظ إعدادات Firebase محلياً", "success");
+    setWirelessFeedback("success", "✅ تم حفظ إعدادات الاتصال بنجاح — يمكنك الآن اختبار الاتصال أو إنشاء غرفة.");
+    showToast("💾 تم حفظ إعدادات الاتصال بنجاح", "success");
   }
 
   async function testFirebaseConnectionFromForm() {
-    if (!realtimeSync) return;
+    if (!isAdminAllowed() || !realtimeSync) return;
     const cfg = readFirebaseSettingsFromForm();
-    setWirelessFeedback("info", "⏳ جاري الاتصال بـ Firebase وتسجيل الدخول المجهول...");
+    setWirelessFeedback("info", "⏳ جاري اختبار الاتصال بالخادم...");
     if (dom.btnFbTestConn) dom.btnFbTestConn.disabled = true;
     const res = await realtimeSync.testConnection(cfg);
     if (dom.btnFbTestConn) dom.btnFbTestConn.disabled = false;
     if (res.ok) {
       setWirelessFeedback("success", `✅ ${res.message}`);
-      showToast("🔌 تم التحقق من اتصال Firebase بنجاح!", "success");
+      showToast("🔌 تم التحقق من الاتصال بنجاح!", "success");
     } else {
       setWirelessFeedback("error", `❌ ${res.error}`);
     }
@@ -11574,9 +12007,13 @@
 
   function openWirelessRoomModal() {
     if (!dom.wirelessRoomModal) return;
-    populateFirebaseSettingsInputs();
-    if (firebaseCfgStore && !firebaseCfgStore.isConfigured() && !state.wireless.active) {
-      state.wireless.settingsOpen = true;
+    if (isAdminAllowed()) {
+      populateFirebaseSettingsInputs();
+      if (firebaseCfgStore && !firebaseCfgStore.isConfigured() && !state.wireless.active) {
+        state.wireless.settingsOpen = true;
+      }
+    } else {
+      state.wireless.settingsOpen = false;
     }
     // تنظيف تلقائي صامت للغرف السابقة الخاملة (>24 ساعة) المملوكة لهذا الجهاز فقط
     if (realtimeSync && typeof realtimeSync.cleanupStaleOwnedRooms === "function") {
@@ -11598,9 +12035,9 @@
         : state.wireless.stats);
     state.wireless.stats = stats || state.wireless.stats;
     if (dom.wirelessDiagnosticsBar) {
-      dom.wirelessDiagnosticsBar.hidden = !state.wireless.active;
+      dom.wirelessDiagnosticsBar.hidden = !state.wireless.active || !isAdminAllowed();
     }
-    if (!state.wireless.active || !stats) return;
+    if (!state.wireless.active || !stats || !isAdminAllowed()) return;
     if (dom.wirelessDiagKb) dom.wirelessDiagKb.textContent = `${Number(stats.kbSent || 0).toFixed(2)} KB`;
     if (dom.wirelessDiagWrites) dom.wirelessDiagWrites.textContent = String(stats.writes || 0);
     if (dom.wirelessDiagSkipped) dom.wirelessDiagSkipped.textContent = String(stats.skippedWrites || 0);
@@ -11608,12 +12045,14 @@
 
   function renderWirelessRoomModal() {
     const wl = state.wireless;
+    const adminAllowed = isAdminAllowed();
 
     if (dom.wirelessSettingsPanel) {
-      dom.wirelessSettingsPanel.hidden = !wl.settingsOpen;
+      dom.wirelessSettingsPanel.hidden = !wl.settingsOpen || !adminAllowed;
     }
     if (dom.btnToggleWirelessSettings) {
-      dom.btnToggleWirelessSettings.setAttribute("aria-expanded", String(Boolean(wl.settingsOpen)));
+      dom.btnToggleWirelessSettings.hidden = !adminAllowed;
+      dom.btnToggleWirelessSettings.setAttribute("aria-expanded", String(Boolean(wl.settingsOpen && adminAllowed)));
     }
 
     if (dom.wirelessConnBadge) {
@@ -11622,10 +12061,10 @@
         dom.wirelessConnBadge.textContent = "⚪ الوضع المحلي (الغرفة غير مفعّلة)";
       } else if (wl.connected) {
         dom.wirelessConnBadge.className = "dual-status-pill is-connected";
-        dom.wirelessConnBadge.textContent = "🟢 الغرفة اللاسلكية متصلة";
+        dom.wirelessConnBadge.textContent = "🟢 الغرفة متصلة وجاهزة";
       } else {
         dom.wirelessConnBadge.className = "dual-status-pill is-single";
-        dom.wirelessConnBadge.textContent = "🟡 جاري إعادة الاتصال بـ Firebase...";
+        dom.wirelessConnBadge.textContent = "🟡 جاري إعادة الاتصال...";
       }
     }
 
@@ -12280,7 +12719,7 @@
     if (!firebaseCfgStore || !firebaseCfgStore.isConfigured()) {
       state.wireless.settingsOpen = true;
       renderWirelessRoomModal();
-      setWirelessFeedback("warning", "⚠️ يرجى إدخال وحفظ إعدادات Firebase أولاً قبل إنشاء الغرفة اللاسلكية.");
+      setWirelessFeedback("warning", "⚠️ خدمة اللعب عبر الهواتف غير جاهزة حالياً — تأكد من الاتصال بالإنترنت.");
       return;
     }
 
@@ -12355,7 +12794,7 @@
       winnerTeamName: "",
       runnerUpDeltaMs: null
     };
-    setWirelessFeedback("info", "تم إغلاق الغرفة اللاسلكية وحذف بياناتها من Firebase والسجل المحلي بنجاح.");
+    setWirelessFeedback("info", "تم إغلاق الغرفة وفصل الأجهزة المتصلة بنجاح.");
     renderWirelessRoomModal();
     broadcastLiveDisplayState();
     showToast("🔴 تم إغلاق وحذف الغرفة اللاسلكية", "info");
@@ -13800,6 +14239,10 @@
     if (dom.btnOpenCustomPackBuilder && window.SeenJeemCustomPackBuilder) {
       dom.btnOpenCustomPackBuilder.addEventListener("click", () => window.SeenJeemCustomPackBuilder.open());
     }
+    const btnOpenCustomPackBuilderSj = document.getElementById("btn-open-custom-pack-builder-sj");
+    if (btnOpenCustomPackBuilderSj && window.SeenJeemCustomPackBuilder) {
+      btnOpenCustomPackBuilderSj.addEventListener("click", () => window.SeenJeemCustomPackBuilder.open());
+    }
     if (dom.btnBankOpenPackBuilder && window.SeenJeemCustomPackBuilder) {
       dom.btnBankOpenPackBuilder.addEventListener("click", () => {
         closeBankManagerModal();
@@ -13807,13 +14250,123 @@
       });
     }
 
-    // --- ربط أحداث الحزمة الثالثة عشرة (المزامنة السحابية + بلاغات Google Sheets التلقائية) ---
+    // --- ربط أحداث الحزمة السادسة عشرة (بوابة الألعاب + تسجيل الدخول + ملفي الشخصي + لوحة الإدارة للمالك فقط) ---
+    const btnLaunchSeenJeem = document.getElementById("btn-launch-seen-jeem");
+    if (btnLaunchSeenJeem) {
+      btnLaunchSeenJeem.addEventListener("click", () => showSeenJeemSetup());
+    }
+    const btnBackToHubFromSj = document.getElementById("btn-back-to-hub-from-sj");
+    if (btnBackToHubFromSj) {
+      btnBackToHubFromSj.addEventListener("click", () => showGameHub());
+    }
+    const btnHubLogoHome = document.getElementById("btn-hub-logo-home");
+    if (btnHubLogoHome) {
+      btnHubLogoHome.addEventListener("click", () => showGameHub());
+    }
+    const btnHubCycleTheme = document.getElementById("btn-hub-cycle-theme");
+    if (btnHubCycleTheme) {
+      btnHubCycleTheme.addEventListener("click", () => {
+        const order = ["dark-glass", "royal-gold", "high-contrast"];
+        const idx = order.indexOf(state.theme);
+        const next = order[(idx + 1) % order.length];
+        applyTheme(next, true);
+        if (window.SeenJeemProfile) window.SeenJeemProfile.updateProfile({ preferredTheme: next });
+        const labels = {
+          "dark-glass": "🌌 زجاجي داكن",
+          "royal-gold": "👑 ملكي ذهبي",
+          "high-contrast": "🔆 تباين عالٍ"
+        };
+        showToast(`🎨 تم تبديل المظهر إلى «${labels[next] || next}»`, "info");
+      });
+    }
+    const btnOpenAdminPanel = document.getElementById("btn-open-admin-panel");
+    if (btnOpenAdminPanel) {
+      btnOpenAdminPanel.addEventListener("click", () => {
+        if (!isAdminAllowed()) return;
+        openBankManagerModal();
+      });
+    }
+    const btnAdminSyncSheets = document.getElementById("btn-admin-sync-sheets");
+    if (btnAdminSyncSheets) {
+      btnAdminSyncSheets.addEventListener("click", () => {
+        if (!isAdminAllowed()) return;
+        syncFromGoogleSheets(true);
+      });
+    }
+    const btnOpenPlayerProfile = document.getElementById("btn-open-player-profile");
+    if (btnOpenPlayerProfile) {
+      btnOpenPlayerProfile.addEventListener("click", () => openProfileModal());
+    }
+
+    // زر الحساب في الهيدر: يفتح «تسجيل الدخول» عند عدم الدخول، ويفتح «ملفي الشخصي» عند تسجيل الدخول
     if (dom.btnCloudSyncPill) {
       dom.btnCloudSyncPill.addEventListener("click", () => {
-        openBankManagerModal();
-        if (dom.bankCloudSyncSection) {
-          dom.bankCloudSyncSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        const cs = window.SeenJeemCloudSync;
+        if (cs && cs.isSignedIn()) {
+          openProfileModal();
+        } else {
+          openAuthLoginModal();
         }
+      });
+    }
+
+    // أحداث نافذة تسجيل الدخول الودية
+    const authLoginModal = document.getElementById("auth-login-modal");
+    const btnCloseAuthLogin = document.getElementById("btn-close-auth-login");
+    const btnAuthContinueGuest = document.getElementById("btn-auth-continue-guest");
+    const btnAuthGoogleSignin = document.getElementById("btn-auth-google-signin");
+    const btnAuthGoogleRedirect = document.getElementById("btn-auth-google-redirect");
+
+    if (btnCloseAuthLogin) btnCloseAuthLogin.addEventListener("click", closeAuthLoginModal);
+    if (btnAuthContinueGuest) {
+      btnAuthContinueGuest.addEventListener("click", () => {
+        closeAuthLoginModal();
+        showToast("👤 تتابع اللعب كزائر — يمكنك فتح «ملفي الشخصي» في أي وقت", "info");
+      });
+    }
+    if (authLoginModal) {
+      authLoginModal.addEventListener("click", (e) => {
+        if (e.target === authLoginModal) closeAuthLoginModal();
+      });
+    }
+    if (btnAuthGoogleSignin) {
+      btnAuthGoogleSignin.addEventListener("click", async () => {
+        const cs = window.SeenJeemCloudSync;
+        if (!cs) return;
+        setAuthLoginFeedback("info", "⏳ جاري فتح نافذة تسجيل الدخول بحساب Google...");
+        const res = await cs.signInWithGoogle({ useRedirect: false });
+        if (res.ok) {
+          if (btnAuthGoogleRedirect) btnAuthGoogleRedirect.hidden = true;
+          closeAuthLoginModal();
+          renderCloudSyncUI();
+          showToast("✨ أهلاً بك! تم تسجيل الدخول وحفظ بياناتك بنجاح", "success");
+        } else {
+          if (btnAuthGoogleRedirect) btnAuthGoogleRedirect.hidden = !res.suggestRedirect;
+          setAuthLoginFeedback("warning", `⚠️ ${res.error || "تعذّر تسجيل الدخول حالياً."}`);
+        }
+      });
+    }
+    if (btnAuthGoogleRedirect) {
+      btnAuthGoogleRedirect.addEventListener("click", () => {
+        if (window.SeenJeemCloudSync) {
+          window.SeenJeemCloudSync.signInWithGoogle({ useRedirect: true });
+        }
+      });
+    }
+
+    // أحداث نافذة «ملفي الشخصي»
+    const profileModal = document.getElementById("profile-modal");
+    const btnCloseProfileModal = document.getElementById("btn-close-profile-modal");
+    if (btnCloseProfileModal) btnCloseProfileModal.addEventListener("click", closeProfileModal);
+    if (profileModal) {
+      profileModal.addEventListener("click", (e) => {
+        if (e.target === profileModal) closeProfileModal();
+      });
+    }
+
+    if (window.SeenJeemProfile) {
+      window.SeenJeemProfile.onChange(() => {
+        renderCloudSyncUI();
       });
     }
     if (window.SeenJeemCloudSync) {
@@ -13827,8 +14380,8 @@
         const res = await cs.signInWithGoogle({ useRedirect: false });
         if (res.ok) {
           if (dom.btnCloudGoogleRedirect) dom.btnCloudGoogleRedirect.hidden = true;
-          setCloudSyncFeedback("success", "✅ تم تسجيل الدخول والمزامنة السحابية الذكية بنجاح!");
-          showToast("☁️ تم ربط حساب Google والمزامنة بنجاح!", "success");
+          setCloudSyncFeedback("success", "✅ تم تسجيل الدخول وحفظ البيانات بنجاح!");
+          showToast("✨ تم تسجيل الدخول وحفظ بياناتك بنجاح!", "success");
         } else {
           if (dom.btnCloudGoogleRedirect) dom.btnCloudGoogleRedirect.hidden = !res.suggestRedirect;
           setCloudSyncFeedback("warning", `⚠️ ${res.error || "تعذّر تسجيل الدخول."}`);
@@ -13846,20 +14399,20 @@
       dom.btnCloudSignout.addEventListener("click", async () => {
         if (!window.SeenJeemCloudSync) return;
         await window.SeenJeemCloudSync.signOut();
-        setCloudSyncFeedback("info", "تم تسجيل الخروج بنجاح — جميع بياناتك المحلية محفوظة على هذا الجهاز.");
-        showToast("🚪 تم تسجيل الخروج من المزامنة السحابية (البيانات المحلية محفوظة)", "info");
+        setCloudSyncFeedback("info", "تم تسجيل الخروج بنجاح — جميع بياناتك محفوظة على هذا الجهاز.");
+        showToast("🚪 تم تسجيل الخروج بنجاح (بياناتك محفوظة على هذا الجهاز)", "info");
       });
     }
     if (dom.btnCloudSyncNow) {
       dom.btnCloudSyncNow.addEventListener("click", async () => {
         if (!window.SeenJeemCloudSync) return;
-        setCloudSyncFeedback("info", "🔄 جاري الدمج الذكي مع السحابة...");
+        setCloudSyncFeedback("info", "🔄 جاري حفظ وتحديث البيانات الآن...");
         const res = await window.SeenJeemCloudSync.syncNow({ silent: false });
         if (res.ok) {
-          setCloudSyncFeedback("success", "✅ اكتملت المزامنة والدمج الذكي بنجاح!");
-          showToast("🟢 تمت المزامنة السحابية بنجاح!", "success");
+          setCloudSyncFeedback("success", "✅ تم حفظ وتحديث بياناتك بنجاح!");
+          showToast("🟢 تم حفظ وتحديث بياناتك بنجاح!", "success");
         } else {
-          setCloudSyncFeedback("warning", `⚠️ ${res.error || "تعذّرت المزامنة."}`);
+          setCloudSyncFeedback("warning", `⚠️ ${res.error || "تعذّر التحديث."}`);
         }
       });
     }
@@ -13969,8 +14522,8 @@
     if (dom.btnCloseWirelessRoom) {
       dom.btnCloseWirelessRoom.addEventListener("click", () => {
         openConfirmDialog({
-          title: "إغلاق الغرفة اللاسلكية؟",
-          message: "سيتم فصل جميع الهواتف المتصلة وحذف بيانات الغرفة من Firebase فوراً، مع استمرار المباراة محلياً دون انقطاع.",
+          title: "إغلاق الغرفة؟",
+          message: "سيتم فصل جميع الهواتف المتصلة وإنهاء الغرفة فوراً، مع استمرار المباراة على جهازك دون انقطاع.",
           confirmText: "نعم، أغلق الغرفة",
           onConfirm: () => closeWirelessRoom()
         });
@@ -13978,6 +14531,7 @@
     }
     if (dom.btnToggleWirelessSettings) {
       dom.btnToggleWirelessSettings.addEventListener("click", () => {
+        if (!isAdminAllowed()) return;
         state.wireless.settingsOpen = !state.wireless.settingsOpen;
         renderWirelessRoomModal();
       });
@@ -14163,6 +14717,7 @@
         applyTheme(matchStore.loadTheme(), false);
         applyTvScale(matchStore.loadTvScale(), false);
         renderSetupScreen();
+        renderCloudSyncUI();
         if (dom.bankManagerModal && dom.bankManagerModal.classList.contains("open")) {
           renderBankManagerModal();
         }
@@ -14170,7 +14725,7 @@
           renderHallOfFameModal();
         }
         if (!silent) {
-          showToast("☁️ تم تحديث بياناتك من السحابة بنجاح", "success");
+          showToast("✨ تم تحديث بيانات حسابك بنجاح", "success");
         }
       },
       launchTournamentMatch: (matchInfo) => {
@@ -14330,6 +14885,9 @@
     initFullscreenControls();
     renderDualScreenStatusUI();
     renderSetupScreen();
+    showGameHub();
+    applyAdminVisibility();
+    renderCloudSyncUI();
 
     if (cachedSheets && cachedSheets.categories.length > 0) {
       setSheetsStatus(

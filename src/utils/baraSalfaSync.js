@@ -195,7 +195,7 @@
     async _ensureInitialized(roleTag = "host") {
       const cfg = window.SeenJeemFirebaseConfig ? window.SeenJeemFirebaseConfig.getConfig() : null;
       if (!window.SeenJeemFirebaseConfig || !window.SeenJeemFirebaseConfig.isValidConfig(cfg)) {
-        throw new Error("إعدادات Firebase غير مكتملة. أدخلها من «📡 الغرفة اللاسلكية ← ⚙️ إعدادات الاتصال».");
+        throw new Error("تعذّر تفعيل اللعب عبر الهواتف حالياً — تأكد من الاتصال بالإنترنت.");
       }
       if (!navigator.onLine) {
         throw new Error("لا يوجد اتصال بالإنترنت حالياً لتفعيل الوضع اللاسلكي.");
@@ -632,7 +632,7 @@
       }
     }
 
-    async registerPlayer(rawName) {
+    async registerPlayer(rawName, rawAvatar = "") {
       if (this._role !== "player" || !this.roomCode || !this._uid || !this._sdk || !this._db || this._kicked) {
         return { ok: false, error: "غير متصل بالغرفة" };
       }
@@ -640,6 +640,9 @@
       if (!cleanName) {
         return { ok: false, error: "يرجى كتابة اسمك أولاً." };
       }
+      const cleanAvatar = String(
+        rawAvatar || (window.SeenJeemProfile && window.SeenJeemProfile.getRoomIdentity().avatar) || ""
+      ).trim().slice(0, 8);
       const { dbMod } = this._sdk;
       const pRef = dbMod.ref(this._db, `baraRooms/${this.roomCode}/players/${this._uid}`);
       this._lastPlayerName = cleanName;
@@ -648,6 +651,7 @@
         await dbMod.set(pRef, {
           uid: this._uid,
           name: cleanName,
+          avatar: cleanAvatar || "👤",
           joinedAt: dbMod.serverTimestamp(),
           online: true
         });

@@ -1258,7 +1258,7 @@
             ${!this.freePlay ? `<span class="ac-points-live-pill">⚡ قيمة الجولة الآن: <strong>+${pts}</strong> نقطة</span>` : ""}
             ${
               this._isDualConnected()
-                ? `<button type="button" class="btn btn-ghost btn-xxs" data-ac-act="toggle-route" ${clip.isLocalFile ? "disabled title='الملفات المحلية تعمل تلقائياً على جهاز المقدّم لضمان عدم تعطل ObjectURL'" : ""}>
+                ? `<button type="button" class="btn btn-ghost btn-xxs" data-ac-act="toggle-route" ${clip.isLocalFile ? "disabled title='الملفات المحلية تعمل تلقائياً على جهاز المقدّم'" : ""}>
                     ${route === "display" ? "📺 الصوت: التلفزيون فقط (بلا صدى)" : clip.isLocalFile ? "💻 الصوت: الجهاز الرئيسي (ملف محلي)" : "💻 الصوت: جهاز المقدّم"}
                   </button>`
                 : ""

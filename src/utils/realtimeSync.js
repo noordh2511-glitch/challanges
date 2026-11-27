@@ -570,7 +570,7 @@
         (window.SeenJeemFirebaseConfig ? window.SeenJeemFirebaseConfig.getConfig() : null);
 
       if (!window.SeenJeemFirebaseConfig || !window.SeenJeemFirebaseConfig.isValidConfig(cfg)) {
-        throw new Error("إعدادات Firebase غير مكتملة. أدخلها من «⚙️ إعدادات الاتصال اللاسلكي».");
+        throw new Error("تعذّر تفعيل غرفة اللعب حالياً — تأكد من الاتصال بالإنترنت.");
       }
 
       if (!navigator.onLine) {
@@ -723,12 +723,12 @@
         return {
           ok: true,
           uid,
-          message: "تم الاتصال بـ Firebase وتسجيل الدخول المجهول بنجاح!"
+          message: "تم التحقق من الاتصال بنجاح!"
         };
       } catch (err) {
         return {
           ok: false,
-          error: (err && err.message) || "تعذّر الاتصال بـ Firebase — تحقّق من الإعدادات وAnonymous Auth."
+          error: "تعذّر الاتصال حالياً، تأكد من الإنترنت وحاول مجدداً."
         };
       }
     }

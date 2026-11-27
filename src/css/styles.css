@@ -14951,3 +14951,453 @@ body.player-mobile-mode {
     flex-wrap: wrap;
   }
 }
+
+/* =========================================================
+   الحزمة السادسة عشرة: بوابة البطاقات المنفصلة، تسجيل الدخول، البروفايل، ولوحة الإدارة
+   ========================================================= */
+.hub-header {
+  margin-bottom: 14px;
+}
+.hub-top-row {
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+}
+.hub-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.hub-logo-icon {
+  font-size: 1.45rem;
+}
+.hub-account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding-inline: 12px 14px;
+}
+.hub-pill-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+.hub-pill-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hub-online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+
+.game-hub-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 40px;
+}
+.hub-hero-welcome {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+}
+.game-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.hub-game-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: right;
+  gap: 8px;
+  padding: 22px 20px;
+  border-radius: 22px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.72));
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+  min-height: 174px;
+}
+.hub-game-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34, 211, 238, 0.78);
+  box-shadow: 0 16px 34px rgba(6, 182, 212, 0.2);
+}
+.hub-game-card.mode-seen-jeem {
+  background: linear-gradient(145deg, rgba(8, 145, 178, 0.3), rgba(15, 23, 42, 0.9));
+  border-color: rgba(34, 211, 238, 0.5);
+}
+.hub-game-card.mode-blitz {
+  background: linear-gradient(145deg, rgba(217, 119, 6, 0.28), rgba(15, 23, 42, 0.9));
+  border-color: rgba(251, 191, 36, 0.45);
+}
+.hub-game-card.mode-charades {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.24), rgba(15, 23, 42, 0.9));
+  border-color: rgba(52, 211, 153, 0.45);
+}
+.hub-game-card.mode-audio-challenge {
+  background: linear-gradient(145deg, rgba(14, 116, 144, 0.34), rgba(88, 28, 135, 0.34));
+  border-color: rgba(56, 189, 248, 0.5);
+}
+.hub-game-card.mode-bara-salfa {
+  background: linear-gradient(145deg, rgba(147, 51, 234, 0.3), rgba(15, 23, 42, 0.9));
+  border-color: rgba(192, 132, 252, 0.5);
+}
+.hub-game-card.mode-mafia {
+  background: linear-gradient(145deg, rgba(159, 18, 57, 0.34), rgba(15, 23, 42, 0.92));
+  border-color: rgba(244, 63, 94, 0.5);
+}
+.hub-game-card.mode-tournament {
+  background: linear-gradient(145deg, rgba(202, 138, 4, 0.28), rgba(15, 23, 42, 0.9));
+  border-color: rgba(250, 204, 21, 0.5);
+}
+.hub-card-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+.hub-card-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.hub-card-title {
+  font-size: 1.32rem;
+  font-weight: 900;
+}
+.hub-card-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.hub-quick-access {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.hub-quick-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  text-align: right;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.hub-quick-card:hover {
+  border-color: rgba(251, 191, 36, 0.65);
+  transform: translateY(-2px);
+}
+.hub-quick-icon {
+  font-size: 1.9rem;
+}
+.hub-quick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hub-quick-text strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+.hub-quick-text span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sj-subpage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+}
+.sj-subpage-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.08rem;
+}
+.sj-subpage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* نافذة تسجيل الدخول الودية */
+.auth-login-modal-card {
+  width: min(460px, 94vw);
+}
+.auth-login-body {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.auth-hero-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.28), rgba(168, 85, 247, 0.28));
+  border: 2px solid rgba(34, 211, 238, 0.55);
+}
+.auth-welcome-heading {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+.auth-welcome-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+.auth-google-btn {
+  width: 100%;
+  min-height: 50px;
+}
+
+/* نافذة «ملفي الشخصي» والأوسمة */
+.profile-modal-card {
+  width: min(860px, 96vw);
+  max-height: 90vh;
+}
+.profile-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.profile-hero-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78));
+  border: 2px solid rgba(34, 211, 238, 0.45);
+}
+.profile-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile-avatar-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  background: rgba(9, 14, 30, 0.85);
+  border: 3px solid #22d3ee;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.profile-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-hero-name {
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+.profile-title-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.profile-level-bar-wrap {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.profile-level-track {
+  width: 120px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.profile-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #fbbf24);
+}
+.profile-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.profile-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.profile-kpi-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(9, 14, 30, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+.profile-kpi-card strong {
+  display: block;
+  font-size: 1.55rem;
+  font-weight: 900;
+  color: #38bdf8;
+}
+.profile-kpi-card span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.profile-games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+}
+.profile-game-stat-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.84rem;
+}
+.profile-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.profile-badge-item {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0.48;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.profile-badge-item.is-unlocked {
+  opacity: 1;
+  border-color: rgba(251, 191, 36, 0.65);
+  background: linear-gradient(145deg, rgba(120, 53, 15, 0.28), rgba(15, 23, 42, 0.88));
+}
+.profile-badge-icon {
+  font-size: 1.8rem;
+}
+.profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.profile-avatars-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.profile-avatar-opt {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.8);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.profile-avatar-opt.active {
+  border-color: #22d3ee;
+  background: rgba(6, 182, 212, 0.25);
+}
+.profile-colors-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.profile-color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+}
+.profile-color-dot.active {
+  border-color: #ffffff;
+  transform: scale(1.14);
+}
+@media (max-width: 640px) {
+  .game-hub-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-avatars-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
