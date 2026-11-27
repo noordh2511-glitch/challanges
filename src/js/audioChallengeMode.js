@@ -1,14 +1,10 @@
 /**
- * طور «تحدي الصوت» المستقل (Standalone Audio Challenge Mode — Pack 15)
+ * طور «تحدي الصوت» المستقل (Standalone Audio Challenge Mode — Pack 15 & Pack 17)
  * - آلة حالات من 4 مراحل: setup -> playing -> revealed -> summary
- * - مصدران للمقاطع:
- *   1) بنك الأسئلة والفئات الخاصة (visualType === "audio" أو audioUrl صالح) مع سجل عدم تكرار خفيف (audio-challenge-history-v1)
- *   2) جولة سريعة من ملفات جهاز المقدّم (MP3/WAV/M4A/OGG) عبر ObjectURL مؤقت بالذاكرة يُحرّر تلقائياً عند الخروج
- * - نمطان للتشغيل والنقاط:
- *   1) القياسي (نقاط ثابتة + لمحة 5ث)
- *   2) التدرّج الزمني Progressive Snippets: 3ث (+300) -> 7ث (+200) -> كامل (+100)
- * - إعادة استخدام كاملة لمشغّل audioChallengePlayer.js مع Anti-Echo وAuto-Pause تلقائي عند جرس السرعة
- * - منع تسريب مطلق: لا يُرسل answer أو answerImage أو audioSrc أو اسم الملف إلى شاشة التلفزيون أو publicState قبل الكشف
+ * - بطاقة QR Code مدمجة عبر quickGamesSync.js (/quickRooms/{roomCode}) + زر «📺 وضع العرض الكامل»
+ * - الشاشة الرئيسية تشغّل الصوت مركزياً (منع الصدى)، وفور ضغط أي لاعب على جرس السرعة يتوقف الصوت تلقائياً (Auto-Pause)
+ * - هاتف الحكم الاختياري (judgeUid) يرى الإجابة السرية من privateJudge/{uid} فقط ويتحكم بالصوت والتحكيم
+ * - منع تسريب مطلق: لا يُرسل answer أو answerImage أو audioUrl أو اسم الملف إلى publicState أو شاشة العرض قبل الكشف
  */
 (function () {
   "use strict";
@@ -112,9 +108,6 @@
     }
   }
 
-  /**
-   * جمع جميع الأسئلة الصوتية المتاحة من بنك الأسئلة (Sheets + Local + Custom Packs)
-   */
   function collectAudioQuestionsFromCategories(allCategories) {
     const cats = Array.isArray(allCategories) ? allCategories : [];
     const seenIds = new Set();
@@ -190,23 +183,22 @@
         score: 0,
         correctCount: 0
       }));
-      this.roundsOption = 10; // 5 | 10 | 15 | 20 | 0 (all)
-      this.playbackMode = "progressive"; // "standard" | "progressive"
-      this.standardPointRule = "fixed-100"; // "fixed-100" | "question-points"
-      this.localClips = []; // [{ id, audioUrl (ObjectURL), answer, categoryName, ... }]
+      this.roundsOption = 10;
+      this.playbackMode = "progressive";
+      this.standardPointRule = "fixed-100";
+      this.localClips = [];
 
       // حالة الجلسة النشطة
       this.phase = "setup"; // setup | playing | revealed | summary
       this.sessionTeams = [];
       this.sessionClips = [];
       this.currentIndex = 0;
-      this.progressiveStage = 0; // 0 (3s/+300) | 1 (7s/+200) | 2 (full/+100)
+      this.progressiveStage = 0;
       this.hostPreviewAnswer = false;
       this.roundAwardedTeamIdx = null;
       this.roundAwardedPoints = 0;
-      this.roundHistory = []; // [{ clipId, answer, awardedTeamIdx, points }]
+      this.roundHistory = [];
       this.undoStack = [];
-      this.audioRoutePref = "display"; // "display" | "host"
       this.audioStatus = {
         playing: false,
         teaserActive: false,
@@ -218,6 +210,31 @@
       };
       this._playerUnsub = null;
       this._lastBroadcastTimeSec = -1;
+
+      // الحزمة السابعة عشرة: غرفة الهواتف المدمجة (QR) + وضع العرض الكامل
+      this.qrDrawerVisible = false;
+      this.fullDisplayMode = false;
+      this.quickRoom = {
+        active: false,
+        connected: false,
+        roomCode: "",
+        playerUrl: "",
+        joinLocked: false,
+        judgeUid: null,
+        playersMap: {},
+        feedback: "",
+        feedbackKind: "info",
+        buzzer: {
+          status: "locked",
+          roundId: "",
+          winnerUid: null,
+          winnerName: "",
+          winnerAvatar: "",
+          winnerTeamId: "",
+          winnerTeamName: "",
+          winnerTeamIdx: null
+        }
+      };
     }
 
     init() {
@@ -226,27 +243,23 @@
       if (!this.modal || !this.body) return;
 
       const btnClose = document.getElementById("btn-close-audio-challenge");
-      const btnOpenTv = document.getElementById("btn-ac-open-tv");
-      const btnOpenWireless = document.getElementById("btn-ac-open-wireless");
+      const btnToggleQr = document.getElementById("btn-ac-toggle-qr");
+      const btnFullDisplay = document.getElementById("btn-ac-full-display");
+      const btnExitFull = document.getElementById("btn-ac-exit-full-display");
 
       if (btnClose) btnClose.addEventListener("click", () => this.close());
-      if (btnOpenTv) {
-        btnOpenTv.addEventListener("click", () => {
-          if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.openTVDisplayWindow === "function") {
-            window.SeenJeemHostBridge.openTVDisplayWindow();
-          }
-        });
+      if (btnToggleQr) {
+        btnToggleQr.addEventListener("click", () => this.toggleQrDrawer());
       }
-      if (btnOpenWireless) {
-        btnOpenWireless.addEventListener("click", () => {
-          if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.openWirelessRoomModal === "function") {
-            window.SeenJeemHostBridge.openWirelessRoomModal();
-          }
-        });
+      if (btnFullDisplay) {
+        btnFullDisplay.addEventListener("click", () => this.setFullDisplayMode(!this.fullDisplayMode));
+      }
+      if (btnExitFull) {
+        btnExitFull.addEventListener("click", () => this.setFullDisplayMode(false));
       }
 
       this.modal.addEventListener("click", (e) => {
-        if (e.target === this.modal) this.close();
+        if (e.target === this.modal && !this.fullDisplayMode) this.close();
       });
 
       this.body.addEventListener("click", (e) => this._handleBodyClick(e));
@@ -256,16 +269,14 @@
       if (window.SeenJeemAudioChallenge && typeof window.SeenJeemAudioChallenge.onChange === "function") {
         this._playerUnsub = window.SeenJeemAudioChallenge.onChange((st) => {
           if (!this.isOpenFlag || (this.phase !== "playing" && this.phase !== "revealed")) return;
-          if (this._getEffectiveRoute() !== "host") return;
           const prevPlaying = Boolean(this.audioStatus.playing);
           this.audioStatus = { ...this.audioStatus, ...st };
           this._updateLiveAudioControlsDOM();
           const secInt = Math.floor(Number(st.currentTime) || 0);
           if (prevPlaying !== Boolean(st.playing)) {
-            this._broadcastAll(false);
+            this._syncQuickRoom();
           } else if (secInt !== this._lastBroadcastTimeSec) {
             this._lastBroadcastTimeSec = secInt;
-            this._broadcastAll(true);
           }
         });
       }
@@ -279,23 +290,63 @@
       if (!this.modal) this.init();
       if (!this.modal) return;
       this.isOpenFlag = true;
+      this.fullDisplayMode = false;
+      this.qrDrawerVisible = false;
+      this._syncHeaderButtonsUI();
       this.modal.classList.add("open");
       this.modal.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
       this._render();
-      this._broadcastAll(false);
     }
 
     close() {
       if (!this.modal) return;
       this.stopPlayback();
+      this.setFullDisplayMode(false);
+      this.closeQuickRoom({ silent: true });
       this.revokeAllLocalObjectUrls();
       this.phase = "setup";
+      this.qrDrawerVisible = false;
       this.isOpenFlag = false;
       this.modal.classList.remove("open");
       this.modal.setAttribute("aria-hidden", "true");
       document.body.style.overflow = "";
-      this._broadcastAll(false);
+    }
+
+    setFullDisplayMode(enabled) {
+      this.fullDisplayMode = Boolean(enabled);
+      if (this.fullDisplayMode) {
+        this.hostPreviewAnswer = false;
+      }
+      if (this.modal) {
+        this.modal.classList.toggle("is-full-display-mode", this.fullDisplayMode);
+      }
+      const exitBtn = document.getElementById("btn-ac-exit-full-display");
+      if (exitBtn) exitBtn.hidden = !this.fullDisplayMode;
+      this._syncHeaderButtonsUI();
+      this._render();
+    }
+
+    async toggleQrDrawer() {
+      if (!this.quickRoom.active) {
+        await this.createQuickRoom();
+        this.qrDrawerVisible = true;
+      } else {
+        this.qrDrawerVisible = !this.qrDrawerVisible;
+      }
+      this._syncHeaderButtonsUI();
+      this._render();
+    }
+
+    _syncHeaderButtonsUI() {
+      const btnToggleQr = document.getElementById("btn-ac-toggle-qr");
+      if (btnToggleQr) {
+        btnToggleQr.textContent = this.qrDrawerVisible ? "🙈 إخفاء رمز QR" : "📱 إظهار رمز QR";
+      }
+      const btnFull = document.getElementById("btn-ac-full-display");
+      if (btnFull) {
+        btnFull.textContent = this.fullDisplayMode ? "✕ إنهاء العرض الكامل" : "📺 وضع العرض الكامل";
+      }
     }
 
     revokeAllLocalObjectUrls() {
@@ -317,21 +368,6 @@
       if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.showToast === "function") {
         window.SeenJeemHostBridge.showToast(msg, type);
       }
-    }
-
-    _isDualConnected() {
-      return Boolean(
-        window.SeenJeemHostBridge &&
-          typeof window.SeenJeemHostBridge.isDualScreenConnected === "function" &&
-          window.SeenJeemHostBridge.isDualScreenConnected()
-      );
-    }
-
-    _getWirelessInfo() {
-      if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.getWirelessInfo === "function") {
-        return window.SeenJeemHostBridge.getWirelessInfo();
-      }
-      return { active: false, roomCode: "", buzzer: null };
     }
 
     _getAllBankClips() {
@@ -356,13 +392,6 @@
       return this.sessionClips[this.currentIndex] || null;
     }
 
-    _getEffectiveRoute() {
-      const clip = this._getCurrentClip();
-      // حماية حتمية: روابط ObjectURL (blob:) من ملفات محلية تُشغّل على جهاز المقدّم لمنع فشلها بين نوافذ مختلفة بدون أي خطأ Console
-      if (clip && clip.isLocalFile) return "host";
-      return this._isDualConnected() && this.audioRoutePref !== "host" ? "display" : "host";
-    }
-
     _getCurrentPoints() {
       return computeAvailablePoints(
         this._getCurrentClip(),
@@ -372,15 +401,316 @@
       );
     }
 
+    _getActiveTeamsList() {
+      if (this.phase !== "setup") return this.sessionTeams;
+      if (this.freePlay) return [];
+      return this.teamsConfig.slice(0, Math.min(6, Math.max(2, this.teamCount))).map((t, idx) => ({
+        id: `ac-team-${idx}`,
+        name: (t.name || DEFAULT_TEAM_NAMES[idx]).trim().slice(0, 24) || DEFAULT_TEAM_NAMES[idx],
+        color: t.color || TEAM_COLORS[idx % TEAM_COLORS.length],
+        score: 0,
+        correctCount: 0
+      }));
+    }
+
     /* =========================================================
-       التحكم بالصوت وإيقافه التلقائي (إعادة استخدام audioChallengePlayer.js)
+       غرفة الهواتف المدمجة (/quickRooms/{roomCode} — gameType: "audio")
+       ========================================================= */
+    async createQuickRoom() {
+      const sync = window.SeenJeemQuickGamesSync;
+      if (!sync) return;
+      if (!sync.isConfigured()) {
+        this.quickRoom.feedbackKind = "warning";
+        this.quickRoom.feedback = "⚠️ خدمة اللعب عبر الهواتف غير متاحة حالياً — يمكنك بدء اللعب مباشرة بدون هواتف.";
+        this._render();
+        return;
+      }
+      this.quickRoom.feedbackKind = "info";
+      this.quickRoom.feedback = "⏳ جاري إنشاء غرفة اللعب وتوليد رمز QR...";
+      this._render();
+
+      try {
+        const info = await sync.createRoom({
+          gameType: "audio",
+          initialPublicState: this._buildQuickPublicState(),
+          onPlayers: (map) => {
+            this.quickRoom.playersMap = map && typeof map === "object" ? map : {};
+            if (this.quickRoom.judgeUid && !this.quickRoom.playersMap[this.quickRoom.judgeUid]) {
+              this.quickRoom.judgeUid = null;
+              sync.setJudgeUid(null);
+            }
+            this._render();
+          },
+          onBuzzes: (buzzMap) => this._handleIncomingBuzzes(buzzMap),
+          onCommand: (cmd) => this._handlePhoneCommand(cmd),
+          onConnectionState: (isConn) => {
+            this.quickRoom.connected = isConn;
+            this._render();
+          }
+        });
+
+        this.quickRoom.active = true;
+        this.quickRoom.connected = true;
+        this.quickRoom.roomCode = info.roomCode;
+        this.quickRoom.playerUrl = info.playerUrl;
+        this.quickRoom.joinLocked = false;
+        this.quickRoom.feedbackKind = "success";
+        this.quickRoom.feedback = `✅ غرفة تحدي الصوت جاهزة (${info.roomCode}) — امسح الرمز بهاتفك للانضمام!`;
+        this._syncQuickRoom();
+        this._syncHeaderButtonsUI();
+        this._render();
+      } catch (err) {
+        this.quickRoom.feedbackKind = "warning";
+        this.quickRoom.feedback = `⚠️ ${(err && err.message) || "تعذّر إنشاء غرفة الهواتف حالياً."}`;
+        this._render();
+      }
+    }
+
+    async closeQuickRoom({ silent = false } = {}) {
+      const sync = window.SeenJeemQuickGamesSync;
+      if (this.quickRoom.active && sync && sync.gameType === "audio") {
+        await sync.closeRoom();
+      }
+      this.quickRoom = {
+        active: false,
+        connected: false,
+        roomCode: "",
+        playerUrl: "",
+        joinLocked: false,
+        judgeUid: null,
+        playersMap: {},
+        feedback: "",
+        feedbackKind: "info",
+        buzzer: {
+          status: "locked",
+          roundId: "",
+          winnerUid: null,
+          winnerName: "",
+          winnerAvatar: "",
+          winnerTeamId: "",
+          winnerTeamName: "",
+          winnerTeamIdx: null
+        }
+      };
+      this.qrDrawerVisible = false;
+      if (!silent) {
+        this._syncHeaderButtonsUI();
+        this._render();
+        this._toast("🔴 تم إغلاق غرفة الهواتف", "info");
+      }
+    }
+
+    async toggleJoinLocked() {
+      if (!this.quickRoom.active || !window.SeenJeemQuickGamesSync) return;
+      this.quickRoom.joinLocked = !this.quickRoom.joinLocked;
+      await window.SeenJeemQuickGamesSync.setJoinLocked(this.quickRoom.joinLocked);
+      this._render();
+    }
+
+    async setJudgePlayer(uid) {
+      if (!this.quickRoom.active || !window.SeenJeemQuickGamesSync) return;
+      const nextUid = this.quickRoom.judgeUid === uid ? null : uid;
+      this.quickRoom.judgeUid = nextUid;
+      await window.SeenJeemQuickGamesSync.setJudgeUid(nextUid);
+      this._syncQuickRoom();
+      this._render();
+      if (nextUid && this.quickRoom.playersMap[nextUid]) {
+        this._toast(`👑 تم تعيين «${this.quickRoom.playersMap[nextUid].name}» حكماً للجولة عبر هاتفه`, "success");
+      } else {
+        this._toast("تم إلغاء تعيين الحكم عبر الهاتف", "info");
+      }
+    }
+
+    async kickQuickPlayer(uid) {
+      if (!this.quickRoom.active || !window.SeenJeemQuickGamesSync || !uid) return;
+      await window.SeenJeemQuickGamesSync.kickPlayer(uid);
+      if (this.quickRoom.judgeUid === uid) {
+        this.quickRoom.judgeUid = null;
+        await window.SeenJeemQuickGamesSync.setJudgeUid(null);
+      }
+      delete this.quickRoom.playersMap[uid];
+      this._render();
+    }
+
+    _openRoundBuzzer() {
+      const roundId = `ac_${this.currentIndex}_${Date.now().toString(36)}`;
+      this.quickRoom.buzzer = {
+        status: "open",
+        roundId,
+        winnerUid: null,
+        winnerName: "",
+        winnerAvatar: "",
+        winnerTeamId: "",
+        winnerTeamName: "",
+        winnerTeamIdx: null
+      };
+      if (this.quickRoom.active && window.SeenJeemQuickGamesSync) {
+        window.SeenJeemQuickGamesSync.clearBuzzes();
+      }
+    }
+
+    _lockRoundBuzzer() {
+      this.quickRoom.buzzer = {
+        ...this.quickRoom.buzzer,
+        status: "locked"
+      };
+    }
+
+    _handleIncomingBuzzes(buzzMap) {
+      if (!this.quickRoom.active || this.phase !== "playing") return;
+      const bz = this.quickRoom.buzzer;
+      if (!bz || bz.status !== "open") return;
+      const entries = Object.values(buzzMap || {}).filter(
+        (b) => b && b.uid && (!bz.roundId || !b.roundId || b.roundId === bz.roundId) && b.uid !== this.quickRoom.judgeUid
+      );
+      if (entries.length === 0) return;
+      entries.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+      const winner = entries[0];
+      const teamIdx = this.sessionTeams.findIndex((t) => t.id === winner.teamId);
+      const teamName = teamIdx >= 0 ? this.sessionTeams[teamIdx].name : "";
+
+      this.quickRoom.buzzer = {
+        status: "buzzed",
+        roundId: bz.roundId,
+        winnerUid: winner.uid,
+        winnerName: winner.name || "لاعب",
+        winnerAvatar: winner.avatar || "🎯",
+        winnerTeamId: winner.teamId || "",
+        winnerTeamName: teamName,
+        winnerTeamIdx: teamIdx >= 0 ? teamIdx : null
+      };
+
+      // Auto-Pause تلقائي للمقطع الصوتي فور ضغط أول لاعب!
+      this.triggerAudioAction("PAUSE");
+      if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playBuzz === "function") {
+        window.SeenJeemAudio.playBuzz();
+      }
+      this._toast(`🔔 ${winner.avatar || "🎯"} ${winner.name} ضغط الجرس أولاً!`, "success");
+      this._render();
+      this._syncQuickRoom();
+    }
+
+    _handlePhoneCommand(cmd) {
+      if (!cmd || !this.quickRoom.active || !this.quickRoom.judgeUid || cmd.uid !== this.quickRoom.judgeUid) return;
+      const p = cmd.payload && typeof cmd.payload === "object" ? cmd.payload : {};
+      switch (cmd.type) {
+        case "AUDIO_PLAY":
+          this.triggerAudioAction("PLAY");
+          break;
+        case "AUDIO_PAUSE":
+          this.triggerAudioAction("PAUSE");
+          break;
+        case "AUDIO_REPLAY":
+          this.triggerAudioAction("REPLAY");
+          break;
+        case "AUDIO_STAGE":
+          this.setProgressiveStage(Number(p.level) || 0, true);
+          break;
+        case "AUDIO_CORRECT": {
+          const buzzIdx = this.quickRoom.buzzer ? this.quickRoom.buzzer.winnerTeamIdx : null;
+          if (!this.freePlay && Number.isInteger(buzzIdx) && this.sessionTeams[buzzIdx]) {
+            this.awardTeam(buzzIdx);
+          } else if (Number.isInteger(p.teamIdx) && this.sessionTeams[p.teamIdx]) {
+            this.awardTeam(p.teamIdx);
+          } else {
+            this.revealAnswer();
+          }
+          break;
+        }
+        case "AUDIO_WRONG_CONTINUE":
+          this.handleBuzzerWrongContinue();
+          break;
+        case "AUDIO_REVEAL":
+          this.revealAnswer();
+          break;
+        case "AUDIO_NEXT":
+          this.nextRound();
+          break;
+        default:
+          break;
+      }
+    }
+
+    _buildQuickPublicState() {
+      const clip = this._getCurrentClip();
+      const isRevealed = this.phase === "revealed";
+      const stage = PROGRESSIVE_STAGES[this.progressiveStage] || PROGRESSIVE_STAGES[0];
+      const ranked = this.sessionTeams.slice().sort((a, b) => b.score - a.score);
+      const isDraw = ranked.length > 1 && ranked[0].score === ranked[1].score;
+      const awardedTeam =
+        isRevealed && this.roundAwardedTeamIdx !== null && this.sessionTeams[this.roundAwardedTeamIdx]
+          ? this.sessionTeams[this.roundAwardedTeamIdx].name
+          : null;
+
+      return {
+        gameType: "audio",
+        phase: this.phase,
+        roundNumber: this.currentIndex + 1,
+        totalRounds: this.sessionClips.length,
+        roundId: this.quickRoom.buzzer.roundId || `ac_${this.currentIndex}`,
+        category: clip ? clip.categoryName : "تحدي الصوت",
+        categoryIcon: clip ? clip.categoryIcon : "🎵",
+        questionText: clip ? clip.questionText : "استمع للمقطع الصوتي واضغط الجرس!",
+        freePlay: this.freePlay,
+        teams: this._getActiveTeamsList(),
+        judgeUid: this.quickRoom.judgeUid || "",
+        buzzerState: {
+          status: this.quickRoom.buzzer.status,
+          roundId: this.quickRoom.buzzer.roundId,
+          winnerUid: this.quickRoom.buzzer.winnerUid,
+          winnerName: this.quickRoom.buzzer.winnerName,
+          winnerAvatar: this.quickRoom.buzzer.winnerAvatar,
+          winnerTeamId: this.quickRoom.buzzer.winnerTeamId,
+          winnerTeamName: this.quickRoom.buzzer.winnerTeamName
+        },
+        audioPlayback: {
+          playing: Boolean(this.audioStatus && this.audioStatus.playing),
+          mode: this.playbackMode,
+          stageLevel: this.progressiveStage,
+          stageLabel: stage.label,
+          currentPoints: this._getCurrentPoints()
+        },
+        revealedAnswer: isRevealed && clip ? clip.answer : null,
+        revealedExplanation: isRevealed && clip ? clip.explanation : null,
+        revealedAnswerImage: isRevealed && clip && clip.answerImage ? clip.answerImage : null,
+        roundAwardedTeamName: awardedTeam,
+        roundAwardedPoints: isRevealed ? this.roundAwardedPoints : 0,
+        winnerTitle:
+          this.phase === "summary"
+            ? this.freePlay
+              ? "انتهت جولة تحدي الصوت الحر!"
+              : isDraw
+                ? "تعادل مثير في قمة تحدي الصوت!"
+                : `الفائز: ${(ranked[0] && ranked[0].name) || "—"}`
+            : null
+      };
+    }
+
+    _syncQuickRoom() {
+      const sync = window.SeenJeemQuickGamesSync;
+      if (!this.quickRoom.active || !sync || sync.gameType !== "audio") return;
+      sync.publishPublicState(this._buildQuickPublicState());
+      const clip = this._getCurrentClip();
+      if (this.quickRoom.judgeUid && clip && (this.phase === "playing" || this.phase === "revealed")) {
+        sync.setPrivateJudgePayload(this.quickRoom.judgeUid, {
+          roundId: `ac_${this.currentIndex}`,
+          question: clip.questionText,
+          answer: clip.answer,
+          explanation: clip.explanation || "",
+          category: clip.categoryName,
+          points: this._getCurrentPoints()
+        });
+      } else {
+        sync.setPrivateJudgePayload(null, null);
+      }
+    }
+
+    /* =========================================================
+       التحكم بالصوت المركزي على الشاشة الرئيسية (إعادة استخدام audioChallengePlayer.js)
        ========================================================= */
     stopPlayback() {
       if (window.SeenJeemAudioChallenge) {
         window.SeenJeemAudioChallenge.stop();
-      }
-      if (this._isDualConnected() && window.SeenJeemLiveSync && typeof window.SeenJeemLiveSync.broadcastAudioControl === "function") {
-        window.SeenJeemLiveSync.broadcastAudioControl("STOP", {});
       }
       this.audioStatus = {
         ...this.audioStatus,
@@ -396,47 +726,16 @@
       const clip = this._getCurrentClip();
       if (!clip && action !== "STOP") return;
 
-      const route = this._getEffectiveRoute();
       if (action === "STOP") {
         this.stopPlayback();
         this._updateLiveAudioControlsDOM();
-        this._broadcastAll(false);
+        this._syncQuickRoom();
         return;
       }
 
-      const src = clip.audioUrl;
-      const clipStart = Number(clip.audioStart) || 0;
-      const clipEnd = clip.audioEnd;
-
-      if (route === "display" && window.SeenJeemLiveSync && typeof window.SeenJeemLiveSync.broadcastAudioControl === "function") {
-        // Anti-Echo: إيقاف الصوت على جهاز المقدّم فوراً
-        if (window.SeenJeemAudioChallenge) window.SeenJeemAudioChallenge.pause();
-        window.SeenJeemLiveSync.broadcastAudioControl(action, {
-          ...payload,
-          src,
-          clipStart,
-          clipEnd,
-          questionId: clip.id
-        });
-        if (action === "PLAY" || action === "REPLAY" || action === "TEASER_5S") {
-          this.audioStatus.playing = true;
-          this.audioStatus.teaserActive = action === "TEASER_5S";
-        } else if (action === "PAUSE") {
-          this.audioStatus.playing = false;
-          this.audioStatus.teaserActive = false;
-        }
-        this._updateLiveAudioControlsDOM();
-        this._broadcastAll(false);
-        return;
-      }
-
-      // تشغيل محلي على جهاز المقدّم (مع إيقاف التلفزيون لمنع الصدى)
-      if (this._isDualConnected() && window.SeenJeemLiveSync && typeof window.SeenJeemLiveSync.broadcastAudioControl === "function") {
-        window.SeenJeemLiveSync.broadcastAudioControl("PAUSE", {});
-      }
       const player = window.SeenJeemAudioChallenge;
       if (!player) return;
-      player.load(src, { start: clipStart, end: clipEnd, questionId: clip.id });
+      player.load(clip.audioUrl, { start: Number(clip.audioStart) || 0, end: clip.audioEnd, questionId: clip.id });
       if (action === "PLAY") await player.play();
       else if (action === "PAUSE") player.pause();
       else if (action === "REPLAY") await player.replay();
@@ -446,29 +745,21 @@
 
       this.audioStatus = { ...this.audioStatus, ...player.getState() };
       this._updateLiveAudioControlsDOM();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
-    onDisplayAudioStatus(st) {
-      if (!this.isOpenFlag || !st) return;
-      if (this._getEffectiveRoute() !== "display") return;
-      const prevPlaying = Boolean(this.audioStatus.playing);
-      this.audioStatus = { ...this.audioStatus, ...st };
-      this._updateLiveAudioControlsDOM();
-      if (prevPlaying !== Boolean(st.playing)) {
-        this._broadcastAll(false);
-      }
-    }
-
-    /**
-     * يُستدعى تلقائياً من app.js فور ضغط أول فريق على جرس السرعة اللاسلكي!
-     */
-    onWirelessBuzz(buzzerInfo) {
+    // توافق خلفي في حال استُدعي من الجسر القديم
+    onDisplayAudioStatus() {}
+    onWirelessBuzz() {
       if (!this.isOpenFlag || this.phase !== "playing") return;
-      // Auto-Pause فوري للمقطع الصوتي ليتحدث الفريق بوضوح
       this.triggerAudioAction("PAUSE");
       this._render();
-      this._broadcastAll(false);
+    }
+    buildSanitizedDisplayPayload() {
+      return this._buildQuickPublicState();
+    }
+    buildHostPrivatePayload() {
+      return null;
     }
 
     /* =========================================================
@@ -514,35 +805,31 @@
       this._render();
     }
 
-    startSession() {
+    startSession({ offlineOnly = false } = {}) {
       const pool = this.sourceTab === "local" ? this.localClips.slice() : this._getFilteredBankClips();
       if (pool.length === 0) {
         this._toast(
           this.sourceTab === "local"
             ? "⚠️ يرجى اختيار ملف صوتي واحد على الأقل من جهازك أولاً"
-            : "⚠️ لا توجد مقاطع صوتية متاحة — أضفها من صانع الفئات أو اختر ملفات محلية",
+            : "⚠️ لا توجد مقاطع صوتية متاحة — أضفها من فئاتي الخاصة أو اختر ملفات من جهازك",
           "warning"
         );
         return;
       }
 
+      if (offlineOnly && this.quickRoom.active) {
+        this.closeQuickRoom({ silent: true });
+      }
+
       const shuffled = shuffleArray(pool);
       const count = this.roundsOption > 0 ? Math.min(this.roundsOption, shuffled.length) : shuffled.length;
       this.sessionClips = shuffled.slice(0, count);
-
-      this.sessionTeams = this.freePlay
-        ? []
-        : this.teamsConfig.slice(0, Math.min(6, Math.max(2, this.teamCount))).map((t, idx) => ({
-            id: `ac-team-${idx}`,
-            name: (t.name || DEFAULT_TEAM_NAMES[idx]).trim().slice(0, 24) || DEFAULT_TEAM_NAMES[idx],
-            color: t.color || TEAM_COLORS[idx % TEAM_COLORS.length],
-            score: 0,
-            correctCount: 0
-          }));
-
+      this.sessionTeams = this._getActiveTeamsList();
       this.currentIndex = 0;
       this.roundHistory = [];
       this.undoStack = [];
+      this.qrDrawerVisible = false;
+      this._syncHeaderButtonsUI();
       this._enterRound(0);
     }
 
@@ -556,7 +843,7 @@
       this.roundAwardedPoints = 0;
 
       const clip = this._getCurrentClip();
-      if (clip && this._getEffectiveRoute() === "host" && window.SeenJeemAudioChallenge) {
+      if (clip && window.SeenJeemAudioChallenge) {
         window.SeenJeemAudioChallenge.load(clip.audioUrl, {
           start: clip.audioStart,
           end: clip.audioEnd,
@@ -564,24 +851,16 @@
         });
       }
 
-      // إذا كانت الغرفة اللاسلكية نشطة، نفتح الجرس تلقائياً لكل مقطع جديد
-      if (
-        this._getWirelessInfo().active &&
-        window.SeenJeemHostBridge &&
-        typeof window.SeenJeemHostBridge.openSpeedBuzzer === "function"
-      ) {
-        window.SeenJeemHostBridge.openSpeedBuzzer();
-      }
-
+      this._openRoundBuzzer();
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
     setProgressiveStage(level, autoPlay = true) {
       const clamped = Math.min(2, Math.max(0, Number(level) || 0));
       this.progressiveStage = clamped;
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
 
       if (autoPlay) {
         const stage = PROGRESSIVE_STAGES[clamped];
@@ -596,6 +875,7 @@
     revealAnswer() {
       if (this.phase !== "playing") return;
       this.triggerAudioAction("PAUSE");
+      this._lockRoundBuzzer();
       this.phase = "revealed";
       const clip = this._getCurrentClip();
       if (clip) markClipPlayedInHistory(clip.id);
@@ -603,7 +883,7 @@
         window.SeenJeemAudio.playReveal();
       }
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
     awardTeam(teamIdx) {
@@ -613,6 +893,7 @@
 
       this._pushUndoSnapshot();
       this.triggerAudioAction("PAUSE");
+      this._lockRoundBuzzer();
 
       const pts = this._getCurrentPoints();
       if (!this.freePlay && Number.isInteger(teamIdx) && this.sessionTeams[teamIdx]) {
@@ -635,17 +916,8 @@
       markClipPlayedInHistory(clip.id);
       this.phase = "revealed";
       this._recordRoundOutcome(clip, this.roundAwardedTeamIdx, this.roundAwardedPoints);
-
-      if (
-        this._getWirelessInfo().active &&
-        window.SeenJeemHostBridge &&
-        typeof window.SeenJeemHostBridge.lockSpeedBuzzer === "function"
-      ) {
-        window.SeenJeemHostBridge.lockSpeedBuzzer();
-      }
-
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
     handleBuzzerWrongContinue() {
@@ -653,17 +925,11 @@
       if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playNoScore === "function") {
         window.SeenJeemAudio.playNoScore();
       }
-      if (
-        this._getWirelessInfo().active &&
-        window.SeenJeemHostBridge &&
-        typeof window.SeenJeemHostBridge.openSpeedBuzzer === "function"
-      ) {
-        window.SeenJeemHostBridge.openSpeedBuzzer();
-      }
+      this._openRoundBuzzer();
       this._toast("❌ إجابة خاطئة — أُعيد فتح الجرس ويمكن متابعة المقطع!", "info");
       this.triggerAudioAction("PLAY");
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
     skipRound() {
@@ -688,6 +954,7 @@
 
     _enterSummary() {
       this.stopPlayback();
+      this._lockRoundBuzzer();
       this.phase = "summary";
       if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playVictory === "function") {
         window.SeenJeemAudio.playVictory();
@@ -696,7 +963,7 @@
         window.SeenJeemHostBridge.triggerConfetti("victory", "default");
       }
       this._render();
-      this._broadcastAll(false);
+      this._syncQuickRoom();
     }
 
     _recordRoundOutcome(clip, teamIdx, points) {
@@ -743,99 +1010,11 @@
       }
       this._toast("↩️ تم التراجع عن آخر خطوة", "info");
       this._render();
-      this._broadcastAll(false);
-    }
-
-    /**
-     * معالجة أوامر ريموت المقدّم (?mode=remote)
-     */
-    handleRemoteCommand(payload = {}) {
-      if (!this.isOpenFlag) return;
-      const act = payload.action;
-      if (act === "play") this.triggerAudioAction("PLAY");
-      else if (act === "pause") this.triggerAudioAction("PAUSE");
-      else if (act === "replay") this.triggerAudioAction("REPLAY");
-      else if (act === "teaser") this.triggerAudioAction("TEASER_5S", { seconds: Number(payload.seconds) || 5 });
-      else if (act === "stage") this.setProgressiveStage(Number(payload.level) || 0, true);
-      else if (act === "reveal") this.revealAnswer();
-      else if (act === "award") this.awardTeam(payload.teamIdx === null || payload.teamIdx === undefined ? null : Number(payload.teamIdx));
-      else if (act === "buzzer-wrong") this.handleBuzzerWrongContinue();
-      else if (act === "skip") this.skipRound();
-      else if (act === "next") this.nextRound();
-      else if (act === "undo") this.undoLastAction();
+      this._syncQuickRoom();
     }
 
     /* =========================================================
-       حزم التلفزيون وريموت المقدّم (Anti-Spoiler 100%)
-       ========================================================= */
-    buildSanitizedDisplayPayload() {
-      const clip = this._getCurrentClip();
-      const isRevealed = this.phase === "revealed";
-      const st = this.audioStatus || {};
-      const stage = PROGRESSIVE_STAGES[this.progressiveStage] || PROGRESSIVE_STAGES[0];
-      const ranked = this.sessionTeams.slice().sort((a, b) => b.score - a.score);
-
-      return {
-        phase: this.phase,
-        roundNumber: this.currentIndex + 1,
-        totalRounds: this.sessionClips.length,
-        categoryName: clip ? clip.categoryName : "تحدي الصوت",
-        categoryIcon: clip ? clip.categoryIcon : "🎵",
-        questionText: clip ? clip.questionText : "",
-        playbackMode: this.playbackMode,
-        progressiveStage: this.progressiveStage,
-        progressiveLabel: stage.label,
-        currentPoints: this._getCurrentPoints(),
-        freePlay: this.freePlay,
-        teams: this.sessionTeams.map((t) => ({ id: t.id, name: t.name, color: t.color, score: t.score, correctCount: t.correctCount })),
-        audioState: {
-          playing: Boolean(st.playing),
-          teaserActive: Boolean(st.teaserActive),
-          currentTime: Number(st.currentTime) || 0,
-          duration: Number(st.duration) || 0,
-          autoplayBlocked: Boolean(st.autoplayBlocked),
-          route: this._getEffectiveRoute(),
-          isLocalFile: Boolean(clip && clip.isLocalFile)
-        },
-        // منع تسريب صارم: الإجابة وصورة الإجابة والشرح لا تُرسل مطلقاً قبل phase === "revealed"
-        revealedAnswer: isRevealed && clip ? clip.answer : null,
-        revealedExplanation: isRevealed && clip ? clip.explanation : null,
-        revealedAnswerImage: isRevealed && clip && clip.answerImage ? clip.answerImage : null,
-        roundAwardedTeamIdx: isRevealed ? this.roundAwardedTeamIdx : null,
-        roundAwardedPoints: isRevealed ? this.roundAwardedPoints : 0,
-        summary:
-          this.phase === "summary"
-            ? {
-                totalPlayed: this.sessionClips.length,
-                standings: ranked,
-                winnerName: ranked[0] ? ranked[0].name : null,
-                isDraw: ranked.length > 1 && ranked[0].score === ranked[1].score
-              }
-            : null
-      };
-    }
-
-    buildHostPrivatePayload() {
-      const clip = this._getCurrentClip();
-      if (!clip || (this.phase !== "playing" && this.phase !== "revealed")) return null;
-      return {
-        answer: clip.answer,
-        explanation: clip.explanation || "",
-        categoryName: clip.categoryName,
-        currentPoints: this._getCurrentPoints(),
-        playbackMode: this.playbackMode,
-        progressiveStage: this.progressiveStage
-      };
-    }
-
-    _broadcastAll(skipWireless = false) {
-      if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.broadcastTV === "function") {
-        window.SeenJeemHostBridge.broadcastTV({ skipWireless });
-      }
-    }
-
-    /* =========================================================
-       التفاعل ورسم واجهة المقدّم
+       التفاعل ورسم الواجهة (مع بطاقة QR المدمجة ووضع العرض الكامل)
        ========================================================= */
     _handleBodyClick(e) {
       const btn = e.target.closest("button");
@@ -863,11 +1042,13 @@
           break;
         case "toggle-free-play":
           this.freePlay = !this.freePlay;
+          this._syncQuickRoom();
           this._render();
           break;
         case "set-team-count":
           this.freePlay = false;
           this.teamCount = Math.min(6, Math.max(2, Number(btn.dataset.val) || 2));
+          this._syncQuickRoom();
           this._render();
           break;
         case "set-rounds":
@@ -889,13 +1070,38 @@
           this.revokeAllLocalObjectUrls();
           this._render();
           break;
-        case "open-wireless":
-          if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.openWirelessRoomModal === "function") {
-            window.SeenJeemHostBridge.openWirelessRoomModal();
+        case "create-qr-room":
+          this.createQuickRoom();
+          break;
+        case "close-qr-room":
+          this.closeQuickRoom();
+          break;
+        case "toggle-lock-room":
+          this.toggleJoinLocked();
+          break;
+        case "copy-qr-link":
+          if (this.quickRoom.playerUrl && navigator.clipboard) {
+            navigator.clipboard.writeText(this.quickRoom.playerUrl).then(() => {
+              this._toast("📋 تم نسخ رابط الانضمام للهواتف", "success");
+            });
           }
           break;
+        case "set-judge":
+          this.setJudgePlayer(btn.dataset.uid);
+          break;
+        case "kick-player":
+          this.kickQuickPlayer(btn.dataset.uid);
+          break;
+        case "hide-qr-drawer":
+          this.qrDrawerVisible = false;
+          this._syncHeaderButtonsUI();
+          this._render();
+          break;
         case "start-session":
-          this.startSession();
+          this.startSession({ offlineOnly: false });
+          break;
+        case "start-offline":
+          this.startSession({ offlineOnly: true });
           break;
         case "play":
           this.triggerAudioAction("PLAY");
@@ -912,13 +1118,8 @@
         case "prog-stage":
           this.setProgressiveStage(Number(btn.dataset.level) || 0, true);
           break;
-        case "toggle-route":
-          this.stopPlayback();
-          this.audioRoutePref = this.audioRoutePref === "host" ? "display" : "host";
-          this._render();
-          this._broadcastAll(false);
-          break;
         case "toggle-preview":
+          if (this.fullDisplayMode) return;
           this.hostPreviewAnswer = !this.hostPreviewAnswer;
           this._render();
           break;
@@ -932,10 +1133,9 @@
           this.handleBuzzerWrongContinue();
           break;
         case "buzzer-open":
-          if (window.SeenJeemHostBridge && typeof window.SeenJeemHostBridge.openSpeedBuzzer === "function") {
-            window.SeenJeemHostBridge.openSpeedBuzzer();
-            this._render();
-          }
+          this._openRoundBuzzer();
+          this._render();
+          this._syncQuickRoom();
           break;
         case "undo":
           this.undoLastAction();
@@ -961,7 +1161,7 @@
           this.stopPlayback();
           this.phase = "setup";
           this._render();
-          this._broadcastAll(false);
+          this._syncQuickRoom();
           break;
         case "exit-home":
           this.close();
@@ -976,7 +1176,10 @@
       if (!t) return;
       if (t.dataset.acTeamName !== undefined) {
         const idx = Number(t.dataset.acTeamName);
-        if (this.teamsConfig[idx]) this.teamsConfig[idx].name = t.value;
+        if (this.teamsConfig[idx]) {
+          this.teamsConfig[idx].name = t.value;
+          this._syncQuickRoom();
+        }
       } else if (t.dataset.acTeamColor !== undefined) {
         const idx = Number(t.dataset.acTeamColor);
         if (this.teamsConfig[idx]) this.teamsConfig[idx].color = t.value;
@@ -1030,13 +1233,118 @@
       const statusEl = document.getElementById("ac-status-label");
       if (statusEl) {
         statusEl.textContent = st.autoplayBlocked
-          ? "🔇 يرجى النقر على شاشة التلفزيون لتفعيل الصوت"
+          ? "🔇 اضغط على زر التشغيل لتفعيل الصوت"
           : st.error
             ? `⚠️ ${st.error}`
             : st.playing
               ? "🔊 جاري تشغيل المقطع الصوتي..."
               : "⏸️ جاهز / متوقف مؤقتاً";
       }
+    }
+
+    _renderMidgameQrDrawerHtml() {
+      if (!this.qrDrawerVisible || !this.quickRoom.active) return "";
+      const qr = this.quickRoom;
+      const qrSvg =
+        qr.playerUrl && window.SeenJeemQR
+          ? window.SeenJeemQR.toSVG(qr.playerUrl, { size: 136, margin: 2, ariaLabel: `رمز انضمام غرفة ${qr.roomCode}` })
+          : "";
+      const count = Object.keys(qr.playersMap || {}).length;
+      return `
+        <div class="qg-midgame-qr-card">
+          <div class="qg-midgame-qr-svg">${qrSvg}</div>
+          <div class="qg-midgame-qr-info">
+            <div class="qg-midgame-qr-title">📱 امسح الرمز بهاتفك للانضمام فوراً</div>
+            <div class="qg-midgame-qr-code">رمز الغرفة: <strong>${escapeHtml(qr.roomCode)}</strong> • المنضمّون: <strong>${count}</strong></div>
+            <div class="qg-midgame-qr-actions">
+              <button type="button" class="btn btn-secondary btn-xxs" data-ac-act="copy-qr-link">📋 نسخ الرابط</button>
+              <a href="${escapeHtml(qr.playerUrl)}" target="_blank" rel="noopener" class="btn btn-gold-outline btn-xxs">↗️ فتح شاشة لاعب</a>
+              <button type="button" class="btn btn-ghost btn-xxs" data-ac-act="hide-qr-drawer">🙈 إخفاء</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    _renderSetupQrSectionHtml() {
+      const qr = this.quickRoom;
+      const players = Object.values(qr.playersMap || {}).filter((p) => p && p.uid && p.name);
+      const teams = this._getActiveTeamsList();
+      const teamMap = new Map(teams.map((t) => [t.id, t.name]));
+      const qrSvg =
+        qr.active && qr.playerUrl && window.SeenJeemQR
+          ? window.SeenJeemQR.toSVG(qr.playerUrl, { size: 164, margin: 3, ariaLabel: `رمز انضمام غرفة ${qr.roomCode}` })
+          : "";
+
+      return `
+        <section class="bank-section qg-setup-qr-card">
+          <div class="bank-section-header">
+            <h3 class="bank-section-title">📱 اللعب عبر الهواتف (جرس السرعة + هاتف الحكم)</h3>
+            <span class="dual-status-pill ${qr.active && qr.connected ? "is-connected" : "is-single"}">
+              ${!qr.active ? "⚪ غير مفعّلة بعد" : qr.connected ? `🟢 غرفة ${escapeHtml(qr.roomCode)} (${players.length} لاعب)` : "🟡 يعيد الاتصال..."}
+            </span>
+          </div>
+          ${qr.feedback ? `<div class="wireless-feedback-box is-${escapeHtml(qr.feedbackKind)}">${escapeHtml(qr.feedback)}</div>` : ""}
+          ${
+            !qr.active
+              ? `
+                <div class="qg-qr-init-row">
+                  <button type="button" class="btn btn-primary btn-sm" data-ac-act="create-qr-room">📱 فتح غرفة اللعب وإظهار رمز QR</button>
+                  <span class="bs-hint">يمسح اللاعبون الرمز بهواتفهم للضغط على «أعرف الإجابة!» وإيقاف الصوت تلقائياً، أو يمكنك البدء مباشرة بدون هواتف.</span>
+                </div>
+              `
+              : `
+                <div class="bs-wl-active-grid">
+                  <div class="bs-wl-qr-col">
+                    <div class="wireless-qr-svg-wrap">${qrSvg}</div>
+                    <div class="wireless-player-code-display">رمز الغرفة: <strong>${escapeHtml(qr.roomCode)}</strong></div>
+                    <div class="wireless-qr-actions">
+                      <button type="button" class="btn btn-ghost btn-xxs" data-ac-act="copy-qr-link">📋 نسخ الرابط</button>
+                      <a href="${escapeHtml(qr.playerUrl)}" target="_blank" rel="noopener" class="btn btn-secondary btn-xxs">↗️ فتح شاشة لاعب</a>
+                    </div>
+                  </div>
+                  <div class="bs-wl-players-col">
+                    <div class="bs-wl-guard-row">
+                      <button type="button" class="btn ${qr.joinLocked ? "btn-amber" : "btn-secondary"} btn-xs" data-ac-act="toggle-lock-room">
+                        ${qr.joinLocked ? "🔒 الانضمام مقفل (افتح)" : "🔓 قفل الانضمام"}
+                      </button>
+                      <button type="button" class="btn btn-danger-outline btn-xs" data-ac-act="close-qr-room">🔴 إغلاق الغرفة</button>
+                    </div>
+                    <div class="bs-wl-roster-head">اللاعبون المنضمّون (${players.length}):</div>
+                    <div class="bs-wl-roster-list">
+                      ${
+                        players.length === 0
+                          ? `<div class="wireless-device-empty">امسح الرمز بهاتفك للانضمام — ستظهر الأسماء والأفاتارات هنا فوراً...</div>`
+                          : players
+                              .map((p) => {
+                                const isJudge = qr.judgeUid === p.uid;
+                                const tName = teamMap.get(p.teamId) || "";
+                                return `
+                                  <div class="wireless-device-row${isJudge ? " is-vip-row" : ""}">
+                                    <div class="wireless-device-meta">
+                                      <span class="wireless-device-online-dot"></span>
+                                      <strong>${escapeHtml(p.avatar || "🎯")} ${escapeHtml(p.name)}</strong>
+                                      ${tName ? `<span class="qg-team-mini-tag">${escapeHtml(tName)}</span>` : ""}
+                                      ${isJudge ? `<span class="bs-vip-tag">👑 حكم</span>` : ""}
+                                    </div>
+                                    <div class="bs-row-btns">
+                                      <button type="button" class="btn ${isJudge ? "btn-amber" : "btn-gold-outline"} btn-xxs" data-ac-act="set-judge" data-uid="${escapeHtml(p.uid)}" title="تعيين هذا الهاتف كحكم يرى الإجابة ويتحكم بالصوت">
+                                        ${isJudge ? "✓ حكم" : "👑 تعيين كحكم"}
+                                      </button>
+                                      <button type="button" class="btn btn-danger-outline btn-xxs" data-ac-act="kick-player" data-uid="${escapeHtml(p.uid)}">🚫 طرد</button>
+                                    </div>
+                                  </div>
+                                `;
+                              })
+                              .join("")
+                      }
+                    </div>
+                  </div>
+                </div>
+              `
+          }
+        </section>
+      `;
     }
 
     _render() {
@@ -1050,7 +1358,6 @@
       const allBank = this._getAllBankClips();
       const filteredBank = this._getFilteredBankClips();
       const playedCount = loadPlayedHistoryIds().length;
-      const wl = this._getWirelessInfo();
 
       const catMap = new Map();
       allBank.forEach((c) => {
@@ -1064,17 +1371,18 @@
 
       return `
         <div class="ac-stage">
+          ${this._renderSetupQrSectionHtml()}
+
           <!-- تبويبا اختيار مصدر المقاطع -->
           <div class="ac-source-tabs" role="tablist">
             <button type="button" class="ac-tab-btn${this.sourceTab === "bank" ? " active" : ""}" data-ac-act="tab" data-val="bank">
-              📚 بنك الأسئلة والفئات الخاصة (${allBank.length} مقطع)
+              📚 مكتبة الأسئلة والفئات الخاصة (${allBank.length} مقطع)
             </button>
             <button type="button" class="ac-tab-btn${this.sourceTab === "local" ? " active" : ""}" data-ac-act="tab" data-val="local">
               📂 جولة سريعة من ملفات جهازك (أوفلاين) (${this.localClips.length})
             </button>
           </div>
 
-          <!-- مصدر المقاطع -->
           <section class="bank-section">
             ${
               this.sourceTab === "bank"
@@ -1082,11 +1390,11 @@
                   ? `
                     <div class="ac-empty-box">
                       <div class="ac-empty-icon">🎵</div>
-                      <h3>لا توجد أسئلة صوتية في البنك أو الفئات الخاصة بعد</h3>
-                      <p>يمكنك إضافة أسئلة صوتية (MP3 / WAV / رابط مباشر) في صانع الفئات الخاصة، أو تجربة تبويب «📂 جولة سريعة من ملفات جهازك» فوراً!</p>
+                      <h3>لا توجد مقاطع صوتية في المكتبة أو الفئات الخاصة بعد</h3>
+                      <p>يمكنك إضافة أسئلة صوتية في «فئاتي الخاصة»، أو اختيار ملفات صوتية من جهازك مباشرة!</p>
                       <div class="ac-empty-actions">
                         <button type="button" class="btn btn-amber btn-md" data-ac-act="open-pack-builder">
-                          ✨ إضافة أسئلة صوتية في صانع الفئات الخاصة
+                          ✨ إضافة مقاطع في فئاتي الخاصة
                         </button>
                         <button type="button" class="btn btn-secondary btn-md" data-ac-act="tab" data-val="local">
                           📂 تشغيل ملفات صوتية من جهازك الآن
@@ -1121,19 +1429,19 @@
                   `
                 : `
                   <div class="bank-section-header">
-                    <h3 class="bank-section-title">📂 ملفات صوتية مؤقتة من جهازك (تُحذف من الذاكرة عند الإغلاق)</h3>
+                    <h3 class="bank-section-title">📂 ملفات صوتية مؤقتة من جهازك</h3>
                     <span class="bank-count-pill">${this.localClips.length} ملف جاهز</span>
                   </div>
                   <div class="ac-local-upload-bar">
                     <label for="ac-local-files-input" class="btn btn-primary btn-sm ac-file-label">
-                      ➕ اختيار ملفات صوتية (MP3 / WAV / M4A / OGG)
+                      ➕ اختيار ملفات صوتية من جهازك
                     </label>
                     <input type="file" id="ac-local-files-input" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.opus" multiple hidden />
                     ${this.localClips.length > 0 ? `<button type="button" class="btn btn-danger-outline btn-xs" data-ac-act="clear-local">🗑️ مسح الكل</button>` : ""}
                   </div>
                   ${
                     this.localClips.length === 0
-                      ? `<div class="empty-inline-note">اختر ملفاً صوتياً أو أكثر من جهازك — سيُستخلص اسم الملف تلقائياً كإجابة مقترحة للمقدّم فقط دون تسريبها للجمهور.</div>`
+                      ? `<div class="empty-inline-note">اختر ملفاً صوتياً أو أكثر من جهازك — سيُستخلص اسم الملف تلقائياً كإجابة مقترحة مخفية عن اللاعبين حتى الكشف.</div>`
                       : `
                         <div class="ac-local-list">
                           ${this.localClips
@@ -1141,7 +1449,7 @@
                               (clip, idx) => `
                             <div class="ac-local-item">
                               <span class="ac-local-num">#${idx + 1}</span>
-                              <input type="text" class="text-input ac-local-inp" data-ac-local-answer="${escapeHtml(clip.id)}" value="${escapeHtml(clip.answer)}" placeholder="الإجابة الصحيحة (للمقدّم فقط)" aria-label="الإجابة للمقطع ${idx + 1}" />
+                              <input type="text" class="text-input ac-local-inp" data-ac-local-answer="${escapeHtml(clip.id)}" value="${escapeHtml(clip.answer)}" placeholder="الإجابة الصحيحة" aria-label="الإجابة للمقطع ${idx + 1}" />
                               <input type="text" class="text-input ac-local-cat" data-ac-local-cat="${escapeHtml(clip.id)}" value="${escapeHtml(clip.categoryName)}" placeholder="الفئة" aria-label="فئة المقطع ${idx + 1}" />
                               <button type="button" class="btn btn-danger-outline btn-xxs" data-ac-act="remove-local" data-id="${escapeHtml(clip.id)}" title="إزالة">✕</button>
                             </div>
@@ -1155,13 +1463,9 @@
             }
           </section>
 
-          <!-- إعداد الفرق والجولات ونمط التدرّج -->
           <section class="bank-section">
             <div class="bank-section-header">
               <h3 class="bank-section-title">⚙️ إعدادات الجولة والفرق</h3>
-              <button type="button" class="btn btn-secondary btn-xs" data-ac-act="open-wireless">
-                ${wl.active ? `📡 الغرفة نشطة (${escapeHtml(wl.roomCode)}) • جرس السرعة جاهز` : "📡 فتح غرفة لاسلكية لجرس السرعة (QR)"}
-              </button>
             </div>
 
             <div class="ac-config-grid">
@@ -1228,9 +1532,12 @@
             </div>
           </section>
 
-          <div class="mafia-setup-footer">
+          <div class="mafia-setup-footer qg-setup-footer-row">
             <button type="button" class="btn btn-primary btn-lg mafia-start-btn" data-ac-act="start-session" ${activePoolCount === 0 ? "disabled" : ""}>
               🎵 ابدأ تحدي الصوت (${activePoolCount} مقطع متاح)
+            </button>
+            <button type="button" class="btn btn-secondary btn-md" data-ac-act="start-offline" ${activePoolCount === 0 ? "disabled" : ""}>
+              ▶️ بدء اللعب مباشرة بدون هواتف
             </button>
           </div>
         </div>
@@ -1242,27 +1549,22 @@
       if (!clip) return "";
       const isRevealed = this.phase === "revealed";
       const pts = this._getCurrentPoints();
-      const route = this._getEffectiveRoute();
       const st = this.audioStatus || {};
-      const wl = this._getWirelessInfo();
-      const bz = wl.active ? wl.buzzer : null;
-      const isBuzzed = Boolean(bz && bz.state === "buzzed" && bz.winnerTeamName);
+      const qr = this.quickRoom;
+      const bz = qr.buzzer || { status: "locked" };
+      const isBuzzed = Boolean(bz.status === "buzzed" && bz.winnerName);
       const buzzTeamIdx = isBuzzed && Number.isInteger(bz.winnerTeamIdx) ? bz.winnerTeamIdx : null;
+      const hideHostSecrets = this.fullDisplayMode || Boolean(qr.judgeUid);
 
       return `
         <div class="ac-stage ac-round-stage">
+          ${this._renderMidgameQrDrawerHtml()}
+
           <!-- ترويسة الجولة -->
           <div class="ac-round-top">
             <span class="mafia-phase-pill">🎵 الجولة ${this.currentIndex + 1} / ${this.sessionClips.length}</span>
             <span class="bank-count-pill">${escapeHtml(clip.categoryIcon)} ${escapeHtml(clip.categoryName)}</span>
             ${!this.freePlay ? `<span class="ac-points-live-pill">⚡ قيمة الجولة الآن: <strong>+${pts}</strong> نقطة</span>` : ""}
-            ${
-              this._isDualConnected()
-                ? `<button type="button" class="btn btn-ghost btn-xxs" data-ac-act="toggle-route" ${clip.isLocalFile ? "disabled title='الملفات المحلية تعمل تلقائياً على جهاز المقدّم'" : ""}>
-                    ${route === "display" ? "📺 الصوت: التلفزيون فقط (بلا صدى)" : clip.isLocalFile ? "💻 الصوت: الجهاز الرئيسي (ملف محلي)" : "💻 الصوت: جهاز المقدّم"}
-                  </button>`
-                : ""
-            }
           </div>
 
           <!-- شريط نقاط الفرق -->
@@ -1286,27 +1588,33 @@
               : ""
           }
 
-          <!-- شريط جرس السرعة اللاسلكي (Auto-Pause عند الضغط) -->
+          <!-- شريط جرس السرعة (Auto-Pause عند الضغط) -->
           ${
-            wl.active
+            qr.active
               ? `
                 <div class="ac-buzzer-bar${isBuzzed ? " is-buzzed" : ""}">
                   ${
                     isBuzzed
                       ? `
-                        <div class="ac-buzz-winner">🔔 الأسرع بالجرس: <strong>${escapeHtml(bz.winnerTeamName)}</strong> (تم إيقاف الصوت تلقائياً)</div>
-                        <div class="ac-buzz-actions">
-                          ${
-                            !this.freePlay && buzzTeamIdx !== null && this.sessionTeams[buzzTeamIdx]
-                              ? `<button type="button" class="btn btn-steal-win btn-sm" data-ac-act="award" data-team-idx="${buzzTeamIdx}">✅ إجابة صحيحة (+${pts})</button>`
-                              : `<button type="button" class="btn btn-steal-win btn-sm" data-ac-act="reveal">✅ إجابة صحيحة وكشف</button>`
-                          }
-                          <button type="button" class="btn btn-danger-outline btn-sm" data-ac-act="buzzer-wrong">❌ خطأ (متابعة المقطع وإعادة فتح الجرس)</button>
-                        </div>
+                        <div class="ac-buzz-winner">🔔 الأسرع بالجرس: <strong>${escapeHtml(bz.winnerAvatar || "🎯")} ${escapeHtml(bz.winnerName)}</strong>${bz.winnerTeamName ? ` (${escapeHtml(bz.winnerTeamName)})` : ""} — تم إيقاف الصوت تلقائياً</div>
+                        ${
+                          !this.fullDisplayMode
+                            ? `
+                              <div class="ac-buzz-actions">
+                                ${
+                                  !this.freePlay && buzzTeamIdx !== null && this.sessionTeams[buzzTeamIdx]
+                                    ? `<button type="button" class="btn btn-steal-win btn-sm" data-ac-act="award" data-team-idx="${buzzTeamIdx}">✅ إجابة صحيحة (+${pts})</button>`
+                                    : `<button type="button" class="btn btn-steal-win btn-sm" data-ac-act="reveal">✅ إجابة صحيحة وكشف</button>`
+                                }
+                                <button type="button" class="btn btn-danger-outline btn-sm" data-ac-act="buzzer-wrong">❌ خطأ (متابعة المقطع وإعادة فتح الجرس)</button>
+                              </div>
+                            `
+                            : ""
+                        }
                       `
                       : `
-                        <span>🔔 جرس السرعة اللاسلكي: <strong>${bz && bz.state === "open" ? "مفتوح للفرق الآن!" : "مقفل"}</strong></span>
-                        <button type="button" class="btn btn-secondary btn-xs" data-ac-act="buzzer-open">🔔 فتح / إعادة فتح الجرس</button>
+                        <span>🔔 جرس السرعة للهواتف: <strong>${bz.status === "open" ? "مفتوح الآن!" : "مقفل"}</strong></span>
+                        ${!this.fullDisplayMode ? `<button type="button" class="btn btn-secondary btn-xs" data-ac-act="buzzer-open">🔔 فتح / إعادة فتح الجرس</button>` : ""}
                       `
                   }
                 </div>
@@ -1320,62 +1628,72 @@
               <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
             <div id="ac-status-label" class="ac-status-label">
-              ${st.autoplayBlocked ? "🔇 يرجى النقر على شاشة التلفزيون لتفعيل الصوت" : st.playing ? "🔊 جاري تشغيل المقطع الصوتي..." : "⏸️ جاهز للتشغيل"}
-            </div>
-
-            <div class="ac-playback-btns">
-              <button type="button" id="ac-btn-play" class="btn btn-primary btn-md" data-ac-act="play" ${st.playing ? "hidden" : ""}>▶️ تشغيل</button>
-              <button type="button" id="ac-btn-pause" class="btn btn-amber btn-md" data-ac-act="pause" ${!st.playing ? "hidden" : ""}>⏸️ إيقاف مؤقت</button>
-              <button type="button" class="btn btn-secondary btn-md" data-ac-act="replay">🔁 إعادة</button>
-              ${
-                this.playbackMode === "standard"
-                  ? `<button type="button" class="btn btn-gold-outline btn-md" data-ac-act="teaser-5">⚡ لمحة 5ث</button>`
-                  : ""
-              }
+              ${st.autoplayBlocked ? "🔇 اضغط تشغيل لتفعيل الصوت" : st.playing ? "🔊 جاري تشغيل المقطع الصوتي..." : "⏸️ جاهز للتشغيل"}
             </div>
 
             ${
-              this.playbackMode === "progressive"
+              !this.fullDisplayMode
                 ? `
+                  <div class="ac-playback-btns">
+                    <button type="button" id="ac-btn-play" class="btn btn-primary btn-md" data-ac-act="play" ${st.playing ? "hidden" : ""}>▶️ تشغيل</button>
+                    <button type="button" id="ac-btn-pause" class="btn btn-amber btn-md" data-ac-act="pause" ${!st.playing ? "hidden" : ""}>⏸️ إيقاف مؤقت</button>
+                    <button type="button" class="btn btn-secondary btn-md" data-ac-act="replay">🔁 إعادة</button>
+                    ${this.playbackMode === "standard" ? `<button type="button" class="btn btn-gold-outline btn-md" data-ac-act="teaser-5">⚡ لمحة 5ث</button>` : ""}
+                  </div>
+
+                  ${
+                    this.playbackMode === "progressive"
+                      ? `
+                        <div class="ac-progressive-row">
+                          ${PROGRESSIVE_STAGES.map(
+                            (sg) => `
+                            <button type="button" class="btn ${this.progressiveStage === sg.level ? "btn-amber" : "btn-secondary"} btn-sm" data-ac-act="prog-stage" data-level="${sg.level}">
+                              🎵 ${escapeHtml(sg.label)}
+                            </button>
+                          `
+                          ).join("")}
+                        </div>
+                      `
+                      : ""
+                  }
+
+                  <div class="ac-progress-row">
+                    <span id="ac-cur-time">${formatMmSs(st.currentTime)}</span>
+                    <input type="range" id="ac-seek-slider" class="ac-seek-slider" min="0" max="${st.duration > 0 ? st.duration : 100}" step="0.5" value="${st.duration > 0 ? Math.min(st.duration, st.currentTime) : 0}" ${st.duration <= 0 ? "disabled" : ""} aria-label="تقديم أو إرجاع المقطع الصوتي" />
+                    <span id="ac-dur-time">${st.duration > 0 ? formatMmSs(st.duration) : "--:--"}</span>
+                    <label class="ac-vol-wrap" title="مستوى الصوت">
+                      🔊
+                      <input type="range" id="ac-volume-slider" min="0" max="100" step="5" value="${Math.round((Number(st.volume) || 0.85) * 100)}" aria-label="مستوى صوت التحدي" />
+                    </label>
+                  </div>
+                `
+                : `
                   <div class="ac-progressive-row">
                     ${PROGRESSIVE_STAGES.map(
-                      (sg) => `
-                      <button type="button" class="btn ${this.progressiveStage === sg.level ? "btn-amber" : "btn-secondary"} btn-sm" data-ac-act="prog-stage" data-level="${sg.level}">
-                        🎵 ${escapeHtml(sg.label)}
-                      </button>
-                    `
+                      (sg) => `<span class="qg-prog-pill${this.progressiveStage === sg.level ? " active" : ""}">🎵 ${escapeHtml(sg.label)}</span>`
                     ).join("")}
                   </div>
                 `
-                : ""
             }
-
-            <div class="ac-progress-row">
-              <span id="ac-cur-time">${formatMmSs(st.currentTime)}</span>
-              <input type="range" id="ac-seek-slider" class="ac-seek-slider" min="0" max="${st.duration > 0 ? st.duration : 100}" step="0.5" value="${st.duration > 0 ? Math.min(st.duration, st.currentTime) : 0}" ${st.duration <= 0 ? "disabled" : ""} aria-label="تقديم أو إرجاع المقطع الصوتي" />
-              <span id="ac-dur-time">${st.duration > 0 ? formatMmSs(st.duration) : "--:--"}</span>
-              <label class="ac-vol-wrap" title="مستوى الصوت">
-                🔊
-                <input type="range" id="ac-volume-slider" min="0" max="100" step="5" value="${Math.round((Number(st.volume) || 0.85) * 100)}" aria-label="مستوى صوت التحدي" />
-              </label>
-            </div>
           </div>
 
-          <!-- معاينة الإجابة للمقدّم فقط / أو بطاقة الكشف -->
+          <!-- منع تسريب صارم: لا تُعرض الإجابة في DOM إطلاقاً في العرض الكامل أو عند تعيين حكم قبل phase === revealed -->
           ${
             !isRevealed
-              ? `
-                <div class="ac-host-secret-wrap">
-                  <button type="button" class="btn btn-ghost btn-xs" data-ac-act="toggle-preview">
-                    ${this.hostPreviewAnswer ? "🙈 إخفاء المعاينة" : "👁️ معاينة سريعة للإجابة (للمقدّم فقط)"}
-                  </button>
-                  ${
-                    this.hostPreviewAnswer
-                      ? `<div class="ac-host-secret-box"><strong>🔒 الإجابة:</strong> ${escapeHtml(clip.answer)}${clip.explanation ? `<small> — ${escapeHtml(clip.explanation)}</small>` : ""}</div>`
-                      : ""
-                  }
-                </div>
-              `
+              ? hideHostSecrets
+                ? ""
+                : `
+                  <div class="ac-host-secret-wrap">
+                    <button type="button" class="btn btn-ghost btn-xs" data-ac-act="toggle-preview">
+                      ${this.hostPreviewAnswer ? "🙈 إخفاء المعاينة" : "👁️ معاينة سريعة للإجابة (للمقدّم فقط)"}
+                    </button>
+                    ${
+                      this.hostPreviewAnswer
+                        ? `<div class="ac-host-secret-box"><strong>🔒 الإجابة:</strong> ${escapeHtml(clip.answer)}${clip.explanation ? `<small> — ${escapeHtml(clip.explanation)}</small>` : ""}</div>`
+                        : ""
+                    }
+                  </div>
+                `
               : `
                 <div class="ac-revealed-answer-card">
                   <div class="ac-revealed-eyebrow">✅ الإجابة الصحيحة</div>
@@ -1386,35 +1704,40 @@
               `
           }
 
-          <!-- أزرار التحكيم السريع ومنح النقاط -->
-          <div class="ac-judge-panel">
-            ${
-              !this.freePlay
-                ? `
-                  <div class="ac-award-grid">
-                    ${this.sessionTeams
-                      .map(
-                        (t, idx) => `
-                      <button type="button" class="btn btn-steal-win btn-sm ac-award-btn" data-ac-act="award" data-team-idx="${idx}" style="border-color:${escapeHtml(t.color)}">
-                        ✅ ${escapeHtml(t.name)} (+${pts})
-                      </button>
-                    `
-                      )
-                      .join("")}
-                  </div>
-                `
-                : ""
-            }
+          ${
+            !this.fullDisplayMode
+              ? `
+                <div class="ac-judge-panel">
+                  ${
+                    !this.freePlay
+                      ? `
+                        <div class="ac-award-grid">
+                          ${this.sessionTeams
+                            .map(
+                              (t, idx) => `
+                            <button type="button" class="btn btn-steal-win btn-sm ac-award-btn" data-ac-act="award" data-team-idx="${idx}" style="border-color:${escapeHtml(t.color)}">
+                              ✅ ${escapeHtml(t.name)} (+${pts})
+                            </button>
+                          `
+                            )
+                            .join("")}
+                        </div>
+                      `
+                      : ""
+                  }
 
-            <div class="ac-bottom-controls">
-              ${!isRevealed ? `<button type="button" class="btn btn-gold-outline btn-md" data-ac-act="reveal">👁️ كشف الإجابة</button>` : ""}
-              <button type="button" class="btn btn-secondary btn-sm" data-ac-act="undo" ${this.undoStack.length === 0 ? "disabled" : ""}>↩️ تراجع</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-ac-act="skip">⏭️ تخطي بدون نقاط</button>
-              <button type="button" class="btn btn-primary btn-md" data-ac-act="next">
-                ${this.currentIndex + 1 < this.sessionClips.length ? "⬅️ المقطع التالي" : "🏆 إنهاء وعرض النتائج"}
-              </button>
-            </div>
-          </div>
+                  <div class="ac-bottom-controls">
+                    ${!isRevealed ? `<button type="button" class="btn btn-gold-outline btn-md" data-ac-act="reveal">👁️ كشف الإجابة</button>` : ""}
+                    <button type="button" class="btn btn-secondary btn-sm" data-ac-act="undo" ${this.undoStack.length === 0 ? "disabled" : ""}>↩️ تراجع</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-ac-act="skip">⏭️ تخطي بدون نقاط</button>
+                    <button type="button" class="btn btn-primary btn-md" data-ac-act="next">
+                      ${this.currentIndex + 1 < this.sessionClips.length ? "⬅️ المقطع التالي" : "🏆 إنهاء وعرض النتائج"}
+                    </button>
+                  </div>
+                </div>
+              `
+              : ""
+          }
         </div>
       `;
     }
@@ -1456,7 +1779,7 @@
                 : ""
             }
             <button type="button" class="btn btn-primary btn-lg" data-ac-act="new-session">🔄 جولة جديدة</button>
-            <button type="button" class="btn btn-secondary btn-md" data-ac-act="exit-home">العودة للرئيسية</button>
+            <button type="button" class="btn btn-secondary btn-md" data-ac-act="exit-home">⬅️ القائمة الرئيسية</button>
           </div>
         </div>
       `;

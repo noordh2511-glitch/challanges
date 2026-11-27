@@ -2260,12 +2260,14 @@
           <h2 id="blitz-modal-title" class="final-title">جولة البرق السريعة</h2>
         </div>
         <div class="side-mode-header-actions">
-          <button type="button" id="btn-blitz-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 التلفزيون</button>
+          <button type="button" id="btn-blitz-toggle-qr" class="btn btn-secondary btn-xs" title="إظهار أو إخفاء رمز QR لانضمام اللاعبين بهواتفهم">📱 إظهار رمز QR</button>
+          <button type="button" id="btn-blitz-full-display" class="btn btn-gold-outline btn-xs" title="تحويل الشاشة الرئيسية إلى وضع العرض الكامل للجميع">📺 وضع العرض الكامل</button>
           <button type="button" id="btn-close-blitz" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
 
       <div class="side-mode-scroll-body">
+        <div id="blitz-midgame-qr-bar" class="qg-midgame-qr-bar" hidden></div>
         <!-- 1) إعداد البرق السريع -->
         <section id="blitz-setup-view" class="side-mode-view">
           <div class="side-config-grid">
@@ -2301,8 +2303,10 @@
               </select>
             </div>
           </div>
-          <div class="side-mode-footer">
+          <div id="blitz-qr-lobby-box" class="qg-setup-qr-section"></div>
+          <div class="side-mode-footer qg-setup-footer-row">
             <button type="button" id="btn-blitz-start-session" class="btn btn-primary btn-lg">⚡ ابدأ جولة البرق</button>
+            <button type="button" id="btn-blitz-start-offline" class="btn btn-secondary btn-md">▶️ بدء اللعب مباشرة بدون هواتف</button>
           </div>
         </section>
 
@@ -2334,11 +2338,12 @@
             <div id="blitz-timer-progress" class="timer-progress-bar"></div>
           </div>
 
+          <div id="blitz-live-buzzer-banner" class="qg-host-buzzer-banner" hidden></div>
           <div class="blitz-question-stage">
             <span id="blitz-q-cat-pill" class="q-category-pill">⚡ فئة</span>
             <p id="blitz-q-text" class="blitz-q-text"></p>
-            <div class="host-cockpit-card blitz-answer-cockpit">
-              <span class="host-cockpit-field-label">✅ الإجابة الصحيحة (للمقدّم فقط — مخفية عن التلفزيون):</span>
+            <div id="blitz-answer-cockpit" class="host-cockpit-card blitz-answer-cockpit">
+              <span id="blitz-answer-cockpit-label" class="host-cockpit-field-label">✅ الإجابة الصحيحة (تُخفى تلقائياً في العرض الكامل وعند تعيين حكم):</span>
               <div id="blitz-q-answer" class="host-cockpit-answer-text"></div>
             </div>
           </div>
@@ -2383,6 +2388,9 @@
         </section>
       </div>
     </div>
+    <button type="button" id="btn-blitz-exit-full-display" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
   </div>
 
   <!-- =========================================================
@@ -2396,12 +2404,14 @@
           <h2 id="charades-solo-title" class="final-title">طور «من غير كلام» المستقل</h2>
         </div>
         <div class="side-mode-header-actions">
-          <button type="button" id="btn-charades-open-tv" class="btn btn-tv-open btn-xs" title="فتح شاشة العرض التلفزيوني">📺 التلفزيون</button>
+          <button type="button" id="btn-csolo-toggle-qr" class="btn btn-secondary btn-xs" title="إظهار أو إخفاء رمز QR لانضمام اللاعبين بهواتفهم">📱 إظهار رمز QR</button>
+          <button type="button" id="btn-csolo-full-display" class="btn btn-gold-outline btn-xs" title="تحويل الشاشة الرئيسية إلى وضع العرض الكامل للجميع">📺 وضع العرض الكامل</button>
           <button type="button" id="btn-close-charades-solo" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
 
       <div class="side-mode-scroll-body">
+        <div id="csolo-midgame-qr-bar" class="qg-midgame-qr-bar" hidden></div>
         <!-- 1) إعداد من غير كلام المستقل -->
         <section id="csolo-setup-view" class="side-mode-view">
           <div class="side-config-grid">
@@ -2441,8 +2451,10 @@
               <div id="csolo-categories-chips" class="csolo-categories-chips"></div>
             </div>
           </div>
-          <div class="side-mode-footer">
+          <div id="csolo-qr-lobby-box" class="qg-setup-qr-section"></div>
+          <div class="side-mode-footer qg-setup-footer-row">
             <button type="button" id="btn-csolo-start-session" class="btn btn-primary btn-lg">🎭 ابدأ اللعب الآن</button>
+            <button type="button" id="btn-csolo-start-offline" class="btn btn-secondary btn-md">▶️ بدء اللعب مباشرة بدون هواتف</button>
           </div>
         </section>
 
@@ -2474,6 +2486,7 @@
             <div id="csolo-timer-progress" class="timer-progress-bar"></div>
           </div>
 
+          <div id="csolo-actor-live-card" class="qg-actor-live-card" hidden></div>
           <div class="charades-header-card csolo-header-card">
             <div id="csolo-eyebrow" class="charades-header-eyebrow">🎭 من غير كلام</div>
             <h3 id="csolo-topic" class="charades-topic-title">التصنيف الفرعي</h3>
@@ -2555,6 +2568,9 @@
         </section>
       </div>
     </div>
+    <button type="button" id="btn-csolo-exit-full-display" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
   </div>
 
   <!-- =========================================================
@@ -3118,17 +3134,20 @@
           </p>
         </div>
         <div class="bara-header-actions">
-          <button type="button" id="btn-ac-open-wireless" class="btn btn-secondary btn-xs" title="فتح غرفة جرس السرعة للهواتف">
-            📱 جرس السرعة
+          <button type="button" id="btn-ac-toggle-qr" class="btn btn-secondary btn-xs" title="إظهار أو إخفاء رمز QR لانضمام اللاعبين بهواتفهم">
+            📱 إظهار رمز QR
           </button>
-          <button type="button" id="btn-ac-open-tv" class="btn btn-gold-outline btn-xs" title="فتح شاشة العرض التلفزيوني">
-            📺 التلفزيون
+          <button type="button" id="btn-ac-full-display" class="btn btn-gold-outline btn-xs" title="تحويل الشاشة الرئيسية إلى وضع العرض الكامل للجميع">
+            📺 وضع العرض الكامل
           </button>
           <button type="button" id="btn-close-audio-challenge" class="btn btn-secondary btn-xs" aria-label="العودة للقائمة الرئيسية">⬅️ القائمة الرئيسية</button>
         </div>
       </div>
       <div id="audio-challenge-body" class="bank-modal-scroll-body audio-challenge-body"></div>
     </div>
+    <button type="button" id="btn-ac-exit-full-display" class="btn btn-secondary btn-xs bara-exit-clean-btn" hidden>
+      ✕ خروج من العرض الكامل
+    </button>
   </div>
 
   <!-- =========================================================
@@ -3256,6 +3275,7 @@
   <script src="src/utils/baraSalfaBank.js"></script>
   <script src="src/utils/baraSalfaSync.js"></script>
   <script src="src/utils/mafiaSync.js"></script>
+  <script src="src/utils/quickGamesSync.js"></script>
   <script src="src/utils/backupManager.js"></script>
   <script src="src/utils/resultCardGenerator.js"></script>
   <script src="src/utils/audioChallengePlayer.js"></script>
@@ -3273,6 +3293,7 @@
   <script src="src/js/baraSalfaPlayerView.js"></script>
   <script src="src/js/mafiaMode.js"></script>
   <script src="src/js/mafiaPlayerView.js"></script>
+  <script src="src/js/quickGamePlayerView.js"></script>
   <script src="src/js/audioChallengeMode.js"></script>
   <script src="src/js/tournamentMode.js"></script>
   <script src="src/js/customPackBuilder.js"></script>

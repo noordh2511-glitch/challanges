@@ -10595,12 +10595,665 @@
     }
   }
 
+  /* =========================================================
+     الحزمة السابعة عشرة: غرف QR ووضع العرض الكامل للبرق ومن غير كلام
+     ========================================================= */
+  function createEmptyQuickRoomState() {
+    return {
+      active: false,
+      connected: false,
+      roomCode: "",
+      playerUrl: "",
+      joinLocked: false,
+      judgeUid: null,
+      activeActorUid: null,
+      nextActorUid: null,
+      playersMap: {},
+      qrDrawerVisible: false,
+      fullDisplay: false,
+      feedback: "",
+      feedbackKind: "info",
+      buzzer: {
+        status: "locked",
+        roundId: "",
+        winnerUid: null,
+        winnerName: "",
+        winnerAvatar: "",
+        winnerTeamId: "",
+        winnerTeamName: ""
+      }
+    };
+  }
+
+  state.blitzQuick = createEmptyQuickRoomState();
+  state.csoloQuick = createEmptyQuickRoomState();
+
+  function getBlitzPreviewTeams() {
+    if (state.blitz && Array.isArray(state.blitz.teams)) return state.blitz.teams;
+    const names = getSideTeamNames(dom.blitzTeamNamesInputs, state.blitzConfig.teamCount, true);
+    return names.map((name, idx) => ({ id: `blitz-team-${idx}`, name, score: 0 }));
+  }
+
+  function getCsoloPreviewTeams() {
+    if (state.charadesSolo && Array.isArray(state.charadesSolo.teams)) return state.charadesSolo.teams;
+    const names = getSideTeamNames(dom.csoloTeamNamesInputs, state.csoloConfig.teamCount, false);
+    return names.map((name, idx) => ({ id: `charades-team-${idx}`, name, score: 0 }));
+  }
+
+  function renderQuickRoomLobbyHTML(kind, qr, teams) {
+    const isMgk = kind === "mgk";
+    const players = Object.values(qr.playersMap || {}).filter((p) => p && p.uid && p.name);
+    const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
+    const qrSvg =
+      qr.active && qr.playerUrl && window.SeenJeemQR
+        ? window.SeenJeemQR.toSVG(qr.playerUrl, { size: 156, margin: 3, ariaLabel: `رمز انضمام غرفة ${qr.roomCode}` })
+        : "";
+
+    const roleHint = isMgk
+      ? "يمسح اللاعبون الرمز بهواتفهم لتظهر الكلمة السرية على هاتف الممثّل فقط دون أي تسريب على الشاشة الرئيسية."
+      : "يمسح اللاعبون الرمز بهواتفهم للعب بجرس السرعة أو تعيين حكم يرى الإجابة ويتحكم بالجولة من هاتفه.";
+
+    return `
+      <div class="qg-setup-qr-card">
+        <div class="bank-section-header">
+          <h3 class="bank-section-title">📱 اللعب عبر الهواتف (رمز QR مباشر)</h3>
+          <span class="dual-status-pill ${qr.active && qr.connected ? "is-connected" : "is-single"}">
+            ${!qr.active ? "⚪ غير مفعّلة بعد" : qr.connected ? `🟢 غرفة ${escapeHtml(qr.roomCode)} (${players.length} لاعب)` : "🟡 يعيد الاتصال..."}
+          </span>
+        </div>
+        ${qr.feedback ? `<div class="wireless-feedback-box is-${escapeHtml(qr.feedbackKind)}">${escapeHtml(qr.feedback)}</div>` : ""}
+        ${
+          !qr.active
+            ? `
+              <div class="qg-qr-init-row">
+                <button type="button" class="btn btn-primary btn-sm" data-qg-host-act="create" data-qg-kind="${kind}">📱 فتح غرفة اللعب وإظهار رمز QR</button>
+                <span class="bs-hint">${roleHint}</span>
+              </div>
+            `
+            : `
+              <div class="bs-wl-active-grid">
+                <div class="bs-wl-qr-col">
+                  <div class="wireless-qr-svg-wrap">${qrSvg}</div>
+                  <div class="wireless-player-code-display">رمز الغرفة: <strong>${escapeHtml(qr.roomCode)}</strong></div>
+                  <div class="wireless-qr-actions">
+                    <button type="button" class="btn btn-ghost btn-xxs" data-qg-host-act="copy" data-qg-kind="${kind}">📋 نسخ الرابط</button>
+                    <a href="${escapeHtml(qr.playerUrl)}" target="_blank" rel="noopener" class="btn btn-secondary btn-xxs">↗️ فتح شاشة لاعب</a>
+                  </div>
+                </div>
+                <div class="bs-wl-players-col">
+                  <div class="bs-wl-guard-row">
+                    <button type="button" class="btn ${qr.joinLocked ? "btn-amber" : "btn-secondary"} btn-xs" data-qg-host-act="lock" data-qg-kind="${kind}">
+                      ${qr.joinLocked ? "🔒 الانضمام مقفل (افتح)" : "🔓 قفل الانضمام"}
+                    </button>
+                    <button type="button" class="btn btn-danger-outline btn-xs" data-qg-host-act="close" data-qg-kind="${kind}">🔴 إغلاق الغرفة</button>
+                  </div>
+                  <div class="bs-wl-roster-head">اللاعبون المنضمّون (${players.length}):</div>
+                  <div class="bs-wl-roster-list">
+                    ${
+                      players.length === 0
+                        ? `<div class="wireless-device-empty">امسح الرمز بهاتفك للانضمام — ستظهر الأسماء والأفاتارات هنا لحظياً...</div>`
+                        : players
+                            .map((p) => {
+                              const isSpecial = isMgk ? qr.activeActorUid === p.uid : qr.judgeUid === p.uid;
+                              const tName = teamMap.get(p.teamId) || "";
+                              return `
+                                <div class="wireless-device-row${isSpecial ? " is-vip-row" : ""}">
+                                  <div class="wireless-device-meta">
+                                    <span class="wireless-device-online-dot"></span>
+                                    <strong>${escapeHtml(p.avatar || "🎯")} ${escapeHtml(p.name)}</strong>
+                                    ${tName ? `<span class="qg-team-mini-tag">${escapeHtml(tName)}</span>` : ""}
+                                    ${isSpecial ? `<span class="bs-vip-tag">${isMgk ? "🎭 الممثّل" : "👑 حكم"}</span>` : ""}
+                                  </div>
+                                  <div class="bs-row-btns">
+                                    <button type="button" class="btn ${isSpecial ? "btn-amber" : "btn-gold-outline"} btn-xxs" data-qg-host-act="${isMgk ? "set-actor" : "set-judge"}" data-qg-kind="${kind}" data-uid="${escapeHtml(p.uid)}">
+                                      ${isMgk ? (isSpecial ? "✓ الممثّل" : "🎭 تعيين كممثّل") : isSpecial ? "✓ حكم" : "👑 تعيين كحكم"}
+                                    </button>
+                                    <button type="button" class="btn btn-danger-outline btn-xxs" data-qg-host-act="kick" data-qg-kind="${kind}" data-uid="${escapeHtml(p.uid)}">🚫 طرد</button>
+                                  </div>
+                                </div>
+                              `;
+                            })
+                            .join("")
+                    }
+                  </div>
+                </div>
+              </div>
+            `
+        }
+      </div>
+    `;
+  }
+
+  function renderQuickMidgameQrBar(kind, qr, barEl) {
+    if (!barEl) return;
+    if (!qr.qrDrawerVisible || !qr.active) {
+      barEl.hidden = true;
+      barEl.innerHTML = "";
+      return;
+    }
+    const qrSvg =
+      qr.playerUrl && window.SeenJeemQR
+        ? window.SeenJeemQR.toSVG(qr.playerUrl, { size: 126, margin: 2, ariaLabel: `رمز انضمام غرفة ${qr.roomCode}` })
+        : "";
+    const count = Object.keys(qr.playersMap || {}).length;
+    barEl.hidden = false;
+    barEl.innerHTML = `
+      <div class="qg-midgame-qr-card">
+        <div class="qg-midgame-qr-svg">${qrSvg}</div>
+        <div class="qg-midgame-qr-info">
+          <div class="qg-midgame-qr-title">📱 امسح الرمز بهاتفك للانضمام فوراً</div>
+          <div class="qg-midgame-qr-code">رمز الغرفة: <strong>${escapeHtml(qr.roomCode)}</strong> • المنضمّون: <strong>${count}</strong></div>
+          <div class="qg-midgame-qr-actions">
+            <button type="button" class="btn btn-secondary btn-xxs" data-qg-host-act="copy" data-qg-kind="${kind}">📋 نسخ الرابط</button>
+            <a href="${escapeHtml(qr.playerUrl)}" target="_blank" rel="noopener" class="btn btn-gold-outline btn-xxs">↗️ فتح شاشة لاعب</a>
+            <button type="button" class="btn btn-ghost btn-xxs" data-qg-host-act="hide-drawer" data-qg-kind="${kind}">🙈 إخفاء</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBlitzQuickUI() {
+    const lobbyEl = document.getElementById("blitz-qr-lobby-box");
+    const barEl = document.getElementById("blitz-midgame-qr-bar");
+    const btnQr = document.getElementById("btn-blitz-toggle-qr");
+    const btnFull = document.getElementById("btn-blitz-full-display");
+    const btnExit = document.getElementById("btn-blitz-exit-full-display");
+    if (lobbyEl) lobbyEl.innerHTML = renderQuickRoomLobbyHTML("blitz", state.blitzQuick, getBlitzPreviewTeams());
+    renderQuickMidgameQrBar("blitz", state.blitzQuick, barEl);
+    if (btnQr) btnQr.textContent = state.blitzQuick.qrDrawerVisible ? "🙈 إخفاء رمز QR" : "📱 إظهار رمز QR";
+    if (btnFull) btnFull.textContent = state.blitzQuick.fullDisplay ? "✕ إنهاء العرض الكامل" : "📺 وضع العرض الكامل";
+    if (btnExit) btnExit.hidden = !state.blitzQuick.fullDisplay;
+    if (dom.blitzModal) dom.blitzModal.classList.toggle("is-full-display-mode", Boolean(state.blitzQuick.fullDisplay));
+  }
+
+  function renderCsoloQuickUI() {
+    const lobbyEl = document.getElementById("csolo-qr-lobby-box");
+    const barEl = document.getElementById("csolo-midgame-qr-bar");
+    const btnQr = document.getElementById("btn-csolo-toggle-qr");
+    const btnFull = document.getElementById("btn-csolo-full-display");
+    const btnExit = document.getElementById("btn-csolo-exit-full-display");
+    if (lobbyEl) lobbyEl.innerHTML = renderQuickRoomLobbyHTML("mgk", state.csoloQuick, getCsoloPreviewTeams());
+    renderQuickMidgameQrBar("mgk", state.csoloQuick, barEl);
+    if (btnQr) btnQr.textContent = state.csoloQuick.qrDrawerVisible ? "🙈 إخفاء رمز QR" : "📱 إظهار رمز QR";
+    if (btnFull) btnFull.textContent = state.csoloQuick.fullDisplay ? "✕ إنهاء العرض الكامل" : "📺 وضع العرض الكامل";
+    if (btnExit) btnExit.hidden = !state.csoloQuick.fullDisplay;
+    if (dom.charadesSoloModal) dom.charadesSoloModal.classList.toggle("is-full-display-mode", Boolean(state.csoloQuick.fullDisplay));
+  }
+
+  function buildBlitzQuickPublicState() {
+    const s = state.blitz;
+    const qr = state.blitzQuick;
+    const teams = getBlitzPreviewTeams();
+    if (!s) {
+      return { gameType: "blitz", phase: "setup", teams, judgeUid: qr.judgeUid || "" };
+    }
+    const activeTeam = s.teams[s.activeTeamIdx] || s.teams[0];
+    const currentRound = s.currentRoundForTeam || Math.floor(s.currentTurnNumber / Math.max(1, s.teams.length)) + 1;
+    const winPayload = s.phase === "finished" ? buildSideModeWinnerPayload(s.teams, "⚡ نهاية جولة البرق السريعة!") : null;
+
+    return {
+      gameType: "blitz",
+      phase: s.answerRevealed && s.phase === "playing" ? "revealed" : s.phase,
+      roundNumber: currentRound,
+      totalRounds: s.roundsPerTeam,
+      roundId: qr.buzzer.roundId || `bl_${s.currentTurnNumber}_${s.deckCursor}`,
+      category: s.currentQuestion ? s.currentQuestion.categoryName : "",
+      categoryIcon: s.currentQuestion ? s.currentQuestion.categoryIcon || "⚡" : "⚡",
+      questionText: s.phase === "playing" && s.currentQuestion ? s.currentQuestion.question : null,
+      teams: s.teams,
+      activeTeamIdx: s.activeTeamIdx,
+      activeTeamName: activeTeam ? activeTeam.name : "",
+      judgeUid: qr.judgeUid || "",
+      streak: s.currentStreak || 0,
+      timer: {
+        status: s.timerRunning ? "running" : s.phase === "playing" ? "paused" : "idle",
+        endAtMs: s.timerRunning ? s.timerEndAtMs || null : null,
+        remainingMs: Math.max(0, Number(s.timerRemaining) || 0) * 1000,
+        durationSec: s.durationSeconds || 60
+      },
+      buzzerState: { ...qr.buzzer },
+      revealedAnswer: s.answerRevealed && s.currentQuestion ? s.currentQuestion.answer : null,
+      pastItems:
+        s.phase === "turn-summary"
+          ? s.turnLog.map((item) => ({ label: item.question, answer: item.answer, outcome: item.outcome }))
+          : [],
+      winnerTitle: winPayload ? winPayload.title : null
+    };
+  }
+
+  function syncBlitzQuickRoom() {
+    const sync = window.SeenJeemQuickGamesSync;
+    const qr = state.blitzQuick;
+    if (!qr.active || !sync || sync.gameType !== "blitz") return;
+    sync.publishPublicState(buildBlitzQuickPublicState());
+    const s = state.blitz;
+    if (qr.judgeUid && s && s.phase === "playing" && s.currentQuestion) {
+      sync.setPrivateJudgePayload(qr.judgeUid, {
+        roundId: qr.buzzer.roundId || `bl_${s.deckCursor}`,
+        question: s.currentQuestion.question,
+        answer: s.currentQuestion.answer,
+        explanation: s.currentQuestion.explanation || "",
+        category: s.currentQuestion.categoryName,
+        points: 100
+      });
+    } else {
+      sync.setPrivateJudgePayload(null, null);
+    }
+  }
+
+  function openBlitzQuickBuzzer() {
+    const qr = state.blitzQuick;
+    const roundId = `bl_${Date.now().toString(36)}`;
+    qr.buzzer = {
+      status: "open",
+      roundId,
+      winnerUid: null,
+      winnerName: "",
+      winnerAvatar: "",
+      winnerTeamId: "",
+      winnerTeamName: ""
+    };
+    if (qr.active && window.SeenJeemQuickGamesSync && window.SeenJeemQuickGamesSync.gameType === "blitz") {
+      window.SeenJeemQuickGamesSync.clearBuzzes();
+    }
+  }
+
+  function handleBlitzQuickBuzzes(buzzMap) {
+    const qr = state.blitzQuick;
+    const s = state.blitz;
+    if (!qr.active || !s || s.phase !== "playing" || qr.buzzer.status !== "open") return;
+    const entries = Object.values(buzzMap || {}).filter(
+      (b) => b && b.uid && (!qr.buzzer.roundId || !b.roundId || b.roundId === qr.buzzer.roundId) && b.uid !== qr.judgeUid
+    );
+    if (entries.length === 0) return;
+    entries.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+    const winner = entries[0];
+    const team = s.teams.find((t) => t.id === winner.teamId);
+    qr.buzzer = {
+      status: "buzzed",
+      roundId: qr.buzzer.roundId,
+      winnerUid: winner.uid,
+      winnerName: winner.name || "لاعب",
+      winnerAvatar: winner.avatar || "🎯",
+      winnerTeamId: winner.teamId || "",
+      winnerTeamName: team ? team.name : ""
+    };
+    if (window.SeenJeemAudio && typeof window.SeenJeemAudio.playBuzz === "function") {
+      window.SeenJeemAudio.playBuzz();
+    }
+    showToast(`🔔 ${winner.avatar || "🎯"} ${winner.name} ضغط جرس السرعة أولاً!`, "success");
+    renderBlitzView();
+    syncBlitzQuickRoom();
+  }
+
+  function handleBlitzQuickCommand(cmd) {
+    const qr = state.blitzQuick;
+    if (!cmd || !qr.active || !qr.judgeUid || cmd.uid !== qr.judgeUid) return;
+    switch (cmd.type) {
+      case "BEGIN_TURN":
+        if (state.blitz && state.blitz.phase === "ready") beginBlitzTurn();
+        break;
+      case "TOGGLE_TIMER":
+        toggleBlitzPause();
+        break;
+      case "JUDGE_CORRECT":
+        handleBlitzJudge("correct");
+        break;
+      case "JUDGE_WRONG":
+        handleBlitzJudge("wrong");
+        break;
+      case "JUDGE_SKIP":
+        handleBlitzJudge("skip");
+        break;
+      case "REVEAL_ANSWER":
+        if (state.blitz && state.blitz.phase === "playing") {
+          state.blitz.answerRevealed = true;
+          renderBlitzView();
+          syncBlitzQuickRoom();
+        }
+        break;
+      case "NEXT_TURN":
+        if (state.blitz && state.blitz.phase === "turn-summary") advanceBlitzTurn();
+        break;
+      default:
+        break;
+    }
+  }
+
+  async function createBlitzQuickRoom() {
+    const sync = window.SeenJeemQuickGamesSync;
+    const qr = state.blitzQuick;
+    if (!sync) return;
+    if (!sync.isConfigured()) {
+      qr.feedbackKind = "warning";
+      qr.feedback = "⚠️ خدمة اللعب عبر الهواتف غير متاحة حالياً — يمكنك بدء اللعب مباشرة بدون هواتف.";
+      renderBlitzQuickUI();
+      return;
+    }
+    qr.feedbackKind = "info";
+    qr.feedback = "⏳ جاري إنشاء غرفة البرق السريع وتوليد رمز QR...";
+    renderBlitzQuickUI();
+    try {
+      const info = await sync.createRoom({
+        gameType: "blitz",
+        initialPublicState: buildBlitzQuickPublicState(),
+        onPlayers: (map) => {
+          qr.playersMap = map && typeof map === "object" ? map : {};
+          if (qr.judgeUid && !qr.playersMap[qr.judgeUid]) {
+            qr.judgeUid = null;
+            sync.setJudgeUid(null);
+          }
+          renderBlitzQuickUI();
+          if (state.blitz) renderBlitzView();
+        },
+        onBuzzes: (buzzMap) => handleBlitzQuickBuzzes(buzzMap),
+        onCommand: (cmd) => handleBlitzQuickCommand(cmd),
+        onConnectionState: (isConn) => {
+          qr.connected = isConn;
+          renderBlitzQuickUI();
+        }
+      });
+      qr.active = true;
+      qr.connected = true;
+      qr.roomCode = info.roomCode;
+      qr.playerUrl = info.playerUrl;
+      qr.joinLocked = false;
+      qr.feedbackKind = "success";
+      qr.feedback = `✅ غرفة البرق السريع جاهزة (${info.roomCode}) — امسح الرمز بهاتفك للانضمام!`;
+      syncBlitzQuickRoom();
+      renderBlitzQuickUI();
+    } catch (err) {
+      qr.feedbackKind = "warning";
+      qr.feedback = `⚠️ ${(err && err.message) || "تعذّر إنشاء غرفة الهواتف حالياً."}`;
+      renderBlitzQuickUI();
+    }
+  }
+
+  async function closeBlitzQuickRoom(silent = false) {
+    const sync = window.SeenJeemQuickGamesSync;
+    if (state.blitzQuick.active && sync && sync.gameType === "blitz") {
+      await sync.closeRoom();
+    }
+    state.blitzQuick = createEmptyQuickRoomState();
+    if (!silent) {
+      renderBlitzQuickUI();
+      if (state.blitz) renderBlitzView();
+      showToast("🔴 تم إغلاق غرفة البرق السريع", "info");
+    }
+  }
+
+  function buildCsoloQuickPublicState() {
+    const s = state.charadesSolo;
+    const qr = state.csoloQuick;
+    const teams = getCsoloPreviewTeams();
+    const actor = qr.activeActorUid && qr.playersMap[qr.activeActorUid] ? qr.playersMap[qr.activeActorUid] : null;
+    const nextActor = qr.nextActorUid && qr.playersMap[qr.nextActorUid] ? qr.playersMap[qr.nextActorUid] : null;
+
+    if (!s) {
+      return {
+        gameType: "mgk",
+        phase: "setup",
+        teams,
+        activeActorUid: qr.activeActorUid || "",
+        activeActorName: actor ? actor.name : "",
+        activeActorAvatar: actor ? actor.avatar || "🎭" : "🎭",
+        nextActorUid: qr.nextActorUid || "",
+        nextActorName: nextActor ? nextActor.name : ""
+      };
+    }
+
+    const activeTeam = s.teams[s.activeTeamIdx] || s.teams[0];
+    const currentRound = s.currentRoundForTeam || Math.floor(s.currentTurnNumber / Math.max(1, s.teams.length)) + 1;
+    const card = s.currentCard;
+    const hdr = card && card.header ? card.header : null;
+    const winPayload = s.phase === "finished" ? buildSideModeWinnerPayload(s.teams, "🎭 نهاية تحدي «من غير كلام»!") : null;
+
+    // منع تسريب صارم: لا تُمرّر الكلمة السرية أو فكرة التمثيل في publicState مطلقاً!
+    return {
+      gameType: "mgk",
+      phase: s.phase,
+      roundNumber: currentRound,
+      totalRounds: s.roundsPerTeam,
+      category: s.phase === "playing" && card ? (hdr && hdr.topic) || card.categoryName : "",
+      wordCountLabel: s.phase === "playing" && hdr ? `🔢 عدد الكلمات: ${hdr.wordCount || hdr.wordCountLabel || ""}` : "",
+      hintText: s.phase === "playing" && card && s.hintRevealedForCurrent && card.hint ? card.hint : null,
+      teams: s.teams,
+      activeTeamIdx: s.activeTeamIdx,
+      activeTeamName: activeTeam ? activeTeam.name : "",
+      activeActorUid: qr.activeActorUid || "",
+      activeActorName: actor ? actor.name : activeTeam ? activeTeam.name : "",
+      activeActorAvatar: actor ? actor.avatar || "🎭" : "🎭",
+      nextActorUid: qr.nextActorUid || "",
+      nextActorName: nextActor ? nextActor.name : "",
+      skipsRemaining: s.skipLimit === 0 ? null : Math.max(0, s.skipLimit - s.skipsUsedThisTurn),
+      timer: {
+        status: s.timerRunning ? "running" : s.phase === "playing" ? "paused" : "idle",
+        endAtMs: s.timerRunning ? s.timerEndAtMs || null : null,
+        remainingMs: Math.max(0, Number(s.timerRemaining) || 0) * 1000,
+        durationSec: s.durationSeconds || 90
+      },
+      // قائمة الكلمات السابقة المنتهية فقط (وليس الكلمة الحالية أبداً)
+      pastItems: Array.isArray(s.turnLog)
+        ? s.turnLog.map((item) => ({ label: item.topic || item.categoryName || "", answer: item.answer || item.word || "", outcome: item.outcome }))
+        : [],
+      winnerTitle: winPayload ? winPayload.title : null
+    };
+  }
+
+  function syncCsoloQuickRoom() {
+    const sync = window.SeenJeemQuickGamesSync;
+    const qr = state.csoloQuick;
+    if (!qr.active || !sync || sync.gameType !== "mgk") return;
+
+    // تعيين أول لاعب منضم كممثّل افتراضياً إذا لم يُحدّد ممثّل بعد
+    const connectedPlayers = Object.values(qr.playersMap || {}).filter((p) => p && p.uid && p.name);
+    if (!qr.activeActorUid && connectedPlayers.length > 0) {
+      qr.activeActorUid = connectedPlayers[0].uid;
+      sync.setActiveActorUid(qr.activeActorUid);
+    }
+
+    sync.publishPublicState(buildCsoloQuickPublicState());
+
+    const s = state.charadesSolo;
+    const card = s && s.phase === "playing" ? s.currentCard : null;
+    if (qr.activeActorUid && card) {
+      const hdr = card.header || {};
+      sync.setPrivateActorPayload(qr.activeActorUid, {
+        roundId: `mgk_${s.currentTurnNumber}_${s.deckCursor}`,
+        word: card.answer,
+        category: hdr.topic || card.categoryName,
+        wordCount: hdr.wordCount || hdr.wordCountLabel || "",
+        points: Number(card.points) || 100,
+        hints: card.hint || "",
+        explanation: card.explanation || ""
+      });
+    } else {
+      sync.setPrivateActorPayload(null, null);
+    }
+  }
+
+  function handleCsoloQuickCommand(cmd) {
+    const qr = state.csoloQuick;
+    if (!cmd || !qr.active) return;
+    if (cmd.type === "CLAIM_NEXT_ACTOR" && cmd.uid && qr.playersMap[cmd.uid]) {
+      qr.nextActorUid = cmd.uid;
+      const pName = qr.playersMap[cmd.uid].name || "لاعب";
+      if (!state.charadesSolo || state.charadesSolo.phase === "setup" || state.charadesSolo.phase === "ready") {
+        qr.activeActorUid = cmd.uid;
+        if (window.SeenJeemQuickGamesSync) window.SeenJeemQuickGamesSync.setActiveActorUid(cmd.uid);
+        showToast(`🎭 تم تعيين «${pName}» كممثّل للدور الحالي!`, "success");
+      } else {
+        showToast(`🎭 تم تسجيل «${pName}» كممثّل للدور القادم!`, "info");
+      }
+      renderCsoloQuickUI();
+      if (state.charadesSolo) renderCsoloView();
+      syncCsoloQuickRoom();
+      return;
+    }
+
+    if (!qr.activeActorUid || cmd.uid !== qr.activeActorUid) return;
+    switch (cmd.type) {
+      case "BEGIN_TURN":
+        if (state.charadesSolo && state.charadesSolo.phase === "ready") beginCsoloTurn();
+        break;
+      case "TOGGLE_TIMER":
+        toggleCsoloPause();
+        break;
+      case "MGK_GUESSED":
+        handleCsoloGuessed();
+        break;
+      case "MGK_SKIP":
+        handleCsoloSkip();
+        break;
+      case "NEXT_TURN":
+        if (state.charadesSolo && state.charadesSolo.phase === "turn-summary") advanceCsoloTurn();
+        break;
+      default:
+        break;
+    }
+  }
+
+  async function createCsoloQuickRoom() {
+    const sync = window.SeenJeemQuickGamesSync;
+    const qr = state.csoloQuick;
+    if (!sync) return;
+    if (!sync.isConfigured()) {
+      qr.feedbackKind = "warning";
+      qr.feedback = "⚠️ خدمة اللعب عبر الهواتف غير متاحة حالياً — يمكنك بدء اللعب مباشرة بدون هواتف.";
+      renderCsoloQuickUI();
+      return;
+    }
+    qr.feedbackKind = "info";
+    qr.feedback = "⏳ جاري إنشاء غرفة «من غير كلام» وتوليد رمز QR...";
+    renderCsoloQuickUI();
+    try {
+      const info = await sync.createRoom({
+        gameType: "mgk",
+        initialPublicState: buildCsoloQuickPublicState(),
+        onPlayers: (map) => {
+          qr.playersMap = map && typeof map === "object" ? map : {};
+          const list = Object.values(qr.playersMap).filter((p) => p && p.uid && p.name);
+          if (qr.activeActorUid && !qr.playersMap[qr.activeActorUid]) {
+            qr.activeActorUid = list[0] ? list[0].uid : null;
+            sync.setActiveActorUid(qr.activeActorUid);
+          } else if (!qr.activeActorUid && list[0]) {
+            qr.activeActorUid = list[0].uid;
+            sync.setActiveActorUid(qr.activeActorUid);
+          }
+          renderCsoloQuickUI();
+          if (state.charadesSolo) renderCsoloView();
+          syncCsoloQuickRoom();
+        },
+        onCommand: (cmd) => handleCsoloQuickCommand(cmd),
+        onConnectionState: (isConn) => {
+          qr.connected = isConn;
+          renderCsoloQuickUI();
+        }
+      });
+      qr.active = true;
+      qr.connected = true;
+      qr.roomCode = info.roomCode;
+      qr.playerUrl = info.playerUrl;
+      qr.joinLocked = false;
+      qr.feedbackKind = "success";
+      qr.feedback = `✅ غرفة «من غير كلام» جاهزة (${info.roomCode}) — ستصل الكلمة السرية لهاتف الممثّل فقط!`;
+      syncCsoloQuickRoom();
+      renderCsoloQuickUI();
+    } catch (err) {
+      qr.feedbackKind = "warning";
+      qr.feedback = `⚠️ ${(err && err.message) || "تعذّر إنشاء غرفة الهواتف حالياً."}`;
+      renderCsoloQuickUI();
+    }
+  }
+
+  async function closeCsoloQuickRoom(silent = false) {
+    const sync = window.SeenJeemQuickGamesSync;
+    if (state.csoloQuick.active && sync && sync.gameType === "mgk") {
+      await sync.closeRoom();
+    }
+    state.csoloQuick = createEmptyQuickRoomState();
+    if (!silent) {
+      renderCsoloQuickUI();
+      if (state.charadesSolo) renderCsoloView();
+      showToast("🔴 تم إغلاق غرفة «من غير كلام»", "info");
+    }
+  }
+
+  async function handleQuickHostBoxClick(e) {
+    const btn = e.target && e.target.closest ? e.target.closest("button[data-qg-host-act]") : null;
+    if (!btn) return;
+    const act = btn.dataset.qgHostAct;
+    const kind = btn.dataset.qgKind;
+    const isMgk = kind === "mgk";
+    const qr = isMgk ? state.csoloQuick : state.blitzQuick;
+    const sync = window.SeenJeemQuickGamesSync;
+
+    if (act === "create") {
+      if (isMgk) await createCsoloQuickRoom();
+      else await createBlitzQuickRoom();
+    } else if (act === "close") {
+      if (isMgk) await closeCsoloQuickRoom(false);
+      else await closeBlitzQuickRoom(false);
+    } else if (act === "copy") {
+      if (qr.playerUrl && navigator.clipboard) {
+        navigator.clipboard.writeText(qr.playerUrl).then(() => showToast("📋 تم نسخ رابط الانضمام للهواتف", "success"));
+      }
+    } else if (act === "lock" && qr.active && sync) {
+      qr.joinLocked = !qr.joinLocked;
+      await sync.setJoinLocked(qr.joinLocked);
+      if (isMgk) renderCsoloQuickUI();
+      else renderBlitzQuickUI();
+    } else if (act === "set-judge" && !isMgk && qr.active && sync) {
+      const targetUid = btn.dataset.uid || null;
+      qr.judgeUid = qr.judgeUid === targetUid ? null : targetUid;
+      await sync.setJudgeUid(qr.judgeUid);
+      renderBlitzQuickUI();
+      if (state.blitz) renderBlitzView();
+      syncBlitzQuickRoom();
+    } else if (act === "set-actor" && isMgk && qr.active && sync) {
+      const targetUid = btn.dataset.uid || null;
+      qr.activeActorUid = targetUid;
+      await sync.setActiveActorUid(qr.activeActorUid);
+      renderCsoloQuickUI();
+      if (state.charadesSolo) renderCsoloView();
+      syncCsoloQuickRoom();
+    } else if (act === "kick" && qr.active && sync) {
+      const targetUid = btn.dataset.uid || "";
+      if (!targetUid) return;
+      await sync.kickPlayer(targetUid);
+      delete qr.playersMap[targetUid];
+      if (!isMgk && qr.judgeUid === targetUid) {
+        qr.judgeUid = null;
+        await sync.setJudgeUid(null);
+      }
+      if (isMgk && qr.activeActorUid === targetUid) {
+        qr.activeActorUid = null;
+        await sync.setActiveActorUid(null);
+      }
+      if (isMgk) {
+        renderCsoloQuickUI();
+        syncCsoloQuickRoom();
+      } else {
+        renderBlitzQuickUI();
+        syncBlitzQuickRoom();
+      }
+    } else if (act === "hide-drawer") {
+      qr.qrDrawerVisible = false;
+      if (isMgk) renderCsoloQuickUI();
+      else renderBlitzQuickUI();
+    }
+  }
+
   function openBlitzModal() {
     if (!blitzEngine || !dom.blitzModal) return;
     stopBlitzTimer();
     state.blitz = null;
     state.blitzLastFeedback = null;
+    state.blitzQuick.fullDisplay = false;
+    state.blitzQuick.qrDrawerVisible = false;
     renderBlitzSetupUI();
+    renderBlitzQuickUI();
     showOnlyBlitzSubView("setup");
     openModal(dom.blitzModal);
     if (wakeLock && state.setupSettings.wakeLockEnabled) wakeLock.syncForContext(true);
@@ -10610,6 +11263,10 @@
     stopBlitzTimer();
     state.blitz = null;
     state.blitzLastFeedback = null;
+    closeBlitzQuickRoom(true);
+    if (dom.blitzModal) dom.blitzModal.classList.remove("is-full-display-mode");
+    const exitBtn = document.getElementById("btn-blitz-exit-full-display");
+    if (exitBtn) exitBtn.hidden = true;
     closeModal(dom.blitzModal);
     broadcastLiveDisplayState();
     syncWakeLockForCurrentScreen();
@@ -10623,8 +11280,11 @@
     if (dom.blitzFinishView) dom.blitzFinishView.hidden = viewName !== "finished";
   }
 
-  function startBlitzSession() {
+  function startBlitzSession(options = {}) {
     if (!blitzEngine) return;
+    if (options && options.offlineOnly && state.blitzQuick.active) {
+      closeBlitzQuickRoom(true);
+    }
     const cfg = state.blitzConfig;
     const groupId = dom.blitzSourceGroup ? dom.blitzSourceGroup.value : "all";
     cfg.groupId = groupId;
@@ -10650,8 +11310,12 @@
       roundsPerTeam: cfg.roundsPerTeam,
       deck
     });
+    state.blitz.answerRevealed = false;
     state.blitzLastFeedback = null;
+    state.blitzQuick.qrDrawerVisible = false;
+    renderBlitzQuickUI();
     renderBlitzView();
+    syncBlitzQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -10695,12 +11359,33 @@
         }
       }
       renderBlitzTimerUI();
+
+      // شريط جرس السرعة في البرق السريع
+      const bzBanner = document.getElementById("blitz-live-buzzer-banner");
+      if (bzBanner) {
+        const bz = state.blitzQuick.buzzer;
+        if (state.blitzQuick.active && bz && bz.status === "buzzed" && bz.winnerName) {
+          bzBanner.hidden = false;
+          bzBanner.innerHTML = `<span>🔔 الأسرع بالجرس: <strong>${escapeHtml(bz.winnerAvatar || "🎯")} ${escapeHtml(bz.winnerName)}</strong>${bz.winnerTeamName ? ` (${escapeHtml(bz.winnerTeamName)})` : ""}</span>`;
+        } else {
+          bzBanner.hidden = true;
+          bzBanner.innerHTML = "";
+        }
+      }
+
       if (s.currentQuestion) {
         if (dom.blitzQCatPill) {
           dom.blitzQCatPill.textContent = `${s.currentQuestion.categoryIcon || "⚡"} ${s.currentQuestion.categoryName}`;
         }
         if (dom.blitzQText) dom.blitzQText.textContent = s.currentQuestion.question;
-        if (dom.blitzQAnswer) dom.blitzQAnswer.textContent = s.currentQuestion.answer;
+
+        // منع تسريب صارم: إخفاء الإجابة وتفريغ DOM عند وضع العرض الكامل أو عند تعيين حكم عبر الهاتف (إلا بعد الكشف)
+        const cockpit = document.getElementById("blitz-answer-cockpit");
+        const hideAnswer = (state.blitzQuick.fullDisplay || Boolean(state.blitzQuick.judgeUid)) && !s.answerRevealed;
+        if (cockpit) cockpit.hidden = hideAnswer;
+        if (dom.blitzQAnswer) {
+          dom.blitzQAnswer.textContent = hideAnswer ? "" : s.currentQuestion.answer;
+        }
       }
     } else if (s.phase === "turn-summary") {
       if (dom.blitzSummaryTitle) {
@@ -10801,7 +11486,9 @@
     s.currentStreak = 0;
     s.turnLog = [];
     s.currentQuestion = blitzEngine.drawNextQuestion(s);
+    s.answerRevealed = false;
     state.blitzLastFeedback = null;
+    openBlitzQuickBuzzer();
 
     if (!s.currentQuestion) {
       showToast("نفدت الأسئلة المتاحة في الرزمة!", "warning");
@@ -10827,6 +11514,7 @@
 
     if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
     renderBlitzView();
+    syncBlitzQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -10837,6 +11525,7 @@
     s.timerStatus = s.timerRunning ? "running" : "paused";
     s.timerEndAtMs = s.timerRunning ? getWirelessServerNowMs() + s.timerRemaining * 1000 : null;
     renderBlitzTimerUI();
+    syncBlitzQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -10877,12 +11566,15 @@
     }
 
     s.currentQuestion = blitzEngine.drawNextQuestion(s);
+    s.answerRevealed = false;
     if (!s.currentQuestion) {
       finishBlitzTurn();
       return;
     }
+    openBlitzQuickBuzzer();
 
     renderBlitzView();
+    syncBlitzQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -10894,7 +11586,9 @@
     s.timerStatus = "finished";
     s.timerEndAtMs = null;
     s.phase = "turn-summary";
+    state.blitzQuick.buzzer.status = "locked";
     renderBlitzView();
+    syncBlitzQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -10918,6 +11612,7 @@
         dom.btnBlitzReturnTournament.hidden = true;
       }
       renderBlitzView();
+      syncBlitzQuickRoom();
       broadcastLiveDisplayState();
       if (window.SeenJeemAudio) window.SeenJeemAudio.playVictory();
       startVictoryConfetti("default");
@@ -10928,7 +11623,9 @@
       s.timerRemaining = s.durationSeconds;
       s.currentStreak = 0;
       s.turnLog = [];
+      s.answerRevealed = false;
       renderBlitzView();
+      syncBlitzQuickRoom();
       broadcastLiveDisplayState();
     }
   }
@@ -11064,7 +11761,10 @@
     state.charadesSolo = null;
     state.csoloHoldActive = false;
     state.csoloLastFeedback = null;
+    state.csoloQuick.fullDisplay = false;
+    state.csoloQuick.qrDrawerVisible = false;
     renderCsoloSetupUI();
+    renderCsoloQuickUI();
     showOnlyCsoloSubView("setup");
     openModal(dom.charadesSoloModal);
     if (wakeLock && state.setupSettings.wakeLockEnabled) wakeLock.syncForContext(true);
@@ -11075,13 +11775,20 @@
     setCsoloHoldReveal(false);
     state.charadesSolo = null;
     state.csoloLastFeedback = null;
+    closeCsoloQuickRoom(true);
+    if (dom.charadesSoloModal) dom.charadesSoloModal.classList.remove("is-full-display-mode");
+    const exitBtn = document.getElementById("btn-csolo-exit-full-display");
+    if (exitBtn) exitBtn.hidden = true;
     closeModal(dom.charadesSoloModal);
     broadcastLiveDisplayState();
     syncWakeLockForCurrentScreen();
   }
 
-  function startCsoloSession() {
+  function startCsoloSession(options = {}) {
     if (!charadesEngine) return;
+    if (options && options.offlineOnly && state.csoloQuick.active) {
+      closeCsoloQuickRoom(true);
+    }
     const cfg = state.csoloConfig;
     const teamNames = getSideTeamNames(dom.csoloTeamNamesInputs, cfg.teamCount, false);
     const deck = charadesEngine.buildDeck({
@@ -11106,7 +11813,10 @@
       deck
     });
     state.csoloLastFeedback = null;
+    state.csoloQuick.qrDrawerVisible = false;
+    renderCsoloQuickUI();
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11186,19 +11896,36 @@
           dom.csoloWordCount.textContent = `🔢 عدد الكلمات: ${hdr.wordCount || hdr.wordCountLabel || ""}`;
         }
 
-        const isDual = state.dualScreen.connected;
-        if (dom.csoloHostSecretBox) dom.csoloHostSecretBox.hidden = !isDual;
-        if (dom.csoloHoldStage) dom.csoloHoldStage.hidden = isDual;
-
-        if (dom.csoloHostWord) dom.csoloHostWord.textContent = card.answer;
-        if (dom.csoloHostExpRow && dom.csoloHostExp) {
-          dom.csoloHostExp.textContent = card.explanation || "";
-          dom.csoloHostExpRow.hidden = !card.explanation;
-        }
-        if (dom.csoloSecretWord) dom.csoloSecretWord.textContent = card.answer;
-        if (dom.csoloSecretExp) {
-          dom.csoloSecretExp.textContent = card.explanation ? `🎬 فكرة التمثيل: ${card.explanation}` : "";
-          dom.csoloSecretExp.hidden = !card.explanation;
+        const hideSecretOnMain = Boolean(state.csoloQuick.active || state.csoloQuick.fullDisplay);
+        const actorCard = document.getElementById("csolo-actor-live-card");
+        if (hideSecretOnMain) {
+          if (dom.csoloHostSecretBox) dom.csoloHostSecretBox.hidden = true;
+          if (dom.csoloHoldStage) dom.csoloHoldStage.hidden = true;
+          if (dom.csoloHostWord) dom.csoloHostWord.textContent = "";
+          if (dom.csoloHostExp) dom.csoloHostExp.textContent = "";
+          if (dom.csoloSecretWord) dom.csoloSecretWord.textContent = "";
+          if (dom.csoloSecretExp) dom.csoloSecretExp.textContent = "";
+          if (actorCard) {
+            const actorObj = state.csoloQuick.activeActorUid && state.csoloQuick.playersMap[state.csoloQuick.activeActorUid];
+            const aName = actorObj ? actorObj.name : activeTeam.name;
+            const aAvatar = actorObj ? actorObj.avatar || "🎭" : "🎭";
+            actorCard.hidden = false;
+            actorCard.innerHTML = `<div class="qg-actor-live-main"><span>${escapeHtml(aAvatar)}</span><span>الممثّل الآن: ${escapeHtml(aName)}</span></div><span class="qg-actor-live-note">🔒 الكلمة السرية ظاهرة على هاتف الممثّل فقط</span>`;
+          }
+        } else {
+          if (actorCard) {
+            actorCard.hidden = true;
+            actorCard.innerHTML = "";
+          }
+          if (dom.csoloHostSecretBox) dom.csoloHostSecretBox.hidden = true;
+          if (dom.csoloHoldStage) dom.csoloHoldStage.hidden = false;
+          if (dom.csoloHostWord) dom.csoloHostWord.textContent = "";
+          if (dom.csoloHostExp) dom.csoloHostExp.textContent = "";
+          if (dom.csoloSecretWord) dom.csoloSecretWord.textContent = card.answer;
+          if (dom.csoloSecretExp) {
+            dom.csoloSecretExp.textContent = card.explanation ? `🎬 فكرة التمثيل: ${card.explanation}` : "";
+            dom.csoloSecretExp.hidden = !card.explanation;
+          }
         }
 
         if (dom.csoloHintBox) {
@@ -11322,6 +12049,7 @@
 
     if (window.SeenJeemAudio) window.SeenJeemAudio.playTileOpen();
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11332,6 +12060,7 @@
     s.timerStatus = s.timerRunning ? "running" : "paused";
     s.timerEndAtMs = s.timerRunning ? getWirelessServerNowMs() + s.timerRemaining * 1000 : null;
     renderCsoloTimerUI();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11363,6 +12092,7 @@
       return;
     }
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11397,6 +12127,7 @@
       return;
     }
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11406,6 +12137,7 @@
     s.hintRevealedForCurrent = true;
     if (window.SeenJeemAudio) window.SeenJeemAudio.playHint();
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11419,6 +12151,7 @@
     s.timerEndAtMs = null;
     s.phase = "turn-summary";
     renderCsoloView();
+    syncCsoloQuickRoom();
     broadcastLiveDisplayState();
   }
 
@@ -11430,6 +12163,7 @@
       s.phase = "finished";
       recordCsoloToArchive();
       renderCsoloView();
+      syncCsoloQuickRoom();
       broadcastLiveDisplayState();
       if (window.SeenJeemAudio) window.SeenJeemAudio.playVictory();
       startVictoryConfetti("default");
@@ -11440,7 +12174,14 @@
       s.timerRemaining = s.durationSeconds;
       s.skipsUsedThisTurn = 0;
       s.turnLog = [];
+      if (state.csoloQuick.nextActorUid && state.csoloQuick.playersMap[state.csoloQuick.nextActorUid]) {
+        state.csoloQuick.activeActorUid = state.csoloQuick.nextActorUid;
+        state.csoloQuick.nextActorUid = null;
+        if (window.SeenJeemQuickGamesSync) window.SeenJeemQuickGamesSync.setActiveActorUid(state.csoloQuick.activeActorUid);
+      }
+      renderCsoloQuickUI();
       renderCsoloView();
+      syncCsoloQuickRoom();
       broadcastLiveDisplayState();
     }
   }
@@ -13973,8 +14714,44 @@
     if (dom.btnOpenHallOfFame) dom.btnOpenHallOfFame.addEventListener("click", openHallOfFameModal);
     if (dom.btnWinnerOpenHallOfFame) dom.btnWinnerOpenHallOfFame.addEventListener("click", openHallOfFameModal);
 
-    // أحداث نافذة جولة البرق السريعة (60s Blitz)
-    if (dom.btnBlitzOpenTv) dom.btnBlitzOpenTv.addEventListener("click", openTVDisplayWindow);
+    // أحداث نافذة جولة البرق السريعة (60s Blitz + Pack 17 QR & Full Display)
+    const btnBlitzToggleQr = document.getElementById("btn-blitz-toggle-qr");
+    const btnBlitzFullDisplay = document.getElementById("btn-blitz-full-display");
+    const btnBlitzExitFull = document.getElementById("btn-blitz-exit-full-display");
+    const btnBlitzStartOffline = document.getElementById("btn-blitz-start-offline");
+    const blitzQrLobbyBox = document.getElementById("blitz-qr-lobby-box");
+    const blitzMidgameQrBar = document.getElementById("blitz-midgame-qr-bar");
+
+    if (btnBlitzToggleQr) {
+      btnBlitzToggleQr.addEventListener("click", async () => {
+        if (!state.blitzQuick.active) {
+          await createBlitzQuickRoom();
+          state.blitzQuick.qrDrawerVisible = true;
+        } else {
+          state.blitzQuick.qrDrawerVisible = !state.blitzQuick.qrDrawerVisible;
+        }
+        renderBlitzQuickUI();
+      });
+    }
+    if (btnBlitzFullDisplay) {
+      btnBlitzFullDisplay.addEventListener("click", () => {
+        state.blitzQuick.fullDisplay = !state.blitzQuick.fullDisplay;
+        renderBlitzQuickUI();
+        if (state.blitz) renderBlitzView();
+      });
+    }
+    if (btnBlitzExitFull) {
+      btnBlitzExitFull.addEventListener("click", () => {
+        state.blitzQuick.fullDisplay = false;
+        renderBlitzQuickUI();
+        if (state.blitz) renderBlitzView();
+      });
+    }
+    if (btnBlitzStartOffline) {
+      btnBlitzStartOffline.addEventListener("click", () => startBlitzSession({ offlineOnly: true }));
+    }
+    if (blitzQrLobbyBox) blitzQrLobbyBox.addEventListener("click", handleQuickHostBoxClick);
+    if (blitzMidgameQrBar) blitzMidgameQrBar.addEventListener("click", handleQuickHostBoxClick);
     if (dom.btnCloseBlitz) dom.btnCloseBlitz.addEventListener("click", closeBlitzModal);
     if (dom.blitzTeamCountPills) {
       dom.blitzTeamCountPills.querySelectorAll("[data-blitz-teams]").forEach((btn) => {
@@ -14016,8 +14793,44 @@
     }
     if (dom.btnBlitzPlayAgain) dom.btnBlitzPlayAgain.addEventListener("click", openBlitzModal);
 
-    // أحداث نافذة طور «من غير كلام» المستقل
-    if (dom.btnCharadesOpenTv) dom.btnCharadesOpenTv.addEventListener("click", openTVDisplayWindow);
+    // أحداث نافذة طور «من غير كلام» المستقل (+ Pack 17 QR & Full Display)
+    const btnCsoloToggleQr = document.getElementById("btn-csolo-toggle-qr");
+    const btnCsoloFullDisplay = document.getElementById("btn-csolo-full-display");
+    const btnCsoloExitFull = document.getElementById("btn-csolo-exit-full-display");
+    const btnCsoloStartOffline = document.getElementById("btn-csolo-start-offline");
+    const csoloQrLobbyBox = document.getElementById("csolo-qr-lobby-box");
+    const csoloMidgameQrBar = document.getElementById("csolo-midgame-qr-bar");
+
+    if (btnCsoloToggleQr) {
+      btnCsoloToggleQr.addEventListener("click", async () => {
+        if (!state.csoloQuick.active) {
+          await createCsoloQuickRoom();
+          state.csoloQuick.qrDrawerVisible = true;
+        } else {
+          state.csoloQuick.qrDrawerVisible = !state.csoloQuick.qrDrawerVisible;
+        }
+        renderCsoloQuickUI();
+      });
+    }
+    if (btnCsoloFullDisplay) {
+      btnCsoloFullDisplay.addEventListener("click", () => {
+        state.csoloQuick.fullDisplay = !state.csoloQuick.fullDisplay;
+        renderCsoloQuickUI();
+        if (state.charadesSolo) renderCsoloView();
+      });
+    }
+    if (btnCsoloExitFull) {
+      btnCsoloExitFull.addEventListener("click", () => {
+        state.csoloQuick.fullDisplay = false;
+        renderCsoloQuickUI();
+        if (state.charadesSolo) renderCsoloView();
+      });
+    }
+    if (btnCsoloStartOffline) {
+      btnCsoloStartOffline.addEventListener("click", () => startCsoloSession({ offlineOnly: true }));
+    }
+    if (csoloQrLobbyBox) csoloQrLobbyBox.addEventListener("click", handleQuickHostBoxClick);
+    if (csoloMidgameQrBar) csoloMidgameQrBar.addEventListener("click", handleQuickHostBoxClick);
     if (dom.btnCloseCharadesSolo) dom.btnCloseCharadesSolo.addEventListener("click", closeCharadesSoloModal);
     if (dom.csoloTeamCountPills) {
       dom.csoloTeamCountPills.querySelectorAll("[data-csolo-teams]").forEach((btn) => {
@@ -14687,6 +15500,12 @@
     if (urlMode === "mafia-player") {
       if (window.SeenJeemMafiaPlayerView && typeof window.SeenJeemMafiaPlayerView.init === "function") {
         window.SeenJeemMafiaPlayerView.init();
+      }
+      return;
+    }
+    if (urlMode === "blitz-player" || urlMode === "mgk-player" || urlMode === "audio-player") {
+      if (window.SeenJeemQuickGamePlayerView && typeof window.SeenJeemQuickGamePlayerView.init === "function") {
+        window.SeenJeemQuickGamePlayerView.init(urlMode);
       }
       return;
     }

@@ -32,7 +32,18 @@
 
   function getUrlMode() {
     const m = getUrlParams().mode;
-    if (m === "display" || m === "remote" || m === "player" || m === "bara-player" || m === "mafia-player") return m;
+    if (
+      m === "display" ||
+      m === "remote" ||
+      m === "player" ||
+      m === "bara-player" ||
+      m === "mafia-player" ||
+      m === "blitz-player" ||
+      m === "mgk-player" ||
+      m === "audio-player"
+    ) {
+      return m;
+    }
     return "host";
   }
 
