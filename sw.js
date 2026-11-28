@@ -5,11 +5,15 @@
  * - CacheFirst لخطوط Google Fonts (Cairo) والملفات الثابتة والصور المحلية
  * - navigateFallback يحافظ على معاملات الاستعلام مثل ?mode=display في وضع الأوفلاين
  */
-const CACHE_VERSION = "seen-jeem-v4.22.1";
+const CACHE_VERSION = "seen-jeem-v4.23.0";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHEETS_CACHE = `${CACHE_VERSION}-sheets`;
 const FONTS_CACHE = `${CACHE_VERSION}-fonts`;
+const IMAGES_CACHE = `${CACHE_VERSION}-images`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+
+const MAX_CACHED_IMAGES = 250;
+const IMAGES_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 يوماً
 
 const APP_SHELL_URLS = [
   "./",
@@ -65,6 +69,7 @@ const APP_SHELL_URLS = [
   "./src/js/tournamentMode.js",
   "./src/js/customPackBuilder.js",
   "./src/js/app.js",
+  "./apple-touch-icon.png",
   "./src/assets/icons/icon.svg",
   "./src/assets/icons/icon-192.png",
   "./src/assets/icons/icon-512.png"
@@ -72,19 +77,22 @@ const APP_SHELL_URLS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(APP_SHELL_CACHE).then(async (cache) => {
-      // استخدام allSettled لضمان نجاح التثبيت حتى لو تعذّر ملف ثانوي
-      await Promise.allSettled(
-        APP_SHELL_URLS.map((url) =>
-          cache.add(new Request(url, { cache: "reload" })).catch(() => null)
-        )
-      );
-    })
+    caches
+      .open(APP_SHELL_CACHE)
+      .then(async (cache) => {
+        // استخدام allSettled لضمان نجاح التثبيت حتى لو تعذّر ملف ثانوي (دون precache لصور /images/ الـ 220 لسرعة التثبيت)
+        await Promise.allSettled(
+          APP_SHELL_URLS.map((url) =>
+            cache.add(new Request(url, { cache: "reload" })).catch(() => null)
+          )
+        );
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
-  const activeCaches = new Set([APP_SHELL_CACHE, SHEETS_CACHE, FONTS_CACHE, RUNTIME_CACHE]);
+  const activeCaches = new Set([APP_SHELL_CACHE, SHEETS_CACHE, FONTS_CACHE, IMAGES_CACHE, RUNTIME_CACHE]);
   event.waitUntil(
     caches
       .keys()
@@ -142,6 +150,64 @@ async function networkFirst(request, cacheName, timeoutMs = 6000) {
     if (cached) return cached;
     throw _err;
   }
+}
+
+async function trimCacheEntries(cache, maxEntries) {
+  try {
+    const keys = await cache.keys();
+    if (keys.length <= maxEntries) return;
+    const excess = keys.length - maxEntries;
+    for (let i = 0; i < excess; i++) {
+      await cache.delete(keys[i]);
+    }
+  } catch (_err) {}
+}
+
+async function cacheImageWithTimestamp(cache, request, response) {
+  try {
+    if (!response || (!response.ok && response.type !== "opaque")) return;
+    if (response.type === "opaque") {
+      await cache.put(request, response.clone());
+    } else {
+      const headers = new Headers(response.headers);
+      headers.set("x-sw-cached-at", String(Date.now()));
+      const body = await response.clone().arrayBuffer();
+      const stamped = new Response(body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers
+      });
+      await cache.put(request, stamped);
+    }
+    await trimCacheEntries(cache, MAX_CACHED_IMAGES);
+  } catch (_err) {}
+}
+
+async function cacheFirstImages(request, cacheName, maxAgeMs) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) {
+    const cachedAt = Number(cached.headers.get("x-sw-cached-at")) || 0;
+    const isExpired = cachedAt > 0 && Date.now() - cachedAt > maxAgeMs;
+    if (!isExpired) {
+      return cached;
+    }
+  }
+
+  try {
+    const response = await fetch(request);
+    if (response && (response.ok || response.type === "opaque")) {
+      cacheImageWithTimestamp(cache, request, response);
+    }
+    return response;
+  } catch (_err) {
+    if (cached) return cached;
+    throw _err;
+  }
+}
+
+function isLocalImagesRequest(url) {
+  return url.origin === self.location.origin && (url.pathname.startsWith("/images/") || url.pathname.includes("/images/"));
 }
 
 async function cacheFirst(request, cacheName) {
@@ -245,7 +311,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 4) ملفات نفس الأصل (App Shell + صور محلية): CacheFirst / StaleWhileRevalidate
+  // 4) صور الفئات والمجموعات (/images/): CacheFirst (بحد أقصى 250 صورة وصلاحية 30 يوماً)
+  if (isLocalImagesRequest(url)) {
+    event.respondWith(cacheFirstImages(request, IMAGES_CACHE, IMAGES_MAX_AGE_MS));
+    return;
+  }
+
+  // 5) ملفات نفس الأصل (App Shell): CacheFirst مع تحديث بالخلفية / StaleWhileRevalidate
   if (url.origin === self.location.origin) {
     event.respondWith(
       (async () => {

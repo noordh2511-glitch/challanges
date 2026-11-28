@@ -7,6 +7,8 @@
 (function () {
   "use strict";
 
+  const IOS_HINT_DISMISSED_KEY = "seen-jeem-ios-install-dismissed-v1";
+
   class PWAManager {
     constructor() {
       /** @type {BeforeInstallPromptEvent | null} */
@@ -17,8 +19,14 @@
       this._waitingWorker = null;
       this._online = typeof navigator !== "undefined" ? navigator.onLine !== false : true;
       this._isInstalled = this._detectStandalone();
+      this._isIosSafari = this._detectIosSafari();
+      this._iosHintDismissed = this._loadIosHintDismissed();
       this._initialized = false;
       this._reloadingForUpdate = false;
+      this._hadControllerOnInit =
+        typeof navigator !== "undefined" &&
+        "serviceWorker" in navigator &&
+        Boolean(navigator.serviceWorker.controller);
 
       /** @type {Set<Function>} */
       this._installListeners = new Set();
@@ -40,6 +48,45 @@
         // تجاهل
       }
       return false;
+    }
+
+    _detectIosSafari() {
+      try {
+        if (typeof navigator === "undefined") return false;
+        const ua = navigator.userAgent || "";
+        const isIosDevice =
+          /iPad|iPhone|iPod/i.test(ua) ||
+          (navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints) > 1);
+        if (!isIosDevice) return false;
+        const isOtherIosBrowser = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/i.test(ua);
+        return !isOtherIosBrowser;
+      } catch (_err) {
+        return false;
+      }
+    }
+
+    _loadIosHintDismissed() {
+      try {
+        return localStorage.getItem(IOS_HINT_DISMISSED_KEY) === "1";
+      } catch (_err) {
+        return false;
+      }
+    }
+
+    isIosSafari() {
+      return Boolean(this._isIosSafari);
+    }
+
+    shouldShowIosInstallHint() {
+      return Boolean(this._isIosSafari && !this._isInstalled && !this._iosHintDismissed);
+    }
+
+    dismissIosInstallHint() {
+      this._iosHintDismissed = true;
+      try {
+        localStorage.setItem(IOS_HINT_DISMISSED_KEY, "1");
+      } catch (_err) {}
+      this._emitInstallState();
     }
 
     init() {
@@ -107,9 +154,22 @@
         });
 
         navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (this._reloadingForUpdate) return;
+          if (!this._hadControllerOnInit || this._reloadingForUpdate) return;
+          // تحديث تلقائي سلس فقط إذا لم تكن هناك مباراة نشطة على لوحة اللعب
+          const gameScreen = document.getElementById("game-screen");
+          const isInActiveGame = Boolean(gameScreen && gameScreen.classList.contains("active"));
+          if (isInActiveGame) {
+            this._emitUpdateAvailable();
+            return;
+          }
           this._reloadingForUpdate = true;
           window.location.reload();
+        });
+
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible" && this._registration) {
+            this._registration.update().catch(() => {});
+          }
         });
       } catch (_err) {
         // فشل التسجيل في بيئة غير مدعومة يتم التعامل معه بصمت دون كسر التطبيق

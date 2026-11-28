@@ -6,10 +6,12 @@
   <title>سين جيم | لعبة المسابقات الجماعية</title>
   <meta name="description" content="لعبة مسابقات جماعية عربية تفاعلية بنظام سين جيم مع 6 فئات، مؤقت، وسائل مساعدة، ولوحة نقاط احترافية." />
   <meta name="theme-color" content="#0b1228" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="سين جيم" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="src/assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" type="image/svg+xml" href="src/assets/icons/icon.svg" />
 
   <!-- الخط العربي: Cairo -->
@@ -139,6 +141,18 @@
           </div>
         </div>
       </header>
+
+      <!-- تلميح تثبيت التطبيق على أجهزة iOS (Safari) القابل للإغلاق -->
+      <div id="ios-pwa-install-banner" class="ios-pwa-install-banner" role="region" aria-label="تثبيت التطبيق على iOS" hidden>
+        <div class="ios-pwa-install-body">
+          <span class="ios-pwa-install-icon" aria-hidden="true">📲</span>
+          <div class="ios-pwa-install-text">
+            <strong>ثبّت تطبيق «سين جيم» على جهازك</strong>
+            <span>اضغط على زر المشاركة <strong class="ios-share-glyph" aria-hidden="true">⬆️</strong> في Safari ثم اختر <strong>«إضافة إلى الشاشة الرئيسية»</strong>.</span>
+          </div>
+        </div>
+        <button type="button" id="btn-dismiss-ios-pwa" class="ios-pwa-dismiss-btn" aria-label="إغلاق التلميح" title="إغلاق">×</button>
+      </div>
 
       <!-- =========================================================
            1) بوابة الألعاب بالبطاقات المنفصلة (Clean Game Hub)

@@ -9343,9 +9343,19 @@
   }
 
   function syncPwaInstallButtonUI() {
-    if (!dom.btnInstallPwa) return;
-    const show = Boolean(pwaManager && pwaManager.canInstall());
-    dom.btnInstallPwa.hidden = !show;
+    if (dom.btnInstallPwa) {
+      const show = Boolean(pwaManager && pwaManager.canInstall());
+      dom.btnInstallPwa.hidden = !show;
+    }
+    const iosBanner = document.getElementById("ios-pwa-install-banner");
+    if (iosBanner) {
+      const showIos = Boolean(
+        pwaManager &&
+          typeof pwaManager.shouldShowIosInstallHint === "function" &&
+          pwaManager.shouldShowIosInstallHint()
+      );
+      iosBanner.hidden = !showIos;
+    }
   }
 
   function initPwaUI() {
@@ -9353,6 +9363,15 @@
     pwaManager.init();
     syncOnlineOfflineUI(false);
     syncPwaInstallButtonUI();
+
+    const btnDismissIos = document.getElementById("btn-dismiss-ios-pwa");
+    if (btnDismissIos) {
+      btnDismissIos.addEventListener("click", () => {
+        if (typeof pwaManager.dismissIosInstallHint === "function") {
+          pwaManager.dismissIosInstallHint();
+        }
+      });
+    }
 
     pwaManager.onInstallStateChange(() => {
       syncPwaInstallButtonUI();
