@@ -1314,12 +1314,21 @@
 
           card.innerHTML = `
             <div class="tv-board-cat-header">
-              <div class="tv-board-cat-icon">${escapeHtml(bc.category.icon || "🎯")}</div>
-              <h3 class="tv-board-cat-title">${escapeHtml(bc.category.name)}</h3>
-              <span class="tv-board-cat-progress">${bc.remainingInCat} / 6</span>
+              <div class="tv-board-cat-header-content">
+                <div class="tv-board-cat-icon">${escapeHtml(bc.category.icon || "🎯")}</div>
+                <h3 class="tv-board-cat-title">${escapeHtml(bc.category.name)}</h3>
+                <span class="tv-board-cat-progress">${bc.remainingInCat} / 6</span>
+              </div>
             </div>
             <div class="tv-board-tiles-grid">${tilesHtml}</div>
           `;
+          const tvHeaderEl = card.querySelector(".tv-board-cat-header");
+          const catBrowser = window.SeenJeemCategoryBrowser;
+          if (tvHeaderEl && catBrowser && typeof catBrowser.attachCoverImage === "function") {
+            catBrowser.attachCoverImage(tvHeaderEl, catBrowser.getCategoryCoverSources(bc.category), {
+              alt: bc.category.name
+            });
+          }
           this.dom.boardGrid.appendChild(card);
         });
       }

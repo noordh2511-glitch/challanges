@@ -17846,3 +17846,381 @@ body.quick-player-mode {
   background: rgba(20, 14, 4, 0.72);
   border-color: rgba(251, 191, 36, 0.32);
 }
+
+/* =========================================================
+   بطاقة أفلام ومسلسلات المجمّعة (التبويبات) + تعميم صور الغطاء لجميع البطاقات
+   ========================================================= */
+
+/* شريط التبويبات الفرعية داخل البطاقة الرئيسية المجمّعة (الفن المصري، الفن السوري، مسلسلات وأفلام أجنبية) */
+.category-subgroup-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.category-subgroup-tabs[hidden] {
+  display: none !important;
+}
+
+.subgroup-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  background: rgba(30, 41, 59, 0.65);
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.subgroup-tab-btn:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--tab-color, #ec4899) 70%, rgba(255, 255, 255, 0.2));
+  background: color-mix(in srgb, var(--tab-color, #ec4899) 18%, rgba(15, 23, 42, 0.88));
+  color: #ffffff;
+}
+
+.subgroup-tab-btn.active {
+  border-color: var(--tab-color, #ec4899);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tab-color, #ec4899) 82%, #0f172a),
+    color-mix(in srgb, var(--tab-color, #ec4899) 55%, #0f172a)
+  );
+  color: #ffffff;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tab-color, #ec4899) 36%, transparent);
+}
+
+.subgroup-tab-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.subgroup-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.42);
+  color: #f8fafc;
+  font-size: 0.74rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.subgroup-tab-btn.active .subgroup-tab-count {
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.subgroup-tab-sel {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.9);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+[data-theme="high-contrast"] .category-subgroup-tabs {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+[data-theme="royal-gold"] .category-subgroup-tabs {
+  background: rgba(20, 14, 4, 0.78);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+/* شارات معاينة التبويبات على البطاقة الرئيسية المجمّعة (أفلام ومسلسلات) */
+.main-cat-subgroups-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.main-cat-subgroup-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  background: rgba(2, 6, 23, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* تغليف محتوى البطاقات لضمان الترتيب الطبقي السليم فوق صور الغطاء */
+.main-cat-card {
+  overflow: hidden;
+}
+
+.main-cat-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  flex: 1;
+}
+
+.setup-cat-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  width: 100%;
+  flex: 1;
+}
+
+.board-cat-header,
+.tv-board-cat-header {
+  position: relative;
+  overflow: hidden;
+}
+
+.board-cat-header-content,
+.tv-board-cat-header-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 7px;
+  width: 100%;
+  flex: 1;
+}
+
+/* طبقة صورة الغطاء الكاملة (object-cover) + التدرج اللوني الداكن من الأسفل */
+.cat-card-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.38s ease;
+}
+
+.cat-card-cover-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(2, 6, 23, 0.96) 0%,
+    rgba(2, 6, 23, 0.8) 42%,
+    rgba(2, 6, 23, 0.32) 74%,
+    rgba(2, 6, 23, 0.14) 100%
+  );
+  transition: opacity 0.28s ease;
+}
+
+.has-cover-image > .cat-card-cover-img,
+.has-cover-image > .cat-card-cover-overlay {
+  opacity: 1;
+}
+
+/* رفع الشارات وأزرار المفضلة والاختيار فوق الصورة والتدرج */
+.main-cat-sel-badge,
+.setup-cat-check,
+.setup-cat-fav-btn {
+  z-index: 4;
+}
+
+.setup-cat-card::after {
+  z-index: 3;
+}
+
+/* بطاقة المجموعة الرئيسية عند توفر صورة غطاء */
+.main-cat-card.has-cover-image {
+  min-height: 182px;
+  background-image: none;
+  background-color: #0b1228;
+}
+
+.main-cat-card.has-cover-image .main-cat-icon {
+  display: none;
+}
+
+.main-cat-card.has-cover-image .main-cat-body {
+  justify-content: flex-end;
+  padding-top: 36px;
+}
+
+.main-cat-card.has-cover-image .main-cat-title {
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.88);
+}
+
+.main-cat-card.has-cover-image .main-cat-meta {
+  color: #f1f5f9;
+  border-top-color: rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+}
+
+.main-cat-card.has-cover-image .main-cat-subgroup-pill {
+  background: rgba(2, 6, 23, 0.68);
+  border-color: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(4px);
+}
+
+/* بطاقة الفئة الفرعية عند توفر صورة غطاء */
+.setup-cat-card.has-cover-image {
+  min-height: 204px;
+  padding: 14px 11px 12px;
+  background-color: #0b1228;
+}
+
+.setup-cat-card.has-cover-image::before {
+  opacity: 0;
+}
+
+.setup-cat-card.has-cover-image .setup-cat-icon {
+  display: none;
+}
+
+.setup-cat-card.has-cover-image .setup-cat-body {
+  justify-content: flex-end;
+  padding-top: 44px;
+}
+
+.setup-cat-card.has-cover-image .setup-cat-name {
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.92);
+}
+
+.setup-cat-card.has-cover-image .setup-cat-desc {
+  color: #e2e8f0;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  min-height: 0;
+}
+
+.setup-cat-card.has-cover-image .setup-cat-parent-tag {
+  color: #f8fafc;
+  background: rgba(2, 6, 23, 0.62);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  margin-top: 0;
+}
+
+.setup-cat-card.has-cover-image .cat-content-badge {
+  background: rgba(2, 6, 23, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+}
+
+.setup-cat-card.has-cover-image .setup-cat-count {
+  margin-top: 2px;
+  color: #f8fafc;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+.setup-cat-card.has-cover-image .setup-cat-fav-btn,
+.setup-cat-card.has-cover-image .setup-cat-check {
+  backdrop-filter: blur(6px);
+  background: rgba(2, 6, 23, 0.78);
+}
+
+.setup-cat-card.selected.has-cover-image .setup-cat-check {
+  background: var(--cat-color, #10b981);
+}
+
+/* ترويسة بطاقة الفئة على لوحة اللعب وشاشة العرض التلفزيوني عند توفر صورة غطاء */
+.board-cat-header.has-cover-image,
+.tv-board-cat-header.has-cover-image {
+  background-color: #0b1228;
+  border-color: color-mix(in srgb, var(--cat-color, #06b6d4) 55%, rgba(255, 255, 255, 0.22));
+}
+
+.board-cat-header.has-cover-image .board-cat-icon-badge,
+.tv-board-cat-header.has-cover-image .tv-board-cat-icon {
+  display: none;
+}
+
+.board-cat-header.has-cover-image .board-cat-header-content,
+.tv-board-cat-header.has-cover-image .tv-board-cat-header-content {
+  justify-content: flex-end;
+  padding-top: 26px;
+}
+
+.board-cat-header.has-cover-image .board-cat-title,
+.tv-board-cat-header.has-cover-image .tv-board-cat-title {
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+}
+
+.board-cat-header.has-cover-image .board-cat-progress,
+.tv-board-cat-header.has-cover-image .tv-board-cat-progress {
+  color: #f1f5f9;
+  background: rgba(2, 6, 23, 0.68);
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* تأثير تكبير ناعم للصورة عند التحويم */
+@media (hover: hover) {
+  .main-cat-card.has-cover-image:hover > .cat-card-cover-img,
+  .setup-cat-card.has-cover-image:hover > .cat-card-cover-img {
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 640px) {
+  .category-subgroup-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .category-subgroup-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .subgroup-tab-btn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.84rem;
+  }
+
+  .setup-cat-card.has-cover-image {
+    min-height: 176px;
+  }
+
+  .main-cat-card.has-cover-image {
+    min-height: 158px;
+  }
+}

@@ -667,6 +667,10 @@
         ? String(groupRaw).trim().toLowerCase()
         : undefined;
 
+    const imageRes = sanitizeImagePath(getCellRaw(rawCat, "image", "coverImage", "imageUrl", "cover"));
+    const mainCategoryRes = sanitizeOptionalText(getCellRaw(rawCat, "mainCategory", "section"));
+    const mainIconRes = sanitizeOptionalText(getCellRaw(rawCat, "mainIcon"));
+
     return {
       id,
       name,
@@ -674,6 +678,9 @@
       color,
       description,
       ...(group ? { group } : {}),
+      ...(imageRes.value ? { image: imageRes.value } : {}),
+      ...(mainCategoryRes.value ? { mainCategory: mainCategoryRes.value } : {}),
+      ...(mainIconRes.value ? { mainIcon: mainIconRes.value } : {}),
       questions: []
     };
   }

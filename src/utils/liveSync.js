@@ -153,7 +153,8 @@
               id: bc.category.id,
               name: bc.category.name,
               icon: bc.category.icon || "🎯",
-              color: bc.category.color || "#06b6d4"
+              color: bc.category.color || "#06b6d4",
+              image: typeof bc.category.image === "string" ? bc.category.image : ""
             },
             remainingInCat: Number(bc.remainingInCat) || 0,
             rightColumn: Array.isArray(bc.rightColumn)

@@ -13,6 +13,7 @@
 
   const MAIN_CATEGORY_CATALOG = Object.freeze([
     { id: "custom-packs", label: "فئاتي الخاصة", icon: "✨", color: "#f59e0b" },
+    { id: "movies-series", label: "أفلام ومسلسلات", icon: "🎬", color: "#ec4899" },
     { id: "jordan-arab", label: "الأردن والعرب وإسلاميات", icon: "🇯🇴", color: "#ef4444" },
     { id: "culture-geo", label: "ثقافة وجغرافيا وتاريخ", icon: "🌍", color: "#06b6d4" },
     { id: "science-tech", label: "علوم وتقنية وطب", icon: "🔬", color: "#8b5cf6" },
@@ -24,7 +25,16 @@
     { id: "general-misc", label: "منوّعات عامة", icon: "📚", color: "#38bdf8" }
   ]);
 
+  const FALLBACK_MOVIES_SERIES_SUBGROUPS = Object.freeze([
+    Object.freeze({ id: "egyptian-art", label: "الفن المصري", icon: "🇪🇬", color: "#f59e0b", parentMainId: "movies-series" }),
+    Object.freeze({ id: "syrian-art", label: "الفن السوري", icon: "🇸🇾", color: "#e11d48", parentMainId: "movies-series" }),
+    Object.freeze({ id: "foreign-cinema", label: "مسلسلات وأفلام أجنبية", icon: "🍿", color: "#8b5cf6", parentMainId: "movies-series" })
+  ]);
+
   const MAIN_CATALOG_MAP = new Map(MAIN_CATEGORY_CATALOG.map((m) => [m.id, m]));
+
+  const failedCoverUrls = new Set();
+  const loadedCoverUrls = new Set();
 
   const DYNAMIC_COLORS = ["#06b6d4", "#a855f7", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#ef4444", "#14b8a6"];
 
@@ -197,6 +207,39 @@
   }
 
   /**
+   * تحديد المجموعة الفرعية (التبويب) إن كانت الفئة تابعة لمجموعة مجمّعة مثل «أفلام ومسلسلات»
+   */
+  function resolveSubGroupInfo(cat) {
+    if (!cat || typeof cat !== "object") return null;
+    const themes = window.SeenJeemCategoryThemes;
+    const candidates = [cat.subGroup, cat.group, cat.mainCategory, cat.section];
+    for (let i = 0; i < candidates.length; i++) {
+      const raw = typeof candidates[i] === "string" ? candidates[i].trim() : "";
+      if (!raw) continue;
+      if (themes && typeof themes.resolveSubGroup === "function") {
+        const hit = themes.resolveSubGroup(raw);
+        if (hit) return hit;
+      } else {
+        const lower = raw.toLowerCase();
+        const norm = normalizeArabicSearch(raw);
+        const found = FALLBACK_MOVIES_SERIES_SUBGROUPS.find(
+          (sg) => sg.id === lower || normalizeArabicSearch(sg.label) === norm
+        );
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function getSubGroupsForMain(mainId) {
+    const themes = window.SeenJeemCategoryThemes;
+    if (themes && typeof themes.getSubGroupsForMain === "function") {
+      return themes.getSubGroupsForMain(mainId);
+    }
+    return mainId === "movies-series" ? FALLBACK_MOVIES_SERIES_SUBGROUPS : [];
+  }
+
+  /**
    * تحديد الفئة الرئيسية لأي فئة فرعية عبر سجل الأعلام والألوان (categoryThemes.js)
    */
   function resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet } = {}) {
@@ -207,7 +250,13 @@
       return resolveThemeEntry("custom-packs");
     }
 
-    // 2) حقل mainCategory / section صريح من الشيت (يدعم الدول العربية الـ 22 والفئات الموسّعة أو أي قسم جديد)
+    // 2) المجموعات الفرعية المجمّعة (مثل الفن المصري / الفن السوري / مسلسلات وأفلام أجنبية -> أفلام ومسلسلات)
+    const subGroupMeta = resolveSubGroupInfo(cat);
+    if (subGroupMeta && subGroupMeta.parentMainId) {
+      return resolveThemeEntry(subGroupMeta.parentMainId);
+    }
+
+    // 3) حقل mainCategory / section صريح من الشيت (يدعم الدول العربية الـ 22 والفئات الموسّعة أو أي قسم جديد)
     const rawExplicit =
       (typeof cat.mainCategory === "string" && cat.mainCategory.trim()) ||
       (typeof cat.section === "string" && cat.section.trim()) ||
@@ -216,13 +265,19 @@
       return resolveThemeEntry(rawExplicit, cat.mainIcon || "");
     }
 
-    // 3) الاعتماد على resolveCategoryGroup الحالي إن كان موجوداً
+    // 4) حقل group صريح من الشيت أو البيانات المحلية
+    const rawGroup = typeof cat.group === "string" ? cat.group.trim() : "";
+    if (rawGroup) {
+      return resolveThemeEntry(rawGroup, cat.mainIcon || "");
+    }
+
+    // 5) الاعتماد على resolveCategoryGroup الحالي إن كان موجوداً
     const groupId = typeof resolveGroupFn === "function" ? resolveGroupFn(cat) : cat.group;
     if (groupId) {
       return resolveThemeEntry(groupId);
     }
 
-    // 4) أي فئة بدون فئة رئيسية -> منوّعات عامة
+    // 6) أي فئة بدون فئة رئيسية -> منوّعات عامة
     return resolveThemeEntry("general-misc");
   }
 
@@ -242,11 +297,26 @@
       if (!cat || !cat.id || !hasValidQuestions(cat)) return;
       const meta = resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet });
       if (!groupMap.has(meta.id)) {
+        const definedSubGroups = Array.isArray(meta.subGroups) && meta.subGroups.length > 0
+          ? meta.subGroups
+          : getSubGroupsForMain(meta.id);
         groupMap.set(meta.id, {
           ...meta,
           color: meta.accent || meta.color || "#38bdf8",
           accent: meta.accent || meta.color || "#38bdf8",
           gradient: meta.gradient || "",
+          subGroups: definedSubGroups,
+          subGroupStatsMap: new Map(
+            definedSubGroups.map((sg) => [
+              sg.id,
+              {
+                ...sg,
+                count: 0,
+                selectedCount: 0,
+                newQuestionsTotal: 0
+              }
+            ])
+          ),
           subcategories: [],
           subCount: 0,
           selectedCount: 0,
@@ -254,15 +324,32 @@
         });
       }
       const bucket = groupMap.get(meta.id);
+      const newCount = typeof getNewCountFn === "function" ? getNewCountFn(cat) : (cat.questions ? cat.questions.length : 0);
+      const isSelected = selectedSet.has(cat.id);
       bucket.subcategories.push(cat);
       bucket.subCount += 1;
-      if (selectedSet.has(cat.id)) bucket.selectedCount += 1;
-      bucket.newQuestionsTotal += typeof getNewCountFn === "function" ? getNewCountFn(cat) : (cat.questions ? cat.questions.length : 0);
+      if (isSelected) bucket.selectedCount += 1;
+      bucket.newQuestionsTotal += newCount;
+
+      if (bucket.subGroupStatsMap && bucket.subGroupStatsMap.size > 0) {
+        const sgMeta = resolveSubGroupInfo(cat);
+        if (sgMeta && bucket.subGroupStatsMap.has(sgMeta.id)) {
+          const sgStat = bucket.subGroupStatsMap.get(sgMeta.id);
+          sgStat.count += 1;
+          if (isSelected) sgStat.selectedCount += 1;
+          sgStat.newQuestionsTotal += newCount;
+        }
+      }
     });
 
     const themes = window.SeenJeemCategoryThemes;
     return Array.from(groupMap.values())
       .filter((g) => g.subCount > 0)
+      .map((g) => {
+        const subGroupStats = g.subGroupStatsMap ? Array.from(g.subGroupStatsMap.values()) : [];
+        const { subGroupStatsMap: _unused, ...cleanGroup } = g;
+        return { ...cleanGroup, subGroupStats };
+      })
       .sort((a, b) => {
         const ordA = Number.isFinite(Number(a.order)) ? Number(a.order) : themes ? themes.getOrderIndex(a.id) : 500;
         const ordB = Number.isFinite(Number(b.order)) ? Number(b.order) : themes ? themes.getOrderIndex(b.id) : 500;
@@ -272,7 +359,7 @@
   }
 
   /**
-   * البحث الفوري + الفلاتر السريعة عبر الفئات الفرعية (يدعم النطاق الشامل أو التصفية داخل الفئة الرئيسية المفتوحة)
+   * البحث الفوري + الفلاتر السريعة عبر الفئات الفرعية (يدعم النطاق الشامل أو التصفية داخل الفئة الرئيسية المفتوحة وتبويباتها)
    */
   function filterSubcategories(
     allCategories,
@@ -280,6 +367,7 @@
       query = "",
       quickFilter = "all", // "all" | "new" | "media" | "custom" | "favorites"
       activeMainId = null,
+      activeSubGroupId = "all",
       scopeToActiveMain = false,
       favoritesList = null,
       customIdsSet = null,
@@ -294,14 +382,22 @@
     const normQ = normFn(query);
     const normQNoAl = stripAlFn(normQ);
     const isGlobalSearchOrFilter = !scopeToActiveMain && (Boolean(normQ) || quickFilter !== "all");
+    const cleanSubGroupFilter = typeof activeSubGroupId === "string" && activeSubGroupId.trim() ? activeSubGroupId.trim().toLowerCase() : "all";
 
     return (Array.isArray(allCategories) ? allCategories : [])
       .filter((cat) => {
         if (!cat || !cat.id || !hasValidQuestions(cat)) return false;
         const mainMeta = resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet });
+        const subGroupMeta = resolveSubGroupInfo(cat);
 
         if ((scopeToActiveMain || !isGlobalSearchOrFilter) && activeMainId && mainMeta.id !== activeMainId) {
           return false;
+        }
+
+        if (scopeToActiveMain && activeMainId && cleanSubGroupFilter !== "all") {
+          if (!subGroupMeta || subGroupMeta.id !== cleanSubGroupFilter) {
+            return false;
+          }
         }
 
         if (quickFilter === "new") {
@@ -317,7 +413,9 @@
 
         if (normQ) {
           const aliasesStr = Array.isArray(mainMeta.aliases) ? mainMeta.aliases.join(" ") : "";
-          const hay = normFn(`${cat.name || ""} ${cat.description || ""} ${mainMeta.label || ""} ${aliasesStr}`);
+          const subGroupAliases = subGroupMeta && Array.isArray(subGroupMeta.aliases) ? subGroupMeta.aliases.join(" ") : "";
+          const subGroupLabel = subGroupMeta && subGroupMeta.label ? subGroupMeta.label : "";
+          const hay = normFn(`${cat.name || ""} ${cat.description || ""} ${mainMeta.label || ""} ${aliasesStr} ${subGroupLabel} ${subGroupAliases}`);
           if (!hay.includes(normQ) && (!normQNoAl || !hay.includes(normQNoAl))) return false;
         }
 
@@ -325,8 +423,130 @@
       })
       .map((cat) => ({
         category: cat,
-        mainMeta: resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet })
+        mainMeta: resolveMainCategoryInfo(cat, { resolveGroupFn, customIdsSet }),
+        subGroupMeta: resolveSubGroupInfo(cat)
       }));
+  }
+
+  /* =========================================================
+     نظام صور الغطاء التلقائي للبطاقات (الرئيسية والفرعية) مع Fallback آمن
+     ========================================================= */
+  function buildLocalCoverPath(folder, id, { prefix = "" } = {}) {
+    const cleanId = encodeURIComponent(String(id || "").trim());
+    if (!cleanId) return "";
+    const cleanPrefix = prefix ? `${prefix.replace(/^\/+|\/+$/g, "")}/` : "";
+    const isFile = typeof window !== "undefined" && window.location && window.location.protocol === "file:";
+    const pathname = typeof window !== "undefined" && window.location ? window.location.pathname || "/" : "/";
+    const pathParts = pathname.split("/").filter(Boolean);
+    const isSubpath = !isFile && pathParts.length > (pathname.endsWith(".html") ? 1 : 0);
+    return isFile || isSubpath
+      ? `${cleanPrefix}images/${folder}/${cleanId}.webp`
+      : `/${cleanPrefix}images/${folder}/${cleanId}.webp`;
+  }
+
+  function normalizeCoverUrl(rawUrl) {
+    if (typeof rawUrl !== "string") return "";
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return "";
+    if (/^(https?:|data:|blob:|file:)/i.test(trimmed)) return trimmed;
+    if (trimmed.startsWith("/")) {
+      const isFile = typeof window !== "undefined" && window.location && window.location.protocol === "file:";
+      const pathname = typeof window !== "undefined" && window.location ? window.location.pathname || "/" : "/";
+      const pathParts = pathname.split("/").filter(Boolean);
+      const isSubpath = !isFile && pathParts.length > (pathname.endsWith(".html") ? 1 : 0);
+      return isFile || isSubpath ? trimmed.replace(/^\/+/, "") : trimmed;
+    }
+    return trimmed;
+  }
+
+  function getCategoryCoverSources(category) {
+    if (!category || typeof category !== "object") return [];
+    const list = [];
+    const customImg = normalizeCoverUrl(category.image || category.coverImage || "");
+    if (customImg) list.push(customImg);
+    const localImg = buildLocalCoverPath("categories", category.id);
+    if (localImg && !list.includes(localImg)) list.push(localImg);
+    const publicImg = buildLocalCoverPath("categories", category.id, { prefix: "public" });
+    if (publicImg && !list.includes(publicImg)) list.push(publicImg);
+    return list;
+  }
+
+  function getGroupCoverSources(group) {
+    if (!group || typeof group !== "object") return [];
+    const list = [];
+    const customImg = normalizeCoverUrl(group.image || group.coverImage || "");
+    if (customImg) list.push(customImg);
+    const localImg = buildLocalCoverPath("groups", group.id);
+    if (localImg && !list.includes(localImg)) list.push(localImg);
+    const publicImg = buildLocalCoverPath("groups", group.id, { prefix: "public" });
+    if (publicImg && !list.includes(publicImg)) list.push(publicImg);
+    return list;
+  }
+
+  function clearCoverCache() {
+    failedCoverUrls.clear();
+  }
+
+  /**
+   * إرفاق صورة غطاء كاملة (object-cover) مع تدرج لوني داكن من الأسفل ومعالج onError يعود للإيموجي واللون دون صورة مكسورة
+   */
+  function attachCoverImage(cardEl, sources, { alt = "", imgClass = "cat-card-cover-img", overlayClass = "cat-card-cover-overlay" } = {}) {
+    if (!cardEl || !Array.isArray(sources) || sources.length === 0) return false;
+    const candidates = sources.filter((src) => typeof src === "string" && src.trim() && !failedCoverUrls.has(src));
+    if (candidates.length === 0) return false;
+
+    const img = document.createElement("img");
+    img.className = imgClass;
+    img.alt = alt || "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.setAttribute("aria-hidden", "true");
+
+    const overlay = document.createElement("div");
+    overlay.className = overlayClass;
+    overlay.setAttribute("aria-hidden", "true");
+
+    cardEl.insertBefore(overlay, cardEl.firstChild);
+    cardEl.insertBefore(img, cardEl.firstChild);
+
+    let idx = 0;
+
+    const markLoaded = () => {
+      if (img.naturalWidth > 0) {
+        loadedCoverUrls.add(candidates[idx]);
+        cardEl.classList.add("has-cover-image");
+      } else {
+        handleError();
+      }
+    };
+
+    const handleError = () => {
+      if (candidates[idx]) {
+        failedCoverUrls.add(candidates[idx]);
+      }
+      idx += 1;
+      if (idx < candidates.length) {
+        img.src = candidates[idx];
+        return;
+      }
+      img.onload = null;
+      img.onerror = null;
+      cardEl.classList.remove("has-cover-image");
+      if (img.parentNode) img.parentNode.removeChild(img);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+
+    img.onload = markLoaded;
+    img.onerror = handleError;
+
+    if (loadedCoverUrls.has(candidates[0])) {
+      cardEl.classList.add("has-cover-image");
+    }
+    img.src = candidates[0];
+    if (img.complete && img.naturalWidth > 0) {
+      markLoaded();
+    }
+    return true;
   }
 
   function shuffle(arr) {
@@ -416,10 +636,17 @@
     getCategoryContentBadges,
     isMediaCategory,
     isCustomCategory,
+    resolveSubGroupInfo,
+    getSubGroupsForMain,
     resolveMainCategoryInfo,
     resolveMainCategoryId,
     buildMainCategoryGroups,
     filterSubcategories,
-    completeRandomSelection
+    completeRandomSelection,
+    buildLocalCoverPath,
+    getCategoryCoverSources,
+    getGroupCoverSources,
+    attachCoverImage,
+    clearCoverCache
   };
 })();

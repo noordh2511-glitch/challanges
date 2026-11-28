@@ -55,6 +55,7 @@
   /** @type {Array<{ id: string, label: string, icon: string }>} */
   const CATEGORY_GROUPS = [
     { id: "all", label: "الكل", icon: "✨" },
+    { id: "movies-series", label: "أفلام ومسلسلات", icon: "🎬" },
     { id: "jordan-arab", label: "الأردن والعرب وإسلاميات", icon: "🇯🇴" },
     { id: "culture-geo", label: "ثقافة وجغرافيا وتاريخ", icon: "🌍" },
     { id: "science-tech", label: "علوم وتقنية وطب", icon: "🔬" },
@@ -65,11 +66,14 @@
     { id: "charades", label: "من غير كلام", icon: "🎭" }
   ];
 
+  const MOVIES_SERIES_SUBGROUP_IDS = new Set(["egyptian-art", "syrian-art", "foreign-cinema"]);
+
   const VALID_CATEGORY_GROUP_IDS = new Set(
     CATEGORY_GROUPS.filter((g) => g.id !== "all").map((g) => g.id)
   );
 
   const GROUP_FALLBACK_COLORS = {
+    "movies-series": "#ec4899",
     "jordan-arab": "#ef4444",
     "culture-geo": "#06b6d4",
     "science-tech": "#8b5cf6",
@@ -226,8 +230,17 @@
 
     if (typeof category.group === "string") {
       const explicitGroup = category.group.trim().toLowerCase();
+      if (MOVIES_SERIES_SUBGROUP_IDS.has(explicitGroup)) {
+        return "movies-series";
+      }
       if (VALID_CATEGORY_GROUP_IDS.has(explicitGroup)) {
         return explicitGroup;
+      }
+    }
+    if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.resolveSubGroupInfo === "function") {
+      const subMeta = window.SeenJeemCategoryBrowser.resolveSubGroupInfo(category);
+      if (subMeta && subMeta.parentMainId) {
+        return subMeta.parentMainId;
       }
     }
 
@@ -1554,6 +1567,7 @@
   state.setupPresetMode = "classic-6"; // "quick-4" | "classic-6" | "surprise-6"
   state.setupWizardStep = 1; // 1 | 2 | 3
   state.activeMainCategoryId = null; // null = Level 1 (Main Cards), string = Level 2 (Subcategories)
+  state.activeSubGroupTab = "all"; // "all" | "egyptian-art" | "syrian-art" | "foreign-cinema"
   state.subSearchQuery = "";
   state.subQuickFilter = "all";
   state.quickFilter = "all"; // "all" | "new" | "media" | "custom" | "favorites"
@@ -1893,6 +1907,7 @@
 
     const breadcrumbBar = document.getElementById("category-breadcrumb-bar");
     const breadcrumbCurrent = document.getElementById("category-breadcrumb-current");
+    const subGroupTabsBar = document.getElementById("category-subgroup-tabs");
     const subToolbar = document.getElementById("category-sub-toolbar");
     const subSearchInput = document.getElementById("subcat-search-input");
     const btnClearSubSearch = document.getElementById("btn-clear-subcat-search");
@@ -1910,6 +1925,7 @@
     // التأكد أن الفئة الرئيسية المفتوحة ما زالت موجودة
     if (state.activeMainCategoryId && !mainGroups.some((g) => g.id === state.activeMainCategoryId)) {
       state.activeMainCategoryId = null;
+      state.activeSubGroupTab = "all";
       state.subSearchQuery = "";
       state.subQuickFilter = "all";
     }
@@ -1919,29 +1935,48 @@
     // المستوى الأول: بطاقات الفئات الرئيسية والدول العربية (عند عدم البحث الشامل وعدم تفعيل فلتر وعدم الدخول لفئة رئيسية)
     if (!isGlobalFlatView && !state.activeMainCategoryId && browser) {
       if (breadcrumbBar) breadcrumbBar.hidden = true;
+      if (subGroupTabsBar) {
+        subGroupTabsBar.hidden = true;
+        subGroupTabsBar.innerHTML = "";
+      }
       if (subToolbar) subToolbar.hidden = true;
       dom.setupCategoriesGrid.classList.add("is-main-level");
 
       mainGroups.forEach((group) => {
         const card = document.createElement("button");
         card.type = "button";
-        card.className = `main-cat-card${group.selectedCount > 0 ? " has-selections" : ""}${group.isCountry ? " is-country-card" : ""}`;
+        card.className = `main-cat-card${group.selectedCount > 0 ? " has-selections" : ""}${group.isCountry ? " is-country-card" : ""}${group.subGroupStats && group.subGroupStats.length > 0 ? " has-subgroups" : ""}`;
         card.style.setProperty("--main-color", group.accent || group.color || "#38bdf8");
         if (group.gradient) {
           card.style.setProperty("--main-gradient", group.gradient);
         }
         card.dataset.mainCatId = group.id;
+
+        const subGroupPreviewHtml =
+          Array.isArray(group.subGroupStats) && group.subGroupStats.length > 0
+            ? `<div class="main-cat-subgroups-preview">${group.subGroupStats
+                .map((sg) => `<span class="main-cat-subgroup-pill">${escapeHtml(sg.icon || "🎬")} ${escapeHtml(sg.label)}</span>`)
+                .join("")}</div>`
+            : "";
+
         card.innerHTML = `
           ${group.selectedCount > 0 ? `<span class="main-cat-sel-badge">✓ ${group.selectedCount} مختارة</span>` : ""}
-          <div class="main-cat-icon" aria-hidden="true">${escapeHtml(group.icon || "📚")}</div>
-          <div class="main-cat-title">${escapeHtml(group.label)}</div>
-          <div class="main-cat-meta">
-            <span>${group.subCount} فئة فرعية</span>
-            <span>🟢 ${group.newQuestionsTotal} سؤال جديد</span>
+          <div class="main-cat-body">
+            <div class="main-cat-icon" aria-hidden="true">${escapeHtml(group.icon || "📚")}</div>
+            <div class="main-cat-title">${escapeHtml(group.label)}</div>
+            ${subGroupPreviewHtml}
+            <div class="main-cat-meta">
+              <span>${group.subCount} فئة فرعية</span>
+              <span>🟢 ${group.newQuestionsTotal} سؤال جديد</span>
+            </div>
           </div>
         `;
+        if (typeof browser.attachCoverImage === "function") {
+          browser.attachCoverImage(card, browser.getGroupCoverSources(group), { alt: group.label });
+        }
         card.addEventListener("click", () => {
           state.activeMainCategoryId = group.id;
+          state.activeSubGroupTab = "all";
           state.subSearchQuery = "";
           state.subQuickFilter = "all";
           if (subSearchInput) subSearchInput.value = "";
@@ -1957,16 +1992,73 @@
     // المستوى الثاني أو نتائج البحث/الفلاتر السريعة: بطاقات الفئات الفرعية
     dom.setupCategoriesGrid.classList.remove("is-main-level");
     const isInSubScope = Boolean(!isGlobalFlatView && state.activeMainCategoryId);
+    const activeGroupObj = isInSubScope ? mainGroups.find((g) => g.id === state.activeMainCategoryId) : null;
 
     if (breadcrumbBar) {
       if (isInSubScope) {
-        const activeGroupObj = mainGroups.find((g) => g.id === state.activeMainCategoryId);
         breadcrumbBar.hidden = false;
         if (breadcrumbCurrent && activeGroupObj) {
           breadcrumbCurrent.textContent = `${activeGroupObj.icon || "📂"} ${activeGroupObj.label}`;
         }
       } else {
         breadcrumbBar.hidden = true;
+      }
+    }
+
+    // شريط التبويبات (Tabs) للمجموعات المجمّعة مثل «أفلام ومسلسلات» (الفن المصري، الفن السوري، مسلسلات وأفلام أجنبية)
+    const activeSubGroups =
+      isInSubScope && activeGroupObj && Array.isArray(activeGroupObj.subGroupStats) && activeGroupObj.subGroupStats.length > 0
+        ? activeGroupObj.subGroupStats
+        : [];
+    const validTabIds = new Set(["all", ...activeSubGroups.map((sg) => sg.id)]);
+    if (!validTabIds.has(state.activeSubGroupTab)) {
+      state.activeSubGroupTab = "all";
+    }
+
+    if (subGroupTabsBar) {
+      if (activeSubGroups.length > 0) {
+        subGroupTabsBar.hidden = false;
+        subGroupTabsBar.innerHTML = "";
+
+        const tabsDef = [
+          {
+            id: "all",
+            label: "الكل",
+            icon: activeGroupObj.icon || "🎬",
+            color: activeGroupObj.accent || activeGroupObj.color || "#ec4899",
+            count: activeGroupObj.subCount,
+            selectedCount: activeGroupObj.selectedCount
+          },
+          ...activeSubGroups
+        ];
+
+        tabsDef.forEach((tabDef) => {
+          const isAct = state.activeSubGroupTab === tabDef.id;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `subgroup-tab-btn${isAct ? " active" : ""}${tabDef.selectedCount > 0 ? " has-selections" : ""}`;
+          btn.setAttribute("role", "tab");
+          btn.setAttribute("aria-selected", String(isAct));
+          btn.dataset.subgroupTabId = tabDef.id;
+          if (tabDef.color) {
+            btn.style.setProperty("--tab-color", tabDef.color);
+          }
+          btn.innerHTML = `
+            <span class="subgroup-tab-icon" aria-hidden="true">${escapeHtml(tabDef.icon || "🎬")}</span>
+            <span class="subgroup-tab-label">${escapeHtml(tabDef.label)}</span>
+            <span class="subgroup-tab-count">${tabDef.count}</span>
+            ${tabDef.id !== "all" && tabDef.selectedCount > 0 ? `<span class="subgroup-tab-sel">✓ ${tabDef.selectedCount}</span>` : ""}
+          `;
+          btn.addEventListener("click", () => {
+            if (state.activeSubGroupTab === tabDef.id) return;
+            state.activeSubGroupTab = tabDef.id;
+            renderSetupScreen();
+          });
+          subGroupTabsBar.appendChild(btn);
+        });
+      } else {
+        subGroupTabsBar.hidden = true;
+        subGroupTabsBar.innerHTML = "";
       }
     }
 
@@ -1995,13 +2087,14 @@
           query: isInSubScope ? state.subSearchQuery : rawSearch,
           quickFilter: isInSubScope ? state.subQuickFilter || "all" : state.quickFilter,
           activeMainId: isInSubScope ? state.activeMainCategoryId : null,
+          activeSubGroupId: isInSubScope && activeSubGroups.length > 0 ? state.activeSubGroupTab || "all" : "all",
           scopeToActiveMain: isInSubScope,
           favoritesList: favList,
           customIdsSet,
           resolveGroupFn: resolveCategoryGroup,
           getNewCountFn: getCategoryNewCount
         })
-      : state.allCategories.map((c) => ({ category: c, mainMeta: { id: "general", label: "", icon: "🎯", color: "#06b6d4" } }));
+      : state.allCategories.map((c) => ({ category: c, mainMeta: { id: "general", label: "", icon: "🎯", color: "#06b6d4" }, subGroupMeta: null }));
 
     if (filteredItems.length === 0) {
       const emptyBox = document.createElement("div");
@@ -2009,8 +2102,8 @@
       emptyBox.innerHTML = isInSubScope
         ? `
           <div class="categories-empty-icon" aria-hidden="true">🔍</div>
-          <div class="categories-empty-title">لا توجد فئات فرعية مطابقة داخل هذه الفئة</div>
-          <div class="categories-empty-desc">جرّب تعديل كلمة البحث أو اختيار فلتر آخر لعرض بقية الفئات الفرعية.</div>
+          <div class="categories-empty-title">لا توجد فئات فرعية مطابقة داخل هذا القسم حالياً</div>
+          <div class="categories-empty-desc">جرّب التبديل إلى تبويب آخر أو تعديل كلمة البحث لعرض بقية الفئات الفرعية.</div>
         `
         : `
           <div class="categories-empty-icon" aria-hidden="true">🔍</div>
@@ -2023,6 +2116,7 @@
       resetBtn.textContent = isInSubScope ? "إظهار جميع الفئات الفرعية" : "عرض كل الفئات الرئيسية";
       resetBtn.addEventListener("click", () => {
         if (isInSubScope) {
+          state.activeSubGroupTab = "all";
           state.subSearchQuery = "";
           state.subQuickFilter = "all";
           if (subSearchInput) subSearchInput.value = "";
@@ -2030,6 +2124,7 @@
           state.searchQuery = "";
           state.quickFilter = "all";
           state.activeMainCategoryId = null;
+          state.activeSubGroupTab = "all";
           if (dom.categorySearchInput) dom.categorySearchInput.value = "";
         }
         renderSetupScreen();
@@ -2040,7 +2135,7 @@
       return;
     }
 
-    filteredItems.forEach(({ category: cat, mainMeta }) => {
+    filteredItems.forEach(({ category: cat, mainMeta, subGroupMeta }) => {
       const isSelected = state.selectedCategoryIds.includes(cat.id);
       const isFav = favSet.has(cat.id);
       const totalCount = Array.isArray(cat.questions) ? cat.questions.length : 0;
@@ -2049,38 +2144,62 @@
       const playedCount = Math.max(0, totalCount - newCount);
       const hasPartialProgress = playedCount > 0 && newCount > 0;
       const playedPercent = totalCount > 0 ? Math.min(100, Math.round((playedCount / totalCount) * 100)) : 0;
-      const accentColor = getCategoryAccentColor(cat, mainMeta ? mainMeta.id : undefined);
+      const accentColor = getCategoryAccentColor(cat, (subGroupMeta && subGroupMeta.color) ? undefined : mainMeta ? mainMeta.id : undefined);
+      const effectiveAccent = (cat && typeof cat.color === "string" && cat.color.trim()) ? cat.color.trim() : (subGroupMeta && subGroupMeta.color) || accentColor;
       const contentBadges = browser ? browser.getCategoryContentBadges(cat) : [];
 
       const card = document.createElement("div");
       card.role = "button";
       card.tabIndex = 0;
       card.className = `setup-cat-card${isSelected ? " selected" : ""}${isCompleted ? " is-completed-cat" : ""}`;
-      card.style.setProperty("--cat-color", accentColor);
+      card.style.setProperty("--cat-color", effectiveAccent);
       card.setAttribute("aria-pressed", String(isSelected));
       card.dataset.categoryId = cat.id;
 
       const countClass = isCompleted ? "empty" : newCount < totalCount ? "low" : "";
       const countText = isCompleted ? "مكتملة ✓" : `🟢 ${newCount} سؤال جديد`;
 
+      const parentTagHtml =
+        isGlobalFlatView && mainMeta && mainMeta.label
+          ? `<div class="setup-cat-parent-tag">${
+              subGroupMeta
+                ? `${escapeHtml(subGroupMeta.icon || "🎬")} ${escapeHtml(subGroupMeta.label)}`
+                : `${escapeHtml(mainMeta.icon || "📂")} ${escapeHtml(mainMeta.label)}`
+            }</div>`
+          : isInSubScope && state.activeSubGroupTab === "all" && subGroupMeta
+            ? `<div class="setup-cat-parent-tag">${escapeHtml(subGroupMeta.icon || "🎬")} ${escapeHtml(subGroupMeta.label)}</div>`
+            : "";
+
+      const descHtml =
+        typeof cat.description === "string" && cat.description.trim()
+          ? `<div class="setup-cat-desc">${escapeHtml(cat.description.trim())}</div>`
+          : "";
+
       card.innerHTML = `
         <button type="button" class="setup-cat-fav-btn${isFav ? " is-fav" : ""}" data-fav-cat-id="${escapeHtml(cat.id)}" title="${isFav ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}" aria-label="${isFav ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}">
           ${isFav ? "⭐" : "☆"}
         </button>
         <span class="setup-cat-check" aria-hidden="true">✓</span>
-        <div class="setup-cat-icon">${escapeHtml(cat.icon || "🎯")}</div>
-        <div class="setup-cat-name">${escapeHtml(cat.name)}</div>
-        ${isGlobalFlatView && mainMeta && mainMeta.label ? `<div class="setup-cat-parent-tag">${escapeHtml(mainMeta.icon || "📂")} ${escapeHtml(mainMeta.label)}</div>` : ""}
-        <div class="setup-cat-badges-row">
-          ${contentBadges.map((b) => `<span class="cat-content-badge">${b.icon} ${b.label}</span>`).join("")}
+        <div class="setup-cat-body">
+          <div class="setup-cat-icon">${escapeHtml(cat.icon || "🎯")}</div>
+          <div class="setup-cat-name">${escapeHtml(cat.name)}</div>
+          ${descHtml}
+          ${parentTagHtml}
+          <div class="setup-cat-badges-row">
+            ${contentBadges.map((b) => `<span class="cat-content-badge">${b.icon} ${b.label}</span>`).join("")}
+          </div>
+          <div class="setup-cat-count ${countClass}">${countText}</div>
+          ${
+            hasPartialProgress
+              ? `<div class="setup-cat-progress-track" aria-hidden="true" title="تم لعب ${playedCount} من ${totalCount}"><div class="setup-cat-progress-fill" style="width: ${playedPercent}%"></div></div>`
+              : ""
+          }
         </div>
-        <div class="setup-cat-count ${countClass}">${countText}</div>
-        ${
-          hasPartialProgress
-            ? `<div class="setup-cat-progress-track" aria-hidden="true" title="تم لعب ${playedCount} من ${totalCount}"><div class="setup-cat-progress-fill" style="width: ${playedPercent}%"></div></div>`
-            : ""
-        }
       `;
+
+      if (browser && typeof browser.attachCoverImage === "function") {
+        browser.attachCoverImage(card, browser.getCategoryCoverSources(cat), { alt: cat.name });
+      }
 
       const favBtn = card.querySelector(".setup-cat-fav-btn");
       if (favBtn) {
@@ -2404,6 +2523,16 @@
     copy.icon = typeof cat.icon === "string" && cat.icon.trim() ? cat.icon.trim() : "🎯";
     copy.color = typeof cat.color === "string" && cat.color.trim() ? cat.color.trim() : "";
     copy.description = typeof cat.description === "string" ? cat.description.trim() : "";
+    if (typeof cat.image === "string" && cat.image.trim()) {
+      copy.image = cat.image.trim();
+    } else {
+      delete copy.image;
+    }
+    if (typeof cat.mainCategory === "string" && cat.mainCategory.trim()) {
+      copy.mainCategory = cat.mainCategory.trim();
+    } else {
+      delete copy.mainCategory;
+    }
     if (typeof cat.group === "string" && cat.group.trim()) {
       copy.group = cat.group.trim().toLowerCase();
     } else {
@@ -2543,6 +2672,12 @@
         if (!existingById.group && typeof cat.group === "string" && cat.group.trim()) {
           existingById.group = cat.group.trim().toLowerCase();
         }
+        if (!existingById.image && typeof cat.image === "string" && cat.image.trim()) {
+          existingById.image = cat.image.trim();
+        }
+        if (!existingById.mainCategory && typeof cat.mainCategory === "string" && cat.mainCategory.trim()) {
+          existingById.mainCategory = cat.mainCategory.trim();
+        }
         return;
       }
 
@@ -2551,6 +2686,12 @@
       if (existingByName) {
         if (!existingByName.group && typeof cat.group === "string" && cat.group.trim()) {
           existingByName.group = cat.group.trim().toLowerCase();
+        }
+        if (!existingByName.image && typeof cat.image === "string" && cat.image.trim()) {
+          existingByName.image = cat.image.trim();
+        }
+        if (!existingByName.mainCategory && typeof cat.mainCategory === "string" && cat.mainCategory.trim()) {
+          existingByName.mainCategory = cat.mainCategory.trim();
         }
         if (catId !== existingByName.id) {
           idRedirect.set(catId, existingByName.id);
@@ -2789,6 +2930,10 @@
       state.sheetsSourceState = "live";
 
       sanitizer.saveCachedSheetsBank(parsed.categories, parsed.diagnostics, syncedAt);
+
+      if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.clearCoverCache === "function") {
+        window.SeenJeemCategoryBrowser.clearCoverCache();
+      }
 
       rebuildMergedCategories();
       if (dom.setupScreen.classList.contains("active")) {
@@ -4187,10 +4332,19 @@
       const headerEl = document.createElement("div");
       headerEl.className = "board-cat-header";
       headerEl.innerHTML = `
-        <div class="board-cat-icon-badge" aria-hidden="true">${escapeHtml(cat.icon || "🎯")}</div>
-        <h3 class="board-cat-title" title="${escapeHtml(cat.name)}">${escapeHtml(cat.name)}</h3>
-        <span class="board-cat-progress">${remainingInCat} / 6</span>
+        <div class="board-cat-header-content">
+          <div class="board-cat-icon-badge" aria-hidden="true">${escapeHtml(cat.icon || "🎯")}</div>
+          <h3 class="board-cat-title" title="${escapeHtml(cat.name)}">${escapeHtml(cat.name)}</h3>
+          <span class="board-cat-progress">${remainingInCat} / 6</span>
+        </div>
       `;
+      if (window.SeenJeemCategoryBrowser && typeof window.SeenJeemCategoryBrowser.attachCoverImage === "function") {
+        window.SeenJeemCategoryBrowser.attachCoverImage(
+          headerEl,
+          window.SeenJeemCategoryBrowser.getCategoryCoverSources(cat),
+          { alt: cat.name }
+        );
+      }
 
       const tilesGrid = document.createElement("div");
       tilesGrid.className = "board-tiles-grid";
@@ -7934,7 +8088,8 @@
           id: bc.category.id,
           name: bc.category.name,
           icon: bc.category.icon || "🎯",
-          color: getCategoryAccentColor(bc.category)
+          color: getCategoryAccentColor(bc.category),
+          image: typeof bc.category.image === "string" ? bc.category.image : ""
         },
         remainingInCat,
         rightColumn: bc.rightColumn.map(mapSlot),
@@ -14502,6 +14657,7 @@
     if (btnBackToMainCats) {
       btnBackToMainCats.addEventListener("click", () => {
         state.activeMainCategoryId = null;
+        state.activeSubGroupTab = "all";
         state.subSearchQuery = "";
         state.subQuickFilter = "all";
         const subInp = document.getElementById("subcat-search-input");

@@ -54,9 +54,79 @@
       gradient: raw.gradient || buildGradient(accent),
       isCountry: Boolean(raw.isCountry),
       order: Number(raw.order) || 100,
-      aliases: Object.freeze(Array.isArray(raw.aliases) ? raw.aliases : [])
+      aliases: Object.freeze(Array.isArray(raw.aliases) ? raw.aliases : []),
+      subGroups: Object.freeze(Array.isArray(raw.subGroups) ? raw.subGroups : [])
     });
   }
+
+  /* =========================================================
+     المجموعات الفرعية (التبويبات) للمجموعة المجمّعة «أفلام ومسلسلات»
+     ========================================================= */
+  const MOVIES_SERIES_SUBGROUPS = Object.freeze([
+    Object.freeze({
+      id: "egyptian-art",
+      label: "الفن المصري",
+      icon: "🇪🇬",
+      color: "#f59e0b",
+      parentMainId: "movies-series",
+      aliases: Object.freeze([
+        "egyptian-art",
+        "egyptian-cinema",
+        "الفن المصري",
+        "فن مصري",
+        "السينما المصرية",
+        "الفن والسينما المصرية",
+        "أفلام مصرية",
+        "افلام مصريه",
+        "مسلسلات مصرية",
+        "مسلسلات مصريه"
+      ])
+    }),
+    Object.freeze({
+      id: "syrian-art",
+      label: "الفن السوري",
+      icon: "🇸🇾",
+      color: "#e11d48",
+      parentMainId: "movies-series",
+      aliases: Object.freeze([
+        "syrian-art",
+        "syrian-drama",
+        "الفن السوري",
+        "فن سوري",
+        "الدراما السورية",
+        "دراما سورية",
+        "مسلسلات سورية",
+        "مسلسلات سوريه",
+        "أفلام سورية",
+        "افلام سوريه"
+      ])
+    }),
+    Object.freeze({
+      id: "foreign-cinema",
+      label: "مسلسلات وأفلام أجنبية",
+      icon: "🍿",
+      color: "#8b5cf6",
+      parentMainId: "movies-series",
+      aliases: Object.freeze([
+        "foreign-cinema",
+        "world-cinema",
+        "world-cinema-anime",
+        "مسلسلات وأفلام أجنبية",
+        "مسلسلات وافلام اجنبية",
+        "مسلسلات وأفلام اجنبية",
+        "أفلام ومسلسلات أجنبية",
+        "افلام ومسلسلات اجنبية",
+        "السينما العالمية",
+        "سينما عالمية",
+        "السينما العالمية والأنمي",
+        "السينما العالمية والانمي",
+        "أفلام أجنبية",
+        "افلام اجنبية",
+        "مسلسلات أجنبية",
+        "مسلسلات اجنبية"
+      ])
+    })
+  ]);
 
   /* =========================================================
      أ) بطاقات الدول العربية الـ 22 (كل دولة كبطاقة فئة رئيسية مستقلة)
@@ -94,9 +164,24 @@
   const MAIN_THEMES = Object.freeze(
     [
       { id: "custom-packs", label: "فئاتي الخاصة", icon: "✨", accent: "#f59e0b", order: 1, aliases: ["فئاتي الخاصة", "فئات خاصة", "فئاتي", "custom", "custom-packs"] },
-      { id: "egyptian-cinema", label: "الفن والسينما المصرية", icon: "🎬", accent: "#ec4899", order: 10, aliases: ["الفن والسينما المصرية", "السينما المصرية", "أفلام مصرية", "افلام مصريه", "فن وسينما مصرية"] },
+      {
+        id: "movies-series",
+        label: "أفلام ومسلسلات",
+        icon: "🎬",
+        accent: "#ec4899",
+        order: 9,
+        subGroups: MOVIES_SERIES_SUBGROUPS,
+        aliases: [
+          "أفلام ومسلسلات",
+          "افلام ومسلسلات",
+          "مسلسلات وأفلام",
+          "مسلسلات وافلام",
+          "movies-series",
+          "movies",
+          "series"
+        ]
+      },
       { id: "arab-drama", label: "الدراما العربية", icon: "📺", accent: "#a855f7", order: 11, aliases: ["الدراما العربية", "دراما عربية", "مسلسلات عربية", "الدراما والمسلسلات العربية"] },
-      { id: "world-cinema-anime", label: "السينما العالمية والأنمي", icon: "🍿", accent: "#f43f5e", order: 12, aliases: ["السينما العالمية والأنمي", "السينما العالمية والانمي", "سينما عالمية", "أنمي", "انمي", "افلام عالمية"] },
       { id: "football-sports", label: "كرة القدم والرياضة", icon: "⚽", accent: "#10b981", order: 13, aliases: ["كرة القدم والرياضة", "كره القدم والرياضه", "رياضة وكرة قدم", "كرة القدم", "رياضة"] },
       { id: "music-songs", label: "الموسيقى والأغاني", icon: "🎵", accent: "#8b5cf6", order: 14, aliases: ["الموسيقى والأغاني", "الموسيقي والاغاني", "موسيقى وأغاني", "أغاني", "موسيقى"] },
       { id: "geo-science-culture", label: "جغرافيا وعلوم وثقافة عامة", icon: "🌍", accent: "#06b6d4", order: 15, aliases: ["جغرافيا وعلوم وثقافة عامة", "ثقافة عامة وعلوم وجغرافيا", "ثقافة وجغرافيا وعلوم"] },
@@ -120,6 +205,8 @@
 
   const BY_ID = new Map();
   const BY_KEY = new Map();
+  const SUBGROUP_BY_ID = new Map();
+  const SUBGROUP_BY_KEY = new Map();
 
   ALL_THEMES.forEach((entry) => {
     BY_ID.set(entry.id.toLowerCase(), entry);
@@ -131,6 +218,32 @@
       const noAl = stripLeadingAl(n);
       if (noAl && !BY_KEY.has(noAl)) BY_KEY.set(noAl, entry);
     });
+
+    if (Array.isArray(entry.subGroups) && entry.subGroups.length > 0) {
+      entry.subGroups.forEach((sg) => {
+        const sgIdLower = String(sg.id || "").toLowerCase();
+        if (sgIdLower) {
+          SUBGROUP_BY_ID.set(sgIdLower, sg);
+          if (!BY_ID.has(sgIdLower)) BY_ID.set(sgIdLower, entry);
+        }
+        const sgNames = [sg.id, sg.label, ...(Array.isArray(sg.aliases) ? sg.aliases : [])];
+        sgNames.forEach((name) => {
+          const lowerRaw = String(name || "").trim().toLowerCase();
+          if (lowerRaw && !SUBGROUP_BY_ID.has(lowerRaw)) {
+            SUBGROUP_BY_ID.set(lowerRaw, sg);
+          }
+          const n = normalizeArabic(name);
+          if (!n) return;
+          if (!SUBGROUP_BY_KEY.has(n)) SUBGROUP_BY_KEY.set(n, sg);
+          if (!BY_KEY.has(n)) BY_KEY.set(n, entry);
+          const noAl = stripLeadingAl(n);
+          if (noAl) {
+            if (!SUBGROUP_BY_KEY.has(noAl)) SUBGROUP_BY_KEY.set(noAl, sg);
+            if (!BY_KEY.has(noAl)) BY_KEY.set(noAl, entry);
+          }
+        });
+      });
+    }
   });
 
   const FALLBACK_PALETTE = Object.freeze([
@@ -193,13 +306,33 @@
     return found ? found.order : 500;
   }
 
+  function resolveSubGroup(rawNameOrId) {
+    const raw = typeof rawNameOrId === "string" ? rawNameOrId.trim() : "";
+    if (!raw) return null;
+    const lower = raw.toLowerCase();
+    if (SUBGROUP_BY_ID.has(lower)) return SUBGROUP_BY_ID.get(lower);
+    const norm = normalizeArabic(raw);
+    if (norm && SUBGROUP_BY_KEY.has(norm)) return SUBGROUP_BY_KEY.get(norm);
+    const noAl = stripLeadingAl(norm);
+    if (noAl && SUBGROUP_BY_KEY.has(noAl)) return SUBGROUP_BY_KEY.get(noAl);
+    return null;
+  }
+
+  function getSubGroupsForMain(mainId) {
+    const found = BY_ID.get(String(mainId || "").toLowerCase());
+    return found && Array.isArray(found.subGroups) ? found.subGroups : [];
+  }
+
   window.SeenJeemCategoryThemes = {
     ARAB_COUNTRIES,
     MAIN_THEMES,
     ALL_THEMES,
+    MOVIES_SERIES_SUBGROUPS,
     normalizeArabic,
     stripLeadingAl,
     resolveTheme,
+    resolveSubGroup,
+    getSubGroupsForMain,
     isArabCountry,
     getOrderIndex,
     buildGradient
