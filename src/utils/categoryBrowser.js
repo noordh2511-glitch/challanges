@@ -466,8 +466,6 @@
     if (customImg) list.push(customImg);
     const localImg = buildLocalCoverPath("categories", category.id);
     if (localImg && !list.includes(localImg)) list.push(localImg);
-    const publicImg = buildLocalCoverPath("categories", category.id, { prefix: "public" });
-    if (publicImg && !list.includes(publicImg)) list.push(publicImg);
     return list;
   }
 
@@ -478,8 +476,6 @@
     if (customImg) list.push(customImg);
     const localImg = buildLocalCoverPath("groups", group.id);
     if (localImg && !list.includes(localImg)) list.push(localImg);
-    const publicImg = buildLocalCoverPath("groups", group.id, { prefix: "public" });
-    if (publicImg && !list.includes(publicImg)) list.push(publicImg);
     return list;
   }
 
